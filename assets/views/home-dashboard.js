@@ -232,35 +232,224 @@ function hmTile({ label, big, sub, visual, list, stats, settings }) {
   </article>`;
 }
 
-function hmTiles() {
-  const dayMs = 24 * 60 * 60 * 1000;
+// ---- Настройка карточек: какие показывать, что в них выводить, в каком порядке ---------------
+// Хранится в localStorage (по аналогии с SIDEBAR_COLLAPSED_KEY в app.js): состояние чисто UI,
+// не влияет на данные и не синхронизируется между админами/устройствами — допущение прототипа.
+const HM_CARDS_STORAGE_KEY = "hm-dashboard-cards-v1";
+// Карточки, включённые на главной по умолчанию (как было изначально) — остальные
+// доступны в настройках, но появляются на дашборде только когда админ их включит.
+const HM_DEFAULT_VISIBLE_IDS = ["clients", "companies", "operations", "accounts", "eod", "events"];
+const HM_CARD_IDS = [...HM_DEFAULT_VISIBLE_IDS, "payments", "exchanges", "discrepancies", "partners", "currencies"];
+const HM_METRIC_OPTIONS = {
+  clients: ["total", "users", "companies", "byStatus", "byRisk"],
+  companies: ["total", "today", "byStatus", "byRisk"],
+  operations: ["today", "week", "byType"],
+  accounts: ["top", "count"],
+  eod: ["progress", "discrepancies"],
+  events: ["today", "critical", "bySeverity"],
+  payments: ["today", "week", "byStatus"],
+  exchanges: ["today", "week"],
+  discrepancies: ["open", "byType"],
+  partners: ["total", "byStatus"],
+  currencies: ["active", "disabled"],
+};
+
+function hmCardMeta() {
+  return {
+    clients: { label: t("nav.clients"), list: "#/clients-users", stats: "#/analytics-users", settings: "#/settings-verif-kyc" },
+    companies: { label: t("nav.clients-companies"), list: "#/clients-companies", stats: "#/analytics-users", settings: "#/settings-verif-kyb" },
+    operations: { label: t("nav.operations"), list: "#/operations-payments", stats: "#/analytics-operations", settings: "#/settings-tariffs-catalog" },
+    accounts: { label: t("home.volumeTitle"), list: "#/accounts-virtual", stats: "#/analytics-accounts", settings: "#/settings-vabs-currencies" },
+    eod: { label: t("nav.eod"), list: "#/eod-dashboard", stats: "#/analytics-eod", settings: "#/settings-eod-day" },
+    events: { label: t("home.eventsTitle"), list: "#/security-audit-logs", stats: "#/analytics-events", settings: "#/settings-kyt-configs" },
+    payments: { label: t("nav.operations-payments"), list: "#/operations-payments", stats: "#/analytics-operations", settings: "#/settings-tariffs-catalog" },
+    exchanges: { label: t("nav.operations-exchanges"), list: "#/operations-exchanges", stats: "#/analytics-operations", settings: "#/settings-rates" },
+    discrepancies: { label: t("nav.eod-discrepancies"), list: "#/eod-discrepancies", stats: "#/analytics-eod", settings: "#/settings-eod-reconciliation" },
+    partners: { label: t("nav.clients-partners"), list: "#/clients-partners", stats: null, settings: null },
+    currencies: { label: t("nav.settings-vabs-currencies"), list: "#/settings-vabs-currencies", stats: null, settings: null },
+  };
+}
+
+function hmDefaultCardConfig() {
+  return HM_CARD_IDS.map((id) => ({ id, visible: HM_DEFAULT_VISIBLE_IDS.includes(id), metric: HM_METRIC_OPTIONS[id][0] }));
+}
+
+function hmLoadCardConfig() {
+  try {
+    const raw = localStorage.getItem(HM_CARDS_STORAGE_KEY);
+    if (!raw) return hmDefaultCardConfig();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return hmDefaultCardConfig();
+    const seen = new Set();
+    const out = [];
+    parsed.forEach((c) => {
+      if (!c || !HM_METRIC_OPTIONS[c.id] || seen.has(c.id)) return;
+      seen.add(c.id);
+      const opts = HM_METRIC_OPTIONS[c.id];
+      out.push({ id: c.id, visible: c.visible !== false, metric: opts.includes(c.metric) ? c.metric : opts[0] });
+    });
+    HM_CARD_IDS.forEach((id) => { if (!seen.has(id)) out.push({ id, visible: HM_DEFAULT_VISIBLE_IDS.includes(id), metric: HM_METRIC_OPTIONS[id][0] }); });
+    return out;
+  } catch (e) {
+    return hmDefaultCardConfig();
+  }
+}
+
+function hmSaveCardConfig(cfg) {
+  try {
+    localStorage.setItem(HM_CARDS_STORAGE_KEY, JSON.stringify(cfg));
+  } catch (e) {
+    // localStorage недоступен — настройка просто не сохранится между визитами, не критично для прототипа
+  }
+}
+
+// Общая палитра для донатов-разбивок без семантической окраски (статусы платежей,
+// типы сверки, статусы партнёров) — циклом, в отличие от AN_STATUS_COLORS/AN_RISK_COLORS
+// (analytics.js), где цвет привязан к конкретному значению енама.
+const HM_PALETTE = ["var(--color-brand)", "var(--color-info)", "var(--color-warning)", "var(--color-danger)", "var(--color-success)", "var(--color-text-tertiary)"];
+
+// Разбивка по категориям → тайл показывает самую крупную категорию числом и её долю,
+// донат — всё распределение целиком (та же форма, что hmDonut уже использует в accTile).
+function hmBreakdownMetric(counts, labelFn, colorFn) {
+  const entries = Object.keys(counts)
+    .map((k, i) => ({ key: k, value: counts[k], color: colorFn ? colorFn(k, i) : HM_PALETTE[i % HM_PALETTE.length] }))
+    .filter((e) => e.value > 0)
+    .sort((a, b) => b.value - a.value);
+  if (!entries.length) return { big: "—", sub: dh("common.noData"), visual: "" };
+  const total = entries.reduce((n, e) => n + e.value, 0);
+  const top = entries[0];
+  const pct = total ? Math.round((top.value / total) * 100) : 0;
+  return {
+    big: top.value.toLocaleString("ru-RU"),
+    sub: `${labelFn(top.key)} · ${pct}%`,
+    visual: hmDonut(entries.map((e) => ({ value: e.value, color: e.color }))),
+  };
+}
+
+function hmClientsMetric(metric) {
   const users = CLIENTS_USERS_MOCK;
   const companies = CLIENTS_COMPANIES_MOCK;
-  const regs = hmDaily([...users, ...companies].map((c) => c.createdDate).filter(Boolean));
-  const clientsTile = hmTile({
-    label: t("nav.clients"), big: (users.length + companies.length).toLocaleString("ru-RU"),
-    sub: `${hmDelta(regs)} ${t("home.newWeek")(regs.reduce((n, v) => n + v, 0))}`, visual: hmSpark(regs),
-    list: "#/clients-users", stats: "#/analytics-users", settings: "#/settings-verif-kyc",
-  });
+  if (metric === "users") {
+    const d = hmDaily(users.map((u) => u.createdDate).filter(Boolean));
+    return { big: users.length.toLocaleString("ru-RU"), sub: `${hmDelta(d)} ${t("home.newWeek")(d.reduce((n, v) => n + v, 0))}`, visual: hmSpark(d) };
+  }
+  if (metric === "companies") {
+    const d = hmDaily(companies.map((c) => c.createdDate).filter(Boolean));
+    return { big: companies.length.toLocaleString("ru-RU"), sub: `${hmDelta(d)} ${t("home.newWeek")(d.reduce((n, v) => n + v, 0))}`, visual: hmSpark(d) };
+  }
+  if (metric === "byStatus") {
+    const counts = {};
+    users.forEach((u) => { counts[u.kycStatus] = (counts[u.kycStatus] || 0) + 1; });
+    return hmBreakdownMetric(counts, kycStatusLabel, (k) => AN_STATUS_COLORS[k] || "var(--color-text-tertiary)");
+  }
+  if (metric === "byRisk") {
+    const counts = {};
+    users.forEach((u) => { const lvl = u.scoringProfile && u.scoringProfile.scoringRiskLevel; if (lvl) counts[lvl] = (counts[lvl] || 0) + 1; });
+    companies.forEach((c) => { if (c.scoringRiskLevel) counts[c.scoringRiskLevel] = (counts[c.scoringRiskLevel] || 0) + 1; });
+    return hmBreakdownMetric(counts, riskLevelLabel, (k) => AN_RISK_COLORS[k] || "var(--color-text-tertiary)");
+  }
+  const d = hmDaily([...users, ...companies].map((c) => c.createdDate).filter(Boolean));
+  return { big: (users.length + companies.length).toLocaleString("ru-RU"), sub: `${hmDelta(d)} ${t("home.newWeek")(d.reduce((n, v) => n + v, 0))}`, visual: hmSpark(d) };
+}
 
-  const companiesDaily = hmDaily(companies.map((c) => c.createdDate).filter(Boolean));
-  const companiesTile = hmTile({
-    label: t("nav.clients-companies"), big: companies.length.toLocaleString("ru-RU"),
-    sub: `${hmDelta(companiesDaily)} ${t("home.newWeek")(companiesDaily.reduce((n, v) => n + v, 0))}`, visual: hmSpark(companiesDaily),
-    list: "#/clients-companies", stats: "#/analytics-users", settings: "#/settings-verif-kyb",
-  });
+function hmCompaniesMetric(metric) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const companies = CLIENTS_COMPANIES_MOCK;
+  const d = hmDaily(companies.map((c) => c.createdDate).filter(Boolean));
+  if (metric === "today") {
+    const today = companies.filter((c) => c.createdDate && MOCK_NOW - c.createdDate <= dayMs).length;
+    return { big: today.toLocaleString("ru-RU"), sub: t("home.newTodaySub"), visual: hmSpark(d) };
+  }
+  if (metric === "byStatus") {
+    const counts = {};
+    companies.forEach((c) => { const s = c.currentKYBLevelStatusV2 ? c.currentKYBLevelStatusV2.status : "NOT_CONNECTED"; counts[s] = (counts[s] || 0) + 1; });
+    return hmBreakdownMetric(counts, kybStatusLabel, (k) => AN_STATUS_COLORS[k] || "var(--color-text-tertiary)");
+  }
+  if (metric === "byRisk") {
+    const counts = {};
+    companies.forEach((c) => { if (c.scoringRiskLevel) counts[c.scoringRiskLevel] = (counts[c.scoringRiskLevel] || 0) + 1; });
+    return hmBreakdownMetric(counts, riskLevelLabel, (k) => AN_RISK_COLORS[k] || "var(--color-text-tertiary)");
+  }
+  return { big: companies.length.toLocaleString("ru-RU"), sub: `${hmDelta(d)} ${t("home.newWeek")(d.reduce((n, v) => n + v, 0))}`, visual: hmSpark(d) };
+}
 
+function hmOperationsMetric(metric) {
+  const dayMs = 24 * 60 * 60 * 1000;
   const ops = [...OPERATIONS_PAYMENTS_MOCK, ...OPERATIONS_EXCHANGES_MOCK];
-  const opsDaily = hmDaily(ops.map((r) => r.createdDate));
-  const opsTile = hmTile({
-    label: t("nav.operations"), big: ops.filter((r) => MOCK_NOW - r.createdDate <= dayMs).length.toLocaleString("ru-RU"),
-    sub: `${hmDelta(opsDaily)} ${t("home.opsWeek")}`, visual: hmSpark(opsDaily),
-    list: "#/operations-payments", stats: "#/analytics-operations", settings: "#/settings-tariffs-catalog",
-  });
+  const d = hmDaily(ops.map((r) => r.createdDate));
+  if (metric === "week") {
+    const week = d.reduce((n, v) => n + v, 0);
+    return { big: week.toLocaleString("ru-RU"), sub: t("home.opsWeekTotalSub"), visual: hmSpark(d) };
+  }
+  if (metric === "byType") {
+    const counts = { payments: OPERATIONS_PAYMENTS_MOCK.length, exchanges: OPERATIONS_EXCHANGES_MOCK.length };
+    return hmBreakdownMetric(counts, (k) => t(`nav.operations-${k}`), (k, i) => HM_PALETTE[i]);
+  }
+  return { big: ops.filter((r) => MOCK_NOW - r.createdDate <= dayMs).length.toLocaleString("ru-RU"), sub: `${hmDelta(d)} ${t("home.opsWeek")}`, visual: hmSpark(d) };
+}
 
-  // Объём по счетам: остатки активных виртуальных счетов (обязательства перед
-  // клиентами; реальные учитывают те же деньги у провайдеров — складывать нельзя).
-  // Валюты между собой не суммируем: крупно — главная по объёму, ниже — остальные.
+function hmPaymentsMetric(metric) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const rows = OPERATIONS_PAYMENTS_MOCK;
+  const d = hmDaily(rows.map((r) => r.createdDate));
+  if (metric === "week") {
+    const week = d.reduce((n, v) => n + v, 0);
+    return { big: week.toLocaleString("ru-RU"), sub: t("home.opsWeekTotalSub"), visual: hmSpark(d) };
+  }
+  if (metric === "byStatus") {
+    const counts = {};
+    rows.forEach((r) => { counts[r.status] = (counts[r.status] || 0) + 1; });
+    return hmBreakdownMetric(counts, paymentStatusLabel);
+  }
+  return { big: rows.filter((r) => MOCK_NOW - r.createdDate <= dayMs).length.toLocaleString("ru-RU"), sub: `${hmDelta(d)} ${t("home.opsWeek")}`, visual: hmSpark(d) };
+}
+
+function hmExchangesMetric(metric) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const rows = OPERATIONS_EXCHANGES_MOCK;
+  const d = hmDaily(rows.map((r) => r.createdDate));
+  if (metric === "week") {
+    const week = d.reduce((n, v) => n + v, 0);
+    return { big: week.toLocaleString("ru-RU"), sub: t("home.opsWeekTotalSub"), visual: hmSpark(d) };
+  }
+  return { big: rows.filter((r) => MOCK_NOW - r.createdDate <= dayMs).length.toLocaleString("ru-RU"), sub: `${hmDelta(d)} ${t("home.opsWeek")}`, visual: hmSpark(d) };
+}
+
+function hmDiscrepanciesMetric(metric) {
+  const rows = EOD_DISCREPANCIES;
+  const d = hmDaily(rows.map((r) => r.createdDate));
+  if (metric === "byType") {
+    const counts = {};
+    rows.forEach((r) => { counts[r.reconciliationType] = (counts[r.reconciliationType] || 0) + 1; });
+    return hmBreakdownMetric(counts, (k) => eodEnum("reconType", k));
+  }
+  const open = rows.filter(eodIsOpenDiscrepancy).length;
+  return { big: open.toLocaleString("ru-RU"), sub: `${rows.length} ${t("home.discrepanciesTotalSub")}`, visual: hmSpark(d) };
+}
+
+function hmPartnersMetric(metric) {
+  if (metric === "byStatus") {
+    const counts = {};
+    PN_SERVICES.forEach((s) => { counts[s.status] = (counts[s.status] || 0) + 1; });
+    return hmBreakdownMetric(counts, (k) => pn(`status.${k}`));
+  }
+  const approved = PN_SERVICES.filter((s) => s.status === "APPROVED").length;
+  return { big: PN_SERVICES.length.toLocaleString("ru-RU"), sub: `${approved} ${pn("status.APPROVED")}`, visual: "" };
+}
+
+function hmCurrenciesMetric(metric) {
+  const active = VB_CURRENCIES.filter((c) => c.status === "ACTIVE").length;
+  const disabled = VB_CURRENCIES.filter((c) => c.status === "DISABLED").length;
+  if (metric === "disabled") {
+    return { big: disabled.toLocaleString("ru-RU"), sub: t("home.currenciesDisabledSub"), visual: "" };
+  }
+  return { big: active.toLocaleString("ru-RU"), sub: `${VB_CURRENCIES.length} ${t("home.currenciesTotalSub")}`, visual: "" };
+}
+
+// Объём по счетам: остатки активных виртуальных счетов (обязательства перед клиентами;
+// реальные учитывают те же деньги у провайдеров — складывать нельзя). Валюты между собой
+// не суммируем: крупно — главная по объёму, ниже — остальные.
+function hmAccountsMetric(metric) {
   const byCurrency = {};
   const accCount = {};
   accAllAccounts().filter((a) => a.kind === "virtual" && a.status === "ACTIVE").forEach((a) => a.balances.forEach((b) => {
@@ -275,39 +464,202 @@ function hmTiles() {
   const restCur = cur.slice(3);
   const donut = top.map((x, i) => ({ value: x.n, color: palette[i] }));
   if (restCur.length) donut.push({ value: restCur.reduce((n, x) => n + x.n, 0), color: "var(--color-text-tertiary)" });
+  if (metric === "count") {
+    const totalAccounts = cur.reduce((n, x) => n + x.n, 0);
+    return { big: totalAccounts.toLocaleString("ru-RU"), sub: t("home.accountsCountSub"), visual: top.length ? hmDonut(donut) : "" };
+  }
   const subParts = top.slice(1).map((x) => `${compact(x.v)} ${x.c}`);
   if (restCur.length) subParts.push(t("home.otherCurrencies")(restCur.length));
-  const accTile = hmTile({
-    label: t("home.volumeTitle"), big: top.length ? `${compact(top[0].v)} <span class="hm-tile-unit">${top[0].c}</span>` : "—",
+  return {
+    big: top.length ? `${compact(top[0].v)} <span class="hm-tile-unit">${top[0].c}</span>` : "—",
     sub: subParts.join(" · ") || dh("common.noData"),
     visual: top.length ? hmDonut(donut) : "",
-    list: "#/accounts-virtual", stats: "#/analytics-accounts", settings: "#/settings-vabs-currencies",
-  });
+  };
+}
+
+function hmEodMetric(metric) {
   const day = eodActiveDay();
-  let eodTile;
-  if (day) {
-    const stages = eodStagesOf(day);
-    const done = stages.filter((s) => s.status === "COMPLETED").length;
-    const open = EOD_DISCREPANCIES.filter(eodIsOpenDiscrepancy).length;
-    eodTile = hmTile({
-      label: t("nav.eod"), big: eodDayDate(day), sub: `${eodEnum("status", day.status)} · ${open} ${t("home.discShort")}`,
-      visual: hmRing(done / stages.length, `${done}/${stages.length}`),
-      list: "#/eod-dashboard", stats: "#/analytics-eod", settings: "#/settings-eod-day",
-    });
-  } else {
-    eodTile = hmTile({ label: t("nav.eod"), big: "—", sub: dh("common.noData"), visual: "", list: "#/eod-dashboard", stats: "#/analytics-eod", settings: "#/settings-eod-day" });
+  if (!day) return { big: "—", sub: dh("common.noData"), visual: "" };
+  const stages = eodStagesOf(day);
+  const done = stages.filter((s) => s.status === "COMPLETED").length;
+  const open = EOD_DISCREPANCIES.filter(eodIsOpenDiscrepancy).length;
+  const ring = hmRing(done / stages.length, `${done}/${stages.length}`);
+  if (metric === "discrepancies") {
+    return { big: open.toLocaleString("ru-RU"), sub: `${eodDayDate(day)} · ${eodEnum("status", day.status)}`, visual: ring };
   }
+  return { big: eodDayDate(day), sub: `${eodEnum("status", day.status)} · ${open} ${t("home.discShort")}`, visual: ring };
+}
 
+function hmEventsMetric(metric) {
+  const dayMs = 24 * 60 * 60 * 1000;
   const ev = AUDIT_LOGS_MOCK.filter((r) => r.event);
-  const evDaily = hmDaily(ev.map((r) => r.createdDate));
+  const d = hmDaily(ev.map((r) => r.createdDate));
+  const todayCount = ev.filter((r) => MOCK_NOW - r.createdDate <= dayMs).length;
   const critical = ev.filter((r) => MOCK_NOW - r.createdDate <= dayMs && r.event.severity === "CRITICAL").length;
-  const evTile = hmTile({
-    label: t("home.eventsTitle"), big: ev.filter((r) => MOCK_NOW - r.createdDate <= dayMs).length.toLocaleString("ru-RU"),
-    sub: `${critical} ${t("home.criticalShort")} · ${t("home.perDay")}`, visual: hmSpark(evDaily),
-    list: "#/security-audit-logs", stats: "#/analytics-events", settings: "#/settings-kyt-configs",
-  });
+  if (metric === "critical") {
+    return { big: critical.toLocaleString("ru-RU"), sub: `${todayCount} ${t("home.eventsTotalSub")}`, visual: hmSpark(d) };
+  }
+  if (metric === "bySeverity") {
+    const counts = {};
+    ev.forEach((r) => { counts[r.event.severity] = (counts[r.event.severity] || 0) + 1; });
+    return hmBreakdownMetric(counts, (k) => auEnum("severity", k), (k) => AN_SEVERITY_COLORS[k] || "var(--color-text-tertiary)");
+  }
+  return { big: todayCount.toLocaleString("ru-RU"), sub: `${critical} ${t("home.criticalShort")} · ${t("home.perDay")}`, visual: hmSpark(d) };
+}
 
-  return `<div class="hm-tiles">${clientsTile}${companiesTile}${opsTile}${accTile}${eodTile}${evTile}</div>`;
+const HM_METRIC_BUILDERS = {
+  clients: hmClientsMetric,
+  companies: hmCompaniesMetric,
+  operations: hmOperationsMetric,
+  accounts: hmAccountsMetric,
+  eod: hmEodMetric,
+  events: hmEventsMetric,
+  payments: hmPaymentsMetric,
+  exchanges: hmExchangesMetric,
+  discrepancies: hmDiscrepanciesMetric,
+  partners: hmPartnersMetric,
+  currencies: hmCurrenciesMetric,
+};
+
+function hmTiles() {
+  const cfg = hmLoadCardConfig();
+  const meta = hmCardMeta();
+  const visibleCards = cfg.filter((c) => c.visible);
+  const tilesHtml = visibleCards
+    .map((c) => {
+      const m = meta[c.id];
+      const metric = HM_METRIC_BUILDERS[c.id](c.metric);
+      return hmTile({ label: m.label, big: metric.big, sub: metric.sub, visual: metric.visual, list: m.list, stats: m.stats, settings: m.settings });
+    })
+    .join("");
+  const empty = visibleCards.length ? "" : `<div class="dash-empty">${t("home.cardSettings.emptyState")}</div>`;
+  return `<div class="hm-tiles-head">
+    <h2 class="hm-tiles-title">${t("home.tilesTitle")}</h2>
+    <button type="button" class="hm-link" id="hm-cards-settings-btn">${ICONS.settings}<span>${t("home.cardSettings.open")}</span></button>
+  </div>
+  <div class="hm-tiles">${tilesHtml}${empty}</div>`;
+}
+
+// Выбор метрики — не нативный <select>, а тот же кастомный попап-дропдаун, что и
+// на экране создания платежа (.pc-dropdown/.pc-dropdown-trigger/-panel/-option,
+// см. cwDropdownField в operations-payments.js) — переиспользуем готовые классы,
+// открытие/закрытие вешаем один раз на модалку через hmBindCardDropdowns.
+function hmCardSettingsRowHtml(c, meta) {
+  const mt = t("home.cardSettings.metrics");
+  const optionsHtml = HM_METRIC_OPTIONS[c.id]
+    .map((mid) => `<button type="button" class="pc-dropdown-option${mid === c.metric ? " is-selected" : ""}" data-hm-metric-pick="${mid}"><span class="pc-dropdown-option-title">${pdEscape(mt[c.id][mid])}</span></button>`)
+    .join("");
+  return `<div class="hm-card-row" draggable="true" data-hm-card="${c.id}">
+    <span class="hm-card-drag" title="${pdEscape(t("home.cardSettings.dragHint"))}" aria-hidden="true">
+      <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="7" cy="5" r="1.4"/><circle cx="13" cy="5" r="1.4"/><circle cx="7" cy="10" r="1.4"/><circle cx="13" cy="10" r="1.4"/><circle cx="7" cy="15" r="1.4"/><circle cx="13" cy="15" r="1.4"/></svg>
+    </span>
+    <label class="hm-card-vis"><input type="checkbox" data-hm-vis${c.visible ? " checked" : ""} /></label>
+    <span class="hm-card-label">${pdEscape(meta[c.id].label)}</span>
+    <div class="pc-dropdown hm-card-dd" id="hm-dd-${c.id}" data-hm-metric="${c.metric}">
+      <button type="button" class="pc-dropdown-trigger" data-hm-dd-toggle="${c.id}">
+        <span data-hm-dd-label>${pdEscape(mt[c.id][c.metric])}</span><span class="pc-dropdown-chevron">${FILTER_GROUP_CHEVRON}</span>
+      </button>
+      <div class="pc-dropdown-panel">${optionsHtml}</div>
+    </div>
+  </div>`;
+}
+
+// Открытие/закрытие .hm-card-dd и выбор опции — один делегированный обработчик на
+// модалку, по образцу pcBindDropdowns (operations-payments.js).
+function hmBindCardDropdowns(modalEl) {
+  modalEl.addEventListener("click", (e) => {
+    const toggleBtn = e.target.closest("[data-hm-dd-toggle]");
+    if (toggleBtn) {
+      const wrap = modalEl.querySelector(`#hm-dd-${toggleBtn.dataset.hmDdToggle}`);
+      if (!wrap) return;
+      const wasOpen = wrap.classList.contains("is-open");
+      modalEl.querySelectorAll(".hm-card-dd.is-open").forEach((el) => el.classList.remove("is-open"));
+      if (!wasOpen) wrap.classList.add("is-open");
+      return;
+    }
+    const pickBtn = e.target.closest("[data-hm-metric-pick]");
+    if (pickBtn) {
+      const wrap = pickBtn.closest(".hm-card-dd");
+      const value = pickBtn.dataset.hmMetricPick;
+      wrap.dataset.hmMetric = value;
+      wrap.querySelector("[data-hm-dd-label]").textContent = pickBtn.querySelector(".pc-dropdown-option-title").textContent;
+      wrap.querySelectorAll("[data-hm-metric-pick]").forEach((b) => b.classList.toggle("is-selected", b === pickBtn));
+      wrap.classList.remove("is-open");
+      return;
+    }
+    if (!e.target.closest(".pc-dropdown-panel")) {
+      modalEl.querySelectorAll(".hm-card-dd.is-open").forEach((el) => el.classList.remove("is-open"));
+    }
+  });
+}
+
+// Перетаскивание строк — по аналогии с rgRulesDnd в settings-routing.js (та же схема
+// dragstart/dragover с классами -before/-after для индикатора места вставки).
+function hmAttachCardListDnd(list) {
+  if (!list) return;
+  let dragId = null;
+  list.querySelectorAll(".hm-card-row").forEach((row) => {
+    row.addEventListener("dragstart", (e) => {
+      dragId = row.dataset.hmCard;
+      row.classList.add("is-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", dragId);
+    });
+    row.addEventListener("dragend", () => {
+      row.classList.remove("is-dragging");
+      list.querySelectorAll(".hm-card-drop-before, .hm-card-drop-after").forEach((x) => x.classList.remove("hm-card-drop-before", "hm-card-drop-after"));
+    });
+    row.addEventListener("dragover", (e) => {
+      if (!dragId || row.dataset.hmCard === dragId) return;
+      e.preventDefault();
+      const r = row.getBoundingClientRect();
+      const before = e.clientY < r.top + r.height / 2;
+      list.querySelectorAll(".hm-card-drop-before, .hm-card-drop-after").forEach((x) => x.classList.remove("hm-card-drop-before", "hm-card-drop-after"));
+      row.classList.add(before ? "hm-card-drop-before" : "hm-card-drop-after");
+    });
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const target = row.dataset.hmCard;
+      if (!dragId || target === dragId) return;
+      const dragEl = list.querySelector(`[data-hm-card="${dragId}"]`);
+      const r = row.getBoundingClientRect();
+      const before = e.clientY < r.top + r.height / 2;
+      row.insertAdjacentElement(before ? "beforebegin" : "afterend", dragEl);
+      list.querySelectorAll(".hm-card-drop-before, .hm-card-drop-after").forEach((x) => x.classList.remove("hm-card-drop-before", "hm-card-drop-after"));
+    });
+  });
+}
+
+function hmOpenCardSettings() {
+  const cfg = hmLoadCardConfig();
+  const meta = hmCardMeta();
+  const mt = t("home.cardSettings");
+  openModal({
+    title: mt.title,
+    width: 560,
+    bodyHtml: `<p class="modal-confirm-text pd-modal-intro">${mt.intro}</p><div class="hm-card-list" id="hm-card-list">${cfg.map((c) => hmCardSettingsRowHtml(c, meta)).join("")}</div>`,
+    footerHtml: `<button type="button" class="btn-secondary" id="hm-cards-reset">${mt.reset}</button><span class="hm-card-foot-spacer"></span><button type="button" class="btn-secondary" id="hm-cards-cancel">${mt.cancel}</button><button type="button" class="btn-primary" id="hm-cards-save">${mt.save}</button>`,
+    onMount: (el) => {
+      hmAttachCardListDnd(el.querySelector("#hm-card-list"));
+      hmBindCardDropdowns(el);
+      el.querySelector("#hm-cards-cancel").addEventListener("click", closeModal);
+      el.querySelector("#hm-cards-reset").addEventListener("click", () => {
+        hmSaveCardConfig(hmDefaultCardConfig());
+        closeModal();
+        render();
+      });
+      el.querySelector("#hm-cards-save").addEventListener("click", () => {
+        const next = [...el.querySelectorAll(".hm-card-row")].map((row) => ({
+          id: row.dataset.hmCard,
+          visible: row.querySelector("[data-hm-vis]").checked,
+          metric: row.querySelector(".hm-card-dd").dataset.hmMetric,
+        }));
+        hmSaveCardConfig(next);
+        closeModal();
+        render();
+      });
+    },
+  });
 }
 
 function viewHome() {
@@ -371,4 +723,6 @@ function initInteractiveMap(mapId) {
 function initHome() {
   initInteractiveMap("hm-map");
   document.querySelectorAll("[data-dash-hash]").forEach((b) => b.addEventListener("click", () => { window.location.hash = b.dataset.dashHash; }));
+  const settingsBtn = document.getElementById("hm-cards-settings-btn");
+  if (settingsBtn) settingsBtn.addEventListener("click", hmOpenCardSettings);
 }

@@ -66,6 +66,38 @@ function kybStepDef(code) {
   return { step: code, name: KYB_STEP_NAMES[code] };
 }
 
+// Участники компании (вкладка "Сотрудники") — по факту чтения схемы companies (members.resolver.ts,
+// members.service.ts) 30.09.2026:
+// - member.id — суррогат членства, НЕ userId (одна строка = членство в одной компании; тот же человек
+//   может быть участником нескольких компаний с разным type/accessRoles в каждой).
+// - type (CompanyMemberTypeEnum) — кто человек юридически: ubo/shareholder/representative/director.
+// - accessRoles — права ИМЕННО в этой компании, отдельный динамический словарь (CompanyAccessRoleEnum),
+//   сид словаря в коде: COMPANY_REGISTRANT (полный доступ, выдаётся регистранту автоматически, компания
+//   не может остаться без единого участника с этой ролью — инвариант _assertRegistrantsRemain),
+//   COMPANY_PAYER (просмотр + платежи), COMPANY_VIEWER (только просмотр). Смена — только целиком
+//   (updateCompanyMember({ accessRoles: [...] })), не add/remove по одной.
+// - positions — свободный текст (должности), share — доля владения (только для ubo/shareholder).
+const COMPANY_MEMBER_TYPES = ["director", "representative", "shareholder", "ubo"];
+const COMPANY_ACCESS_ROLES = ["COMPANY_REGISTRANT", "COMPANY_PAYER", "COMPANY_VIEWER"];
+const COMPANY_MEMBER_POSITIONS = ["Финансовый директор", "Главный бухгалтер", "Менеджер по продажам", "Технический директор", "Операционный директор"];
+
+// member.id — суррогат (companyId:userId), не userId; opts переопределяет type/accessRoles/positions/share
+// для детерминированной генерации (регистрант) или задаёт их явно (создание/добавление сотрудника вручную).
+function coMakeMember(companyId, user, opts = {}) {
+  return {
+    id: `${companyId}:${user.id}`,
+    userId: user.id,
+    name: user.fullName || user.email,
+    email: user.email,
+    kycStatus: user.kycStatus,
+    kycLevel: user.kycLevel,
+    type: opts.type || COMPANY_MEMBER_TYPES[0],
+    accessRoles: opts.accessRoles || [],
+    positions: opts.positions || [],
+    share: opts.share != null ? opts.share : null,
+  };
+}
+
 const KYB_STEPS_BY_LEVEL = {
   1: ["SCREENING", "ADMIN", "OPEN_ACCOUNT"].map(kybStepDef),
   2: ["SCREENING", "SCORING", "ADMIN", "OPEN_ACCOUNT"].map(kybStepDef),
@@ -428,33 +460,41 @@ CLIENTS_USERS_MOCK.forEach((user, userIdx) => {
   });
 });
 
-// Обратная связь: участники компании. Реальный запрос `company` (пасенный
-// пользователем) списка участников не отдаёт вовсе — только registrant{id}.
-// Честного отдельного списка с должностями у нас нет (и не может быть, раз
-// его нет и в схеме), поэтому строим то же самое ребро user↔company, что уже
-// есть выше (user.linkedCompanies), просто в обратную сторону — кто из
-// пользователей связан с этой компанией, без выдуманных должностей.
+// Обратная связь: участники компании (вкладка "Сотрудники" на карточке компании, вкладка "Компании" на
+// карточке физлица). Реальный запрос `company` списка участников не отдаёт (только registrant{id}) — но
+// отдельные запросы companyMembers/myCompanyMembers (apps/companies members.resolver.ts) отдают полную
+// per-company модель членства (type/accessRoles/positions/share, см. coMakeMember выше), поэтому строим
+// то же ребро user↔company, что уже есть в user.linkedCompanies, но с реальными по форме полями, не только
+// id/имя. Тип и доступ — детерминированно по seed, без реальных данных на конкретного человека (их и не
+// может быть — сид общий, не привязан к конкретной компании).
 CLIENTS_COMPANIES_MOCK.forEach((company) => {
   company.members = [];
 });
-CLIENTS_USERS_MOCK.forEach((user) => {
-  user.linkedCompanies.forEach((link) => {
+CLIENTS_USERS_MOCK.forEach((user, userIdx) => {
+  user.linkedCompanies.forEach((link, linkIdx) => {
     const company = CLIENTS_COMPANIES_MOCK.find((c) => c.id === link.id);
-    if (company && !company.members.some((m) => m.id === user.id)) {
-      company.members.push({ id: user.id, name: user.fullName || user.email, kycStatus: user.kycStatus, kycLevel: user.kycLevel });
-    }
+    if (!company || company.members.some((m) => m.userId === user.id)) return;
+    const seed = userIdx * 3 + linkIdx;
+    company.members.push(
+      coMakeMember(company.id, user, {
+        type: pick(COMPANY_MEMBER_TYPES, seed + 1),
+        accessRoles: seed % 4 === 0 ? [] : seed % 4 === 1 ? ["COMPANY_VIEWER"] : ["COMPANY_PAYER"],
+        positions: seed % 3 === 0 ? [pick(COMPANY_MEMBER_POSITIONS, seed)] : [],
+        share: seed % 5 === 0 ? 10 + (seed % 40) : null,
+      })
+    );
   });
 });
 
-// registrant — реальное поле схемы (company.registrant.id), не nullable по факту
-// (компанию регистрирует конкретный пользователь). Отдельной сущности "кто именно
-// регистрировал" в моке нет — берём первого участника, а если участников нет вовсе,
-// пользователя по seed (та же связь на настоящую запись CLIENTS_USERS_MOCK, а не
-// придуманное имя).
+// registrant — реальное поле схемы (company.registrant.id), не nullable по факту (компанию регистрирует
+// конкретный пользователь); строка члена регистранта создаётся в той же транзакции, что и сама компания,
+// с accessRoles: ['COMPANY_REGISTRANT'] (документ HOW_IT_WORKS.md, раздел 5) — инвариант: у компании всегда
+// есть хотя бы один участник с этой ролью. Отдельной сущности "кто именно регистрировал" в моке нет — берём
+// первого участника, а если участников нет вовсе, пользователя по seed (реальная запись CLIENTS_USERS_MOCK).
 CLIENTS_COMPANIES_MOCK.forEach((company, idx) => {
-  const registrantUser = company.members[0] ? CLIENTS_USERS_MOCK.find((u) => u.id === company.members[0].id) : CLIENTS_USERS_MOCK[idx % CLIENTS_USERS_MOCK.length];
+  const registrantUser = company.members[0] ? CLIENTS_USERS_MOCK.find((u) => u.id === company.members[0].userId) : CLIENTS_USERS_MOCK[idx % CLIENTS_USERS_MOCK.length];
   company.registrant = { id: registrantUser.id, name: registrantUser.fullName || registrantUser.email };
-  if (!company.members.some((m) => m.id === registrantUser.id)) {
-    company.members.unshift({ id: registrantUser.id, name: registrantUser.fullName || registrantUser.email, kycStatus: registrantUser.kycStatus, kycLevel: registrantUser.kycLevel });
-  }
+  const existing = company.members.find((m) => m.userId === registrantUser.id);
+  if (existing) existing.accessRoles = [...new Set([...existing.accessRoles, "COMPANY_REGISTRANT"])];
+  else company.members.unshift(coMakeMember(company.id, registrantUser, { type: "representative", accessRoles: ["COMPANY_REGISTRANT"] }));
 });

@@ -1214,7 +1214,7 @@ function openCompanyCreateWizard() {
         currentKYBLevelStatusV2: null,
         scoringRiskLevel: null,
         blockReasons: null,
-        members: [{ id: state.registrant.id, name: state.registrant.fullName || state.registrant.email, kycStatus: state.registrant.kycStatus, kycLevel: state.registrant.kycLevel }],
+        members: [coMakeMember(seedToUuid(seed), state.registrant, { type: "representative", accessRoles: ["COMPANY_REGISTRANT"] })],
         registrant: { id: state.registrant.id, name: state.registrant.fullName || state.registrant.email },
       };
       CLIENTS_COMPANIES_MOCK.unshift(newCompany);
@@ -1243,7 +1243,7 @@ function openCompanyCreateWizard() {
 // id клиента, не завязаны конкретно на пользователя). Поля основной вкладки и
 // вкладки KYB сверены с реальным запросом `company` (получен от пользователя
 // 23.09.2026) — детали по каждому новому полю см. в комментариях мок-файла.
-const COMPANY_DETAIL_SUB_TABS = ["main", "kyb", "accounts", "operations", "tariff", "security", "auditLog"];
+const COMPANY_DETAIL_SUB_TABS = ["main", "kyb", "accounts", "operations", "tariff", "employees", "security", "auditLog"];
 
 const CO_TAB_ICONS = {
   main: CD_TAB_ICONS.main,
@@ -1251,6 +1251,7 @@ const CO_TAB_ICONS = {
   accounts: CD_TAB_ICONS.accounts,
   operations: CD_TAB_ICONS.operations,
   tariff: CD_TAB_ICONS.tariff,
+  employees: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="7" r="2.75"/><path d="M2.5 17c.4-3 2.4-4.8 5-4.8s4.6 1.8 5 4.8"/><circle cx="14.5" cy="6.5" r="2"/><path d="M13 12.3c2.2.2 3.7 1.9 4 4.7"/></svg>`,
   security: CD_TAB_ICONS.security,
   auditLog: CD_TAB_ICONS.auditLog,
 };
@@ -1307,7 +1308,7 @@ function renderCompanyMembersCard(company) {
   const cod = t("companyDetail");
   const members = company.members || [];
 
-  const content = members.length
+  const list = members.length
     ? `<div class="linked-companies-list">
         ${members
           .map(
@@ -1315,9 +1316,9 @@ function renderCompanyMembersCard(company) {
               <div class="linked-company-row">
                 <span class="linked-company-icon">${ICONS.user}</span>
                 <div class="linked-company-info">
-                  <button type="button" class="table-link linked-company-name" data-member-id="${m.id}">${pdEscape(m.name)}</button>
+                  <button type="button" class="table-link linked-company-name" data-member-id="${m.userId}">${pdEscape(m.name)}</button>
                   <div class="linked-company-badges">
-                    ${m.id === company.registrant.id ? `<span class="badge badge-neutral">${cod.registrantTag}</span>` : ""}
+                    ${m.accessRoles.includes("COMPANY_REGISTRANT") ? `<span class="badge badge-neutral">${cod.registrantTag}</span>` : ""}
                     ${m.kycStatus ? `<span class="badge ${statusBadgeClass(m.kycStatus)}">${kycStatusLabel(m.kycStatus)}</span>` : ""}
                   </div>
                 </div>
@@ -1327,6 +1328,7 @@ function renderCompanyMembersCard(company) {
           .join("")}
       </div>`
     : `<div class="table-cell-muted">${cod.noMembers}</div>`;
+  const content = `${list}<div class="card-more-link"><button type="button" class="table-link" data-co-sub-tab="employees">${cod.viewMore} →</button></div>`;
 
   return sectionCard(cod.sections.members, content);
 }
@@ -1341,19 +1343,15 @@ function renderCompanyKybStatusCard(company) {
   const dots = [1, 2, 3].map((lvl) => `<span class="profile-kyc-dot${lvl <= company.kybLevel ? " is-filled" : ""}"></span>`).join("");
   const status = company.currentKYBLevelStatusV2 ? company.currentKYBLevelStatusV2.status : null;
 
-  return `
-    <div class="card profile-kyc-card">
-      <div class="profile-kyc-card-head">
-        <span class="detail-section-title">${cod.sections.kyb}</span>
-        <span class="profile-kyc-updated">${cod.kybUpdatedLabel} ${company.updatedAt}</span>
-      </div>
-      ${status ? `<span class="badge ${statusBadgeClass(status)}">${kybStatusLabel(status)}</span>` : ""}
-      <div class="profile-kyc-level">
-        <span class="profile-kyc-dots">${dots}</span>
-        <span>${KYB_CONFIG_NAMES[company.kybLevel - 1]}</span>
-      </div>
+  const content = `
+    ${status ? `<span class="badge ${statusBadgeClass(status)}">${kybStatusLabel(status)}</span>` : ""}
+    <div class="profile-kyc-level">
+      <span class="profile-kyc-dots">${dots}</span>
+      <span>${KYB_CONFIG_NAMES[company.kybLevel - 1]}</span>
     </div>
+    <div class="card-more-link"><button type="button" class="table-link" data-co-sub-tab="kyb">${cod.viewMore} →</button></div>
   `;
+  return sectionCard(cod.sections.kyb, content, "profile-kyc-card", `${cod.kybUpdatedLabel} ${company.updatedAt}`);
 }
 
 function formatCompanyMoney(m) {
@@ -2211,6 +2209,216 @@ function openKybStatusChangeModal(company) {
   });
 }
 
+// ---- Вкладка "Сотрудники" — участники компании: юридическая роль (type), доступ в рамках компании
+// (accessRoles), должности, доля. Реальные мутации бэкенда (apps/companies members.resolver.ts, 30.09.2026):
+// createCompanyMemberFromExistingUser / updateCompanyMember (роли заменяются целиком, не add/remove) /
+// deleteCompanyMember — инвариант: у компании должен остаться хотя бы один участник с accessRoles,
+// содержащим COMPANY_REGISTRANT (_assertRegistrantsRemain), поэтому и здесь это проверяется перед
+// сохранением/удалением. ---------------------------------------------------------------------------------
+function coAccessRoleBadges(m) {
+  const e = t("companyDetail.employees");
+  if (!m.accessRoles.length) return `<span class="table-cell-muted">${e.noAccess}</span>`;
+  return m.accessRoles.map((r) => `<span class="badge ${r === "COMPANY_REGISTRANT" ? "badge-neutral" : "badge-info"}">${e.access[r] || r}</span>`).join(" ");
+}
+
+// Инвариант регистранта: нельзя оставить компанию без единого участника с ролью COMPANY_REGISTRANT —
+// проверяется и при смене ролей участника, и при его удалении.
+function coHasOtherRegistrant(company, memberId) {
+  return (company.members || []).some((m) => m.id !== memberId && m.accessRoles.includes("COMPANY_REGISTRANT"));
+}
+
+function coEmployeeRow(company, m) {
+  const e = t("companyDetail.employees");
+  return [
+    `<div class="identity-cell"><button type="button" class="table-link" data-member-id="${m.userId}">${pdEscape(m.name)}</button><div class="table-cell-muted">${pdEscape(m.email || "")}</div></div>`,
+    e.type[m.type] || m.type,
+    coAccessRoleBadges(m),
+    m.positions.length ? pdEscape(m.positions.join(", ")) : e.noPositions,
+    m.share != null ? `${m.share}%` : e.noShare,
+    m.kycStatus ? `<span class="badge ${statusBadgeClass(m.kycStatus)}">${kycStatusLabel(m.kycStatus)}</span>` : "—",
+    rowKebabMenu(`emp-${m.id}`, [
+      { label: e.edit, icon: EDIT_ICON_SVG, attrs: `data-emp-edit="${escapeAttr(m.id)}"` },
+      { label: e.remove, icon: TRASH_ICON_SVG, attrs: `data-emp-remove="${escapeAttr(m.id)}"`, danger: true },
+    ]),
+  ];
+}
+
+function renderCompanyDetailEmployeesTab(company) {
+  const e = t("companyDetail.employees");
+  const members = company.members || [];
+  const table = vbMiniTable(
+    [e.columns.employee, e.columns.type, e.columns.access, e.columns.positions, e.columns.share, e.columns.kyc, ""],
+    members.map((m) => coEmployeeRow(company, m)),
+    e.empty
+  );
+  const addBtn = `<button type="button" class="profile-flat-edit" id="co-emp-add">${PLUS_ICON_SVG}<span>${e.add}</span></button>`;
+  return `<div class="profile-flat-block">${flatSection(`${e.title} · ${members.length}`, table, null, e.desc, addBtn)}</div>`;
+}
+
+// ---- Форма полей участника (общая для "добавить" и "изменить") — тип, доступ (чекбоксы), должности, доля
+function coEmployeeFieldsHtml(m) {
+  const e = t("companyDetail.employees");
+  return `
+    <label class="filters-field">
+      <span class="filters-field-label">${e.fieldType}</span>
+      <select class="address-form-input" id="co-emp-type">
+        ${COMPANY_MEMBER_TYPES.map((v) => `<option value="${v}"${m.type === v ? " selected" : ""}>${e.type[v]}</option>`).join("")}
+      </select>
+    </label>
+    <div class="filters-field">
+      <span class="filters-field-label">${e.fieldAccess}</span>
+      <div class="sc-chips">
+        ${COMPANY_ACCESS_ROLES.map(
+          (r) => `<label class="filter-checkbox-item"><input type="checkbox" data-co-emp-access="${r}"${m.accessRoles.includes(r) ? " checked" : ""} /><span class="filter-checkbox-box"></span><span>${e.access[r]}</span></label>`
+        ).join("")}
+      </div>
+    </div>
+    <label class="filters-field"><span class="filters-field-label">${e.fieldPositions}</span><input class="address-form-input" type="text" id="co-emp-positions" value="${escapeAttr(m.positions.join(", "))}" /></label>
+    <label class="filters-field"><span class="filters-field-label">${e.fieldShare}</span><input class="address-form-input" type="number" min="0" max="100" id="co-emp-share" value="${m.share != null ? m.share : ""}" /></label>
+    <div class="form-error" id="co-emp-error" hidden></div>
+  `;
+}
+
+function coReadEmployeeForm(modalEl) {
+  const accessRoles = [...modalEl.querySelectorAll("[data-co-emp-access]:checked")].map((c) => c.dataset.coEmpAccess);
+  const positions = modalEl
+    .querySelector("#co-emp-positions")
+    .value.split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const shareRaw = modalEl.querySelector("#co-emp-share").value.trim();
+  return {
+    type: modalEl.querySelector("#co-emp-type").value,
+    accessRoles,
+    positions,
+    share: shareRaw ? Number(shareRaw) : null,
+  };
+}
+
+// onDone — какую страницу перерисовать после сохранения: карточку компании (по умолчанию, вызов со
+// вкладки "Сотрудники") или карточку физлица (вызов со вкладки "Компании" в clients-users.js — тот же
+// member-объект, просто открыт с другой стороны, см. companiesOfUser).
+function coOpenEditEmployeeModal(company, member, onDone) {
+  const e = t("companyDetail.employees");
+  const refresh = onDone || (() => updateCompanyDetailView(company));
+  openModal({
+    title: e.modalEditTitle,
+    width: 480,
+    bodyHtml: `<p class="modal-confirm-text">${pdEscape(member.name)}</p>${coEmployeeFieldsHtml(member)}`,
+    footerHtml: `<button type="button" class="btn-secondary" id="co-emp-cancel">${e.cancel}</button><button type="button" class="btn-primary" id="co-emp-save">${e.save}</button>`,
+    onMount: (el) => {
+      el.querySelector("#co-emp-cancel").addEventListener("click", closeModal);
+      el.querySelector("#co-emp-save").addEventListener("click", () => {
+        const fail = (msg) => { const err = el.querySelector("#co-emp-error"); err.textContent = msg; err.hidden = false; };
+        const data = coReadEmployeeForm(el);
+        if (!data.accessRoles.includes("COMPANY_REGISTRANT") && member.accessRoles.includes("COMPANY_REGISTRANT") && !coHasOtherRegistrant(company, member.id)) {
+          return fail(e.errLastRegistrant);
+        }
+        closeModal();
+        requireAdmin2fa("company_member_manage", () => {
+          Object.assign(member, data);
+          showToast(e.updatedToast);
+          refresh();
+        });
+      });
+    },
+  });
+}
+
+function coConfirmRemoveEmployee(company, member, onDone) {
+  const e = t("companyDetail.employees");
+  const refresh = onDone || (() => updateCompanyDetailView(company));
+  if (member.accessRoles.includes("COMPANY_REGISTRANT") && !coHasOtherRegistrant(company, member.id)) {
+    showToast(e.errLastRegistrant);
+    return;
+  }
+  vbConfirm({
+    title: e.removeTitle,
+    text: e.removeText(member.name),
+    confirmLabel: e.remove,
+    danger: true,
+    onConfirm: () => {
+      requireAdmin2fa("company_member_manage", () => {
+        company.members = company.members.filter((m) => m.id !== member.id);
+        showToast(e.removedToast);
+        refresh();
+      });
+    },
+  });
+}
+
+// ---- "Добавить сотрудника": выбор существующего физлица (не создаём тут же — как и регистрант компании,
+// это реальное ограничение createCompanyMemberFromExistingUser: userId ссылается на уже заведённого клиента)
+function coEmployeeCandidateOptions(company, query) {
+  const q = query.trim().toLowerCase();
+  const memberUserIds = new Set((company.members || []).map((m) => m.userId));
+  const list = CLIENTS_USERS_MOCK.filter((u) => !memberUserIds.has(u.id));
+  const filtered = !q ? list.slice(0, 20) : list.filter((u) => (u.fullName || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q));
+  return filtered.slice(0, 20);
+}
+
+function coEmployeeCandidateListHtml(company, query) {
+  const e = t("companyDetail.employees");
+  const options = coEmployeeCandidateOptions(company, query);
+  if (!options.length) return `<div class="table-cell-muted filter-search-empty">${e.pickUserEmpty}</div>`;
+  return options.map((u) => `<button type="button" class="filter-search-item" data-co-emp-pick="${u.id}">${pdEscape(u.fullName || u.email)}<span class="table-cell-muted"> · ${pdEscape(u.email)}</span></button>`).join("");
+}
+
+function coOpenAddEmployeeModal(company) {
+  const e = t("companyDetail.employees");
+  const state = { user: null };
+  const draftMember = () => coMakeMember(company.id, state.user, { type: "director", accessRoles: [], positions: [], share: null });
+
+  const renderStep1 = () => `
+    <div class="filters-field">
+      <span class="filters-field-label">${e.pickUserTitle}</span>
+      <div class="pc-client-picker">
+        <div class="pc-client-search" id="co-emp-pick-search-wrap">
+          <input type="text" class="address-form-input" id="co-emp-pick-search" placeholder="${e.pickUserSearch}" autocomplete="off" />
+          <div class="filter-search-list pc-client-list" id="co-emp-pick-list">${coEmployeeCandidateListHtml(company, "")}</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  openModal({
+    title: e.modalAddTitle,
+    width: 480,
+    bodyHtml: renderStep1(),
+    footerHtml: `<button type="button" class="btn-secondary" id="co-emp-cancel">${e.cancel}</button><button type="button" class="btn-primary" id="co-emp-save" disabled>${e.save}</button>`,
+    onMount: (el) => {
+      el.querySelector("#co-emp-cancel").addEventListener("click", closeModal);
+      const searchInput = el.querySelector("#co-emp-pick-search");
+      const listEl = el.querySelector("#co-emp-pick-list");
+      const bindPicks = () => {
+        listEl.querySelectorAll("[data-co-emp-pick]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.user = CLIENTS_USERS_MOCK.find((u) => u.id === btn.dataset.coEmpPick);
+            if (!state.user) return;
+            el.querySelector(".modal-body").innerHTML = `<p class="modal-confirm-text">${pdEscape(state.user.fullName || state.user.email)}</p>${coEmployeeFieldsHtml(draftMember())}`;
+            el.querySelector("#co-emp-save").disabled = false;
+          });
+        });
+      };
+      searchInput.addEventListener("input", () => {
+        listEl.innerHTML = coEmployeeCandidateListHtml(company, searchInput.value);
+        bindPicks();
+      });
+      bindPicks();
+      el.querySelector("#co-emp-save").addEventListener("click", () => {
+        if (!state.user) return;
+        const data = coReadEmployeeForm(el);
+        closeModal();
+        requireAdmin2fa("company_member_manage", () => {
+          company.members.push(coMakeMember(company.id, state.user, data));
+          showToast(e.addedToast);
+          updateCompanyDetailView(company);
+        });
+      });
+    },
+  });
+}
+
 // ---- Табы + диспетчер тела вкладки ------------------------------------------------
 function renderCompanyDetailTabsBar() {
   return `
@@ -2235,6 +2443,7 @@ function renderCompanyDetailBody(company) {
   if (companyDetailState.subTab === "accounts") return renderClientDetailAccountsTab(company, "company");
   if (companyDetailState.subTab === "operations") return renderClientDetailOperationsTab(company, "company");
   if (companyDetailState.subTab === "tariff") return renderClientDetailTariffTab(company);
+  if (companyDetailState.subTab === "employees") return renderCompanyDetailEmployeesTab(company);
   if (companyDetailState.subTab === "security") return renderClientDetailSecurityTab(company, "company");
   if (companyDetailState.subTab === "auditLog") return renderClientDetailAuditTab(company);
   return renderCompanyDetailMainTab(company);
@@ -2319,6 +2528,23 @@ function attachCompanyDetailContentHandlers(company) {
     btn.addEventListener("click", () => {
       const check = (company.verificationChecks || []).find((c) => c.id === btn.dataset.checkInfo);
       if (check) openCheckDetailsModal(check);
+    });
+  });
+
+  const addEmployeeBtn = content.querySelector("#co-emp-add");
+  if (addEmployeeBtn) addEmployeeBtn.addEventListener("click", () => coOpenAddEmployeeModal(company));
+
+  content.querySelectorAll("[data-emp-edit]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const m = (company.members || []).find((x) => x.id === btn.dataset.empEdit);
+      if (m) coOpenEditEmployeeModal(company, m);
+    });
+  });
+
+  content.querySelectorAll("[data-emp-remove]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const m = (company.members || []).find((x) => x.id === btn.dataset.empRemove);
+      if (m) coConfirmRemoveEmployee(company, m);
     });
   });
 

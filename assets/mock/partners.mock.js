@@ -77,8 +77,6 @@ const PN_SERVICES = [
     allowedIps: ["203.0.113.14", "203.0.113.15"], redirectUris: ["https://app.walletverse.example/auth/callback", "https://staging.walletverse.example/auth/callback"],
     scopes: ["tb:accounts:read", "tb:payments:read", "tb:payments:write"], twofa: { enabled: false }, secretIssuedAt: formatDateTime(pnDate(40, 11, 0)),
     channels: { INNER: true, SWIFT: false, RU_WIRE: false, SBP: true, QR: false },
-    exchange: { mode: "CORPORATE_ACCOUNT", manual: true },
-    corporateAccount: { number: "40702810900000077123", currency: "RUB" },
   }),
   pnService(2, {
     slug: "novapay", name: "NovaPay Demo", description: "Тестовый мерчант: принимает оплату переводами", email: "dev@novapay.example",
@@ -86,8 +84,7 @@ const PN_SERVICES = [
     allowedIps: ["198.51.100.7"], redirectUris: ["https://novapay.example/oauth/return"],
     scopes: ["tb:accounts:read", "tb:payments:read", "tb:payments:write"], twofa: { enabled: true }, secretIssuedAt: formatDateTime(pnDate(3, 11, 0)),
     channels: { INNER: true, SWIFT: true, RU_WIRE: true, SBP: false, QR: false },
-    exchange: { mode: "NONE", manual: false },
-    corporateAccount: null,
+    clientOwnership: "ANY",
   }),
   pnService(3, {
     slug: "cryptobridge", name: "CryptoBridge Test", description: "Заявка от обменника: интеграция не прошла проверку по договору", email: "ops@cryptobridge.example",
@@ -95,8 +92,7 @@ const PN_SERVICES = [
     allowedIps: ["192.0.2.55"], redirectUris: ["https://cryptobridge.example/cb"],
     scopes: ["tb:accounts:read"], twofa: { enabled: true }, secretIssuedAt: formatDateTime(pnDate(22, 11, 0)),
     channels: { INNER: true, SWIFT: false, RU_WIRE: false, SBP: false, QR: false },
-    exchange: { mode: "NONE", manual: false },
-    corporateAccount: null,
+    clientOwnership: "ANY",
   }),
   pnService(4, {
     slug: "legacygw", name: "Legacy Gateway", description: "Прежний платёжный шлюз, заблокирован после смены договора", email: "admin@legacygw.example",
@@ -104,8 +100,7 @@ const PN_SERVICES = [
     allowedIps: ["198.51.100.99", "198.51.100.100"], redirectUris: ["https://legacygw.example/return"],
     scopes: ["tb:accounts:read", "tb:payments:read", "tb:payments:write"], twofa: { enabled: true }, secretIssuedAt: formatDateTime(pnDate(160, 11, 0)),
     channels: { INNER: true, SWIFT: true, RU_WIRE: true, SBP: false, QR: false },
-    exchange: { mode: "NONE", manual: false },
-    corporateAccount: null,
+    clientOwnership: "OWN",
   }),
 ];
 
@@ -161,6 +156,50 @@ function pnBuildClients(service, count, offset) {
 
 const PN_CLIENTS = [...pnBuildClients(PN_SERVICES[0], 12, 0), ...pnBuildClients(PN_SERVICES[1], 2, 3), ...pnBuildClients(PN_SERVICES[3], 3, 7)];
 
+// Гарантируем реальные платежи по рельсу СБП у клиентов сервисов с включённым каналом СБП: вкладка "Операции" на
+// карточке сервиса (settings-partners.js, pnServiceSbpPayments) переиспользует общий список платежей
+// (OPERATIONS_PAYMENTS_MOCK, operations-payments.mock.js — грузится раньше этого файла), отфильтрованный по
+// paymentSystem: "SBP" и internalId клиентов сервиса. Но это два независимых генератора — совпадение клиента по
+// чистой случайности не гарантировано (и по факту не случилось ни у одного сервиса), поэтому здесь добавляем
+// несколько настоящих строк в общий список (не отдельную сущность) — по пополнению и выплате на паре физлиц
+// каждого СБП-сервиса. Форма строки — как у остальных строк OPERATIONS_PAYMENTS_MOCK (SBP: только одна сторона
+// наш клиент, см. комментарий в шапке operations-payments.mock.js).
+(function ensurePnSbpPayments() {
+  let seed = 9000;
+  PN_SERVICES.filter((s) => s.channels && s.channels.SBP).forEach((service) => {
+    pnClientsOf(service.id).filter((c) => c.internalKind === "user").slice(0, 3).forEach((c) => {
+      const user = CLIENTS_USERS_MOCK.find((u) => u.id === c.internalId);
+      if (!user) return;
+      [true, false].forEach((isIncoming) => {
+        seed += 1;
+        const created = pnDate(seed % 20, 9 + (seed % 10), (seed * 7) % 60);
+        const updated = new Date(created.getTime() + 5 * 60 * 1000);
+        const status = pick(PAYMENT_STATUS_OPTIONS, seed);
+        const settled = status === "SUCCESSFUL" ? new Date(updated.getTime() + 2 * 60 * 1000) : null;
+        const sourceAmount = 500 + ((seed * 137) % 9000);
+        const feeAmount = +(sourceAmount * 0.012).toFixed(2);
+        const userRef = { id: user.id, type: "INDIVIDUAL", name: user.fullName || user.email, link: `#/clients-users/${user.id}` };
+        const emptyRef = { id: null, type: null, name: null, link: null };
+        const senderRef = isIncoming ? emptyRef : userRef;
+        const recipientRef = isIncoming ? userRef : emptyRef;
+        OPERATIONS_PAYMENTS_MOCK.push({
+          id: seedToPaymentUuid(seed), code: entityCode("PAY", seed),
+          createdDate: created, updatedDate: updated, createdAt: formatDateTime(created), updatedAt: formatDateTime(updated),
+          settledDate: settled, settledAt: settled ? formatDateTime(settled) : null,
+          direction: isIncoming ? "INCOMING" : "OUTGOING",
+          paymentSystem: "SBP", cryptoOperationType: null, cryptoWallet: null,
+          status, previousStatus: null, isFavorite: false, sourceOfFunds: null,
+          senderClientId: senderRef.id, senderClientType: senderRef.type, senderClientName: senderRef.name, senderClientLink: senderRef.link,
+          recipientClientId: recipientRef.id, recipientClientType: recipientRef.type, recipientClientName: recipientRef.name, recipientClientLink: recipientRef.link,
+          sourceAmount, sourceCurrency: "RUB", targetAmount: sourceAmount, targetCurrency: "RUB", exchangeRate: 1,
+          feeAmount, feeCurrency: "RUB", totalAmount: +(sourceAmount + feeAmount).toFixed(2), totalCurrency: "RUB",
+          purposeOfPayment: "Перевод по СБП", note: null,
+        });
+      });
+    });
+  });
+})();
+
 // Сессии: kind — CODE (код авторизации, живёт 60 с: ACTIVE / USED / EXPIRED) или TOKEN (access token: ACTIVE / INACTIVE)
 const PN_SESSIONS = [];
 (function buildSessions() {
@@ -201,7 +240,7 @@ const PN_SBP_PAYMENTS = [];
       const status = PN_SBP_DEPOSIT_STATUSES[(i + k) % PN_SBP_DEPOSIT_STATUSES.length];
       const created = pnDate((i + k) % 20, 9 + (k % 10), (i * 5) % 60);
       PN_SBP_DEPOSITS.push({
-        id: pnUuid(2000 + dep), serviceId: svc.id, clientId: c.id,
+        id: pnUuid(2000 + dep), code: entityCode("DEP", 2000 + dep), serviceId: svc.id, clientId: c.id,
         cost, amount, fee, wlfee, totalFee, status,
         qrUrl: `https://qr.nspk.ru/${pnUuid(2000 + dep).slice(0, 8)}`,
         isTransferProcessed: status !== "PENDING",
@@ -216,7 +255,7 @@ const PN_SBP_PAYMENTS = [];
       const status = PN_SBP_PAYMENT_STATUSES[(i + pay) % PN_SBP_PAYMENT_STATUSES.length];
       const created = pnDate(i % 15, 10 + (i % 8), (i * 9) % 60);
       PN_SBP_PAYMENTS.push({
-        id: pnUuid(2500 + pay), serviceId: svc.id, clientId: c.id,
+        id: pnUuid(2500 + pay), code: entityCode("PYT", 2500 + pay), serviceId: svc.id, clientId: c.id,
         sourceAmount, totalFee, totalAmount: +(sourceAmount + totalFee).toFixed(2),
         bankName: ["Пример Банк", "Тестбанк", "Демо Финанс"][i % 3], bankBic: "044525" + String(100 + (i % 900)),
         purposeOfPayment: "Вывод средств", sourceOfFunds: PN_SOURCE_OF_FUNDS[i % PN_SOURCE_OF_FUNDS.length],
@@ -264,6 +303,13 @@ function pnPaymentsOfService(serviceId) {
 // Ссылка на реальную запись платформы, к которой привязан партнёрский клиент (документ: лёгкий режим — это клиент банка)
 function pnInternalLink(c) {
   return c.internalKind === "company" ? `#/clients-companies/${c.internalId}` : `#/clients-users/${c.internalId}`;
+}
+// Обратный поиск: привязан ли этот пользователь/компания платформы к партнёрскому сервису через open banking
+// (ExternalServiceClientEntity: userId ↔ externalServiceId, см. apps/open-banking) — используется в таблице
+// «Физлица», строка под ID: если есть связка, вместо белого лейбла (user.service — ASIA_FINTECH/BITBANKER/...,
+// ортогональное понятие) показываем реального партнёра. Связь по internalId, не по совпадению email.
+function pnClientByInternal(kind, id) {
+  return PN_CLIENTS.find((c) => c.internalKind === kind && c.internalId === id);
 }
 // Счета партнёрского клиента — это счета той же реальной записи платформы (ACCOUNTS_VIRTUAL_MOCK, assets/mock/accounts.mock.js:
 // accClientRef линкует счета и на пользователей, и на компании), не отдельная сущность

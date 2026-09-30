@@ -27,6 +27,7 @@ const ADMIN_2FA_ACTIONS = [
   { key: "client_sessions_kill", module: "clients", flags: ["CLIENT_DATA", "ACCESS_CONTROL"] },
   { key: "client_kyc_change", module: "clients", flags: ["CLIENT_DATA"] },
   { key: "client_edit", module: "clients", flags: ["CLIENT_DATA"] },
+  { key: "company_member_manage", module: "clients", flags: ["CLIENT_DATA", "ACCESS_CONTROL"] },
   { key: "partner_manage", module: "clients", flags: ["ACCESS_CONTROL"] },
 
   { key: "payments_export", module: "payments", flags: ["DATA_EXPORT"] },

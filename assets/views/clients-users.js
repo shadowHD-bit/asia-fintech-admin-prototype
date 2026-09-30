@@ -35,7 +35,7 @@ let cuExpandedFilterGroups = null;
 // тарифа — TF_CLIENTS/settings-tariffs-clients.js; KYT — KYT_TRANSACTIONS/
 // security-kyt.mock.js, у каждой записи client.id — тот же id, что у findUser),
 // поэтому вкладки добавлены как отдельные, на одном уровне с "Основное"/"KYC".
-const CLIENT_DETAIL_SUB_TABS = ["main", "kycLevels", "accounts", "operations", "tariff", "kyt", "security", "auditLog"];
+const CLIENT_DETAIL_SUB_TABS = ["main", "kycLevels", "risk", "companies", "accounts", "operations", "tariff", "kyt", "security", "auditLog"];
 
 const CD_TAB_ICONS = {
   security: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="8" rx="1.8"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/><path d="M10 12.5v1.6"/></svg>`,
@@ -46,6 +46,8 @@ const CD_TAB_ICONS = {
   operations: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h14M3 10h10M3 14h6"/></svg>`,
   tariff: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3.5h8l6 6-9.5 9.5-6-6v-8Z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg>`,
   kyt: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 17 6v5.5c0 4-3 6.5-7 8-4-1.5-7-4-7-8V6l7-3.5Z"/><path d="m7 10 2 2 4-4.5"/></svg>`,
+  companies: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="10" height="14" rx="1"/><path d="M8 7h.01M11 7h.01M8 10h.01M11 10h.01M8 13h.01M11 13h.01"/></svg>`,
+  risk: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 3 6v4.5c0 4 3 7 7 8.5 4-1.5 7-4.5 7-8.5V6l-7-3Z"/><path d="M10 8v4"/><circle cx="10" cy="14.3" r="0.15" fill="currentColor" stroke-width="1.2"/></svg>`,
 };
 
 // Сбрасывается при каждом открытии карточки (см. initClientDetailView) —
@@ -771,11 +773,15 @@ const PLUS_ICON_SVG = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor
 const EYE_ICON_SVG = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10s2.8-5.5 8-5.5S18 10 18 10s-2.8 5.5-8 5.5S2 10 2 10Z"/><circle cx="10" cy="10" r="2.2"/></svg>`;
 
 // ---- Карточка-секция со сворачиванием по клику на заголовок ---------------------
-function sectionCard(title, contentHtml, extraClass) {
+// headRight — необязательный текст справа от заголовка внутри той же кнопки-шапки (дата обновления, сумма и т.п.)
+function sectionCard(title, contentHtml, extraClass, headRight) {
   return `
     <div class="card collapsible-card${extraClass ? ` ${extraClass}` : ""}">
       <button type="button" class="collapsible-card-head" data-collapse-toggle>
-        <span class="detail-section-title">${title}</span>
+        <span class="collapsible-card-head-main">
+          <span class="detail-section-title">${title}</span>
+          ${headRight ? `<span class="profile-kyc-updated">${headRight}</span>` : ""}
+        </span>
         <span class="collapsible-card-chevron">${ICONS.chevron}</span>
       </button>
       <div class="collapsible-card-body">${contentHtml}</div>
@@ -790,6 +796,10 @@ function copyIconButton(value) {
 
 function renderClientsUsersRow(row) {
   const country = findCountry(row.residenceCountryId);
+  // Пришёл через партнёра open banking (см. pnClientByInternal, mock/partners.mock.js) — связь по internalId,
+  // ортогональна user.service (белый лейбл ASIA_FINTECH/BITBANKER/...). Есть связка — показываем партнёра.
+  const pc = pnClientByInternal("user", row.id);
+  const svc = pc ? pnById(pc.serviceId) : null;
 
   return `
     <tr>
@@ -806,10 +816,7 @@ function renderClientsUsersRow(row) {
               ${COPY_ICON_SVG}
             </button>
           </div>
-          <div class="identity-cell-sub">
-            <span class="identity-cell-tag">${t("clientsUsers.serviceTag")}</span>
-            <span>${pdEscape(row.service)}</span>
-          </div>
+          ${svc ? `<div class="identity-cell-sub"><span class="identity-cell-tag">${t("clientsUsers.partnerTag")}</span>${vbLink(`#/clients-partners/${svc.id}`, pdEscape(svc.name))}</div>` : ""}
         </div>
       </td>
       <td>${(() => { const b = !!(row.blockReasons && row.blockReasons.length); const l = t(b ? "clientDetail.blocked" : "clientDetail.active"); return `<span class="user-name-cell"><span class="status-dot ${b ? "is-blocked" : "is-active"}" title="${l}" aria-label="${l}"></span><span>${row.fullName}</span></span>`; })()}</td>
@@ -1285,23 +1292,20 @@ function renderTotalBalanceCard(entity, kind) {
       <div class="balance-card-note">${b.accounts(s.accounts)}${s.skipped.length ? ` · ${b.noRate(s.skipped.join(", "))}` : ""}</div>
     </div>
   `;
-  return `
-    <div class="card balance-card">
-      <div class="profile-kyc-card-head">
-        <span class="detail-section-title">${b.title}</span>
-        <span class="profile-kyc-updated">${b.inBase(BASE_CURRENCY)}</span>
-      </div>
-      <div class="balance-card-split">
-        ${block(b.fiat, clientTotalBalanceBase(entity, false))}
-        ${block(b.crypto, clientTotalBalanceBase(entity, true))}
-      </div>
+  const moreAttr = kind === "company" ? `data-co-sub-tab="accounts"` : `data-sub-tab="accounts"`;
+  const content = `
+    <div class="balance-card-split">
+      ${block(b.fiat, clientTotalBalanceBase(entity, false))}
+      ${block(b.crypto, clientTotalBalanceBase(entity, true))}
     </div>
+    <div class="card-more-link"><button type="button" class="table-link" ${moreAttr}>${t("clientDetail.viewMore")} →</button></div>
   `;
+  return sectionCard(b.title, content, "balance-card", b.inBase(BASE_CURRENCY));
 }
 
 function renderCompaniesCard(user) {
   const cd = t("clientDetail");
-  const content = user.linkedCompanies.length
+  const list = user.linkedCompanies.length
     ? `<div class="linked-companies-list">
         ${user.linkedCompanies
           .map(
@@ -1321,6 +1325,7 @@ function renderCompaniesCard(user) {
           .join("")}
       </div>`
     : `<div class="table-cell-muted">${cd.noCompanies}</div>`;
+  const content = `${list}<div class="card-more-link"><button type="button" class="table-link" data-sub-tab="companies">${cd.viewMore} →</button></div>`;
 
   return sectionCard(cd.sections.companies, content);
 }
@@ -1352,19 +1357,33 @@ function renderKycStatusCard(user) {
     .map((lvl) => `<span class="profile-kyc-dot${lvl <= user.kycLevel ? " is-filled" : ""}"></span>`)
     .join("");
 
-  return `
-    <div class="card profile-kyc-card">
-      <div class="profile-kyc-card-head">
-        <span class="detail-section-title">${cd.sections.kyc}</span>
-        <span class="profile-kyc-updated">${cd.kycUpdatedLabel} ${user.updatedAt}</span>
-      </div>
-      <span class="badge ${statusBadgeClass(user.kycStatus)}">${kycStatusLabel(user.kycStatus)}</span>
-      <div class="profile-kyc-level">
-        <span class="profile-kyc-dots">${dots}</span>
-        <span>${kycLevelLabel(user.kycConfigName)}</span>
-      </div>
+  const content = `
+    <span class="badge ${statusBadgeClass(user.kycStatus)}">${kycStatusLabel(user.kycStatus)}</span>
+    <div class="profile-kyc-level">
+      <span class="profile-kyc-dots">${dots}</span>
+      <span>${kycLevelLabel(user.kycConfigName)}</span>
     </div>
+    <div class="card-more-link"><button type="button" class="table-link" data-sub-tab="kycLevels">${cd.viewMore} →</button></div>
   `;
+  return sectionCard(cd.sections.kyc, content, "profile-kyc-card", `${cd.kycUpdatedLabel} ${user.updatedAt}`);
+}
+
+// ---- Панель "Риск и скоринг" (боковая колонка) — personal.scoringProfile: итоговый балл, уровень риска
+// и флаги проверки (PEP, гражданин США, член семьи PEP, санкционные списки, негативные публикации).
+// Поле реальное (см. mock/clients-users.mock.js), просто не было своего места в интерфейсе — здесь и на
+// вкладке "Риск и скоринг" (renderClientDetailRiskTab) выводится впервые.
+function renderRiskScoringCard(user) {
+  const cd = t("clientDetail");
+  const p = user.scoringProfile;
+  if (!p) return "";
+  const level = p.scoringRiskLevel ? `<span class="badge ${riskLevelBadgeClass(p.scoringRiskLevel)}">${riskLevelLabel(p.scoringRiskLevel)}</span>` : `<span class="badge badge-neutral">${cd.riskTab.noLevel}</span>`;
+  const flagsOn = ["isPep", "isUsa", "isFamilyMemberPep", "sanctionList", "adverseMedia"].filter((k) => p[k]);
+  const content = `
+    ${level}
+    ${flagsOn.length ? `<div class="profile-kyc-level"><span>${flagsOn.map((k) => cd.riskTab.flags[k]).join(", ")}</span></div>` : `<div class="profile-kyc-level"><span class="table-cell-muted">${cd.riskTab.noFlags}</span></div>`}
+    <div class="card-more-link"><button type="button" class="table-link" data-sub-tab="risk">${cd.viewMore} →</button></div>
+  `;
+  return sectionCard(cd.sections.risk, content, "profile-kyc-card", p.totalScore != null ? `${cd.riskTab.score}: ${p.totalScore}` : "");
 }
 
 // ---- Формы редактирования (только мок: правки живут в памяти вкладки) ------------
@@ -1527,10 +1546,15 @@ function renderClientDetailMainTab(user) {
     cd.sectionDesc.contacts
   );
 
+  // Партнёрский сервис (open banking, ExternalServiceClientEntity) — ортогонально полю service (белый лейбл
+  // ASIA_FINTECH/BITBANKER/...) выше; см. pnClientByInternal, mock/partners.mock.js.
+  const partnerLink = pnClientByInternal("user", user.id);
+  const partnerSvc = partnerLink ? pnById(partnerLink.serviceId) : null;
   const systemSection = flatSection(
     cd.sections.system,
     `<div class="profile-fields profile-fields-grid profile-fields-grid-3">
       ${copyableField(cd.fields.service, user.service)}
+      ${detailField(cd.fields.partnerService, partnerSvc ? vbLink(`#/clients-partners/${partnerSvc.id}`, pdEscape(partnerSvc.name)) : "—")}
       ${copyableField(cd.fields.createdAt, user.createdAt)}
       ${copyableField(cd.fields.updatedAt, user.updatedAt)}
     </div>`,
@@ -1551,6 +1575,7 @@ function renderClientDetailMainTab(user) {
       <div class="client-detail-grid-side">
         ${renderTotalBalanceCard(user, "user")}
         ${renderKycStatusCard(user)}
+        ${renderRiskScoringCard(user)}
         ${renderCompaniesCard(user)}
       </div>
     </div>
@@ -2926,6 +2951,126 @@ function renderClientDetailKytTab(user) {
   `;
 }
 
+// ---- Вкладка "Компании" — обратная сторона вкладки "Сотрудники" на карточке компании (clients-companies.js):
+// то же ребро CompanyMember (type/accessRoles/positions/share), только строкой идёт компания, а не человек.
+// Действия (изменить/удалить) переиспользуют coOpenEditEmployeeModal/coConfirmRemoveEmployee один в один —
+// это тот же member-объект, просто открыт с другой стороны.
+function companiesOfUser(user) {
+  return CLIENTS_COMPANIES_MOCK.filter((c) => (c.members || []).some((m) => m.userId === user.id)).map((company) => ({
+    company,
+    member: company.members.find((m) => m.userId === user.id),
+  }));
+}
+
+function renderClientDetailCompaniesTab(user) {
+  const e = t("companyDetail.employees");
+  const ct = t("clientDetail.companiesTab");
+  const pairs = companiesOfUser(user);
+  const rows = pairs.map(({ company, member }) => [
+    `<div class="identity-cell"><button type="button" class="table-link" data-company-id="${company.id}">${pdEscape(company.name)}</button>${company.currentKYBLevelStatusV2 ? `<div class="table-cell-muted">${kybStatusLabel(company.currentKYBLevelStatusV2.status)}</div>` : ""}</div>`,
+    e.type[member.type] || member.type,
+    coAccessRoleBadges(member),
+    member.positions.length ? pdEscape(member.positions.join(", ")) : e.noPositions,
+    member.share != null ? `${member.share}%` : e.noShare,
+    rowKebabMenu(`ucomp-${member.id}`, [
+      { label: e.edit, icon: EDIT_ICON_SVG, attrs: `data-ucomp-edit="${escapeAttr(member.id)}"` },
+      { label: e.remove, icon: TRASH_ICON_SVG, attrs: `data-ucomp-remove="${escapeAttr(member.id)}"`, danger: true },
+    ]),
+  ]);
+  const table = vbMiniTable([ct.columnCompany, e.columns.type, e.columns.access, e.columns.positions, e.columns.share, ""], rows, ct.empty);
+  const addBtn = `<button type="button" class="profile-flat-edit" id="ucomp-add">${PLUS_ICON_SVG}<span>${ct.add}</span></button>`;
+  return `<div class="profile-flat-block">${flatSection(`${ct.title} · ${pairs.length}`, table, null, ct.desc, addBtn)}</div>`;
+}
+
+function ucompCandidateOptions(user, query) {
+  const q = query.trim().toLowerCase();
+  const memberCompanyIds = new Set(companiesOfUser(user).map((p) => p.company.id));
+  const list = CLIENTS_COMPANIES_MOCK.filter((c) => !memberCompanyIds.has(c.id));
+  const filtered = !q ? list.slice(0, 20) : list.filter((c) => c.name.toLowerCase().includes(q));
+  return filtered.slice(0, 20);
+}
+
+function ucompCandidateListHtml(user, query) {
+  const ct = t("clientDetail.companiesTab");
+  const options = ucompCandidateOptions(user, query);
+  if (!options.length) return `<div class="table-cell-muted filter-search-empty">${ct.pickCompanyEmpty}</div>`;
+  return options.map((c) => `<button type="button" class="filter-search-item" data-ucomp-pick="${c.id}">${pdEscape(c.name)}</button>`).join("");
+}
+
+function openAddToCompanyModal(user) {
+  const e = t("companyDetail.employees");
+  const ct = t("clientDetail.companiesTab");
+  const state = { company: null };
+  const draftMember = () => coMakeMember(state.company.id, user, { type: "director", accessRoles: [], positions: [], share: null });
+
+  openModal({
+    title: ct.add,
+    width: 480,
+    bodyHtml: `
+      <div class="filters-field">
+        <span class="filters-field-label">${ct.pickCompanyTitle}</span>
+        <div class="pc-client-picker">
+          <div class="pc-client-search" id="ucomp-pick-search-wrap">
+            <input type="text" class="address-form-input" id="ucomp-pick-search" placeholder="${ct.pickCompanySearch}" autocomplete="off" />
+            <div class="filter-search-list pc-client-list" id="ucomp-pick-list">${ucompCandidateListHtml(user, "")}</div>
+          </div>
+        </div>
+      </div>
+    `,
+    footerHtml: `<button type="button" class="btn-secondary" id="ucomp-cancel">${e.cancel}</button><button type="button" class="btn-primary" id="ucomp-save" disabled>${e.save}</button>`,
+    onMount: (el) => {
+      el.querySelector("#ucomp-cancel").addEventListener("click", closeModal);
+      const searchInput = el.querySelector("#ucomp-pick-search");
+      const listEl = el.querySelector("#ucomp-pick-list");
+      const bindPicks = () => {
+        listEl.querySelectorAll("[data-ucomp-pick]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.company = CLIENTS_COMPANIES_MOCK.find((c) => c.id === btn.dataset.ucompPick);
+            if (!state.company) return;
+            el.querySelector(".modal-body").innerHTML = `<p class="modal-confirm-text">${pdEscape(state.company.name)}</p>${coEmployeeFieldsHtml(draftMember())}`;
+            el.querySelector("#ucomp-save").disabled = false;
+          });
+        });
+      };
+      searchInput.addEventListener("input", () => {
+        listEl.innerHTML = ucompCandidateListHtml(user, searchInput.value);
+        bindPicks();
+      });
+      bindPicks();
+      el.querySelector("#ucomp-save").addEventListener("click", () => {
+        if (!state.company) return;
+        const data = coReadEmployeeForm(el);
+        closeModal();
+        requireAdmin2fa("company_member_manage", () => {
+          state.company.members.push(coMakeMember(state.company.id, user, data));
+          showToast(e.addedToast);
+          updateClientDetailView(user);
+        });
+      });
+    },
+  });
+}
+
+// ---- Вкладка "Риск и скоринг" — personal.scoringProfile целиком: уровень, итоговый балл и все флаги
+// проверки (не только включённые, как в боковой карточке) — реальные поля, см. renderRiskScoringCard.
+function renderClientDetailRiskTab(user) {
+  const cd = t("clientDetail");
+  const rt = cd.riskTab;
+  const p = user.scoringProfile;
+  if (!p) return `<div class="profile-flat-block">${flatSection(rt.title, `<div class="table-cell-muted">${rt.noLevel}</div>`, null, rt.desc)}</div>`;
+  const body = `
+    <div class="profile-fields profile-fields-grid profile-fields-grid-3">
+      ${detailField(rt.level, p.scoringRiskLevel ? `<span class="badge ${riskLevelBadgeClass(p.scoringRiskLevel)}">${riskLevelLabel(p.scoringRiskLevel)}</span>` : rt.noLevel)}
+      ${detailField(rt.score, p.totalScore != null ? String(p.totalScore) : "—")}
+    </div>
+    <div class="risk-flags-heading">${rt.flagsTitle}</div>
+    <div class="profile-fields profile-fields-grid profile-fields-grid-3">
+      ${["isPep", "isUsa", "isFamilyMemberPep", "sanctionList", "adverseMedia"].map((k) => detailField(rt.flags[k], `<span class="badge ${p[k] ? "badge-danger" : "badge-neutral"}">${p[k] ? rt.flagYes : rt.flagNo}</span>`)).join("")}
+    </div>
+  `;
+  return `<div class="profile-flat-block">${flatSection(rt.title, body, null, rt.desc)}</div>`;
+}
+
 // ---- Изменение статуса KYC (mutation resetKYCLevelTo): сброс клиента на выбранный
 // уровень/шаг с указанным статусом + обязательная причина и необязательный комментарий.
 function openKycStatusChangeModal(user) {
@@ -3618,6 +3763,8 @@ function renderClientDetailTabsBar() {
 
 function renderClientDetailBody(user) {
   if (clientDetailState.subTab === "kycLevels") return renderClientDetailKycTab(user);
+  if (clientDetailState.subTab === "risk") return renderClientDetailRiskTab(user);
+  if (clientDetailState.subTab === "companies") return renderClientDetailCompaniesTab(user);
   if (clientDetailState.subTab === "accounts") return renderClientDetailAccountsTab(user, "user");
   if (clientDetailState.subTab === "operations") return renderClientDetailOperationsTab(user, "user");
   if (clientDetailState.subTab === "tariff") return renderClientDetailTariffTab(user);
@@ -3734,6 +3881,23 @@ function attachClientDetailContentHandlers(user) {
   content.querySelectorAll("[data-company-id]").forEach((btn) => {
     btn.addEventListener("click", () => {
       window.location.hash = `#/clients-companies/${btn.dataset.companyId}`;
+    });
+  });
+
+  const addToCompanyBtn = content.querySelector("#ucomp-add");
+  if (addToCompanyBtn) addToCompanyBtn.addEventListener("click", () => openAddToCompanyModal(user));
+
+  content.querySelectorAll("[data-ucomp-edit]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const pair = companiesOfUser(user).find((p) => p.member.id === btn.dataset.ucompEdit);
+      if (pair) coOpenEditEmployeeModal(pair.company, pair.member, () => updateClientDetailView(user));
+    });
+  });
+
+  content.querySelectorAll("[data-ucomp-remove]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const pair = companiesOfUser(user).find((p) => p.member.id === btn.dataset.ucompRemove);
+      if (pair) coConfirmRemoveEmployee(pair.company, pair.member, () => updateClientDetailView(user));
     });
   });
 

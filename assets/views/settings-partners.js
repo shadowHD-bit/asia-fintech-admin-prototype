@@ -12,7 +12,7 @@ function pn(path) {
 const PN_TABS = ["overview", "auth", "payments", "operations", "clients", "webhooks", "twofa"];
 let pnTab = "overview";
 let pnLastId = null;
-let pnDraft = null; // { id, authMode, twofa, channels, exchangeMode, manual }
+let pnDraft = null; // { id, authMode, clientOwnership, twofa, channels }
 const PN_STATUSES = ["ON_REVIEW", "APPROVED", "DECLINED", "BLOCKED"];
 const PN_KYC_STATUS_BADGE_CLS = { NOT_STARTED: "badge-neutral", IN_PROGRESS: "badge-info", REJECTED_RETRY: "badge-warning", REJECTED_FINAL: "badge-danger", APPROVED: "badge-success" };
 
@@ -162,9 +162,9 @@ function pnOpenCreate() {
         const secret = pnSecret();
         const now = pdNow();
         const rec = {
-          id: pnUuid(3000 + PN_SERVICES.length), name, description: el.querySelector("#pn-desc").value.trim(), email, logoUrl, status: "ON_REVIEW", authMode,
+          id: pnUuid(3000 + PN_SERVICES.length), name, description: el.querySelector("#pn-desc").value.trim(), email, logoUrl, status: "ON_REVIEW", authMode, clientOwnership: "ANY",
           createdDate: now, createdAt: formatDateTime(now), updatedAt: formatDateTime(now), allowedIps: ips, redirectUris: uris, scopes, twofa: { enabled: true }, secretIssuedAt: formatDateTime(now),
-          channels: { INNER: true, SWIFT: false, RU_WIRE: false, SBP: false, QR: false }, exchange: { mode: "NONE", manual: false }, corporateAccount: null,
+          channels: { INNER: true, SWIFT: false, RU_WIRE: false, SBP: false, QR: false },
         };
         PN_SERVICES.unshift(rec);
         pnShowSecret(rec, secret, true);
@@ -202,12 +202,12 @@ function currentPartnerUserId() {
 }
 
 function pnDraftFor(s) {
-  if (!pnDraft || pnDraft.id !== s.id) pnDraft = { id: s.id, authMode: s.authMode, twofa: s.twofa.enabled, channels: { ...s.channels }, exchangeMode: s.exchange.mode, manual: s.exchange.manual };
+  if (!pnDraft || pnDraft.id !== s.id) pnDraft = { id: s.id, authMode: s.authMode, clientOwnership: s.clientOwnership || "ANY", twofa: s.twofa.enabled, channels: { ...s.channels } };
   return pnDraft;
 }
 
 function pnTabsBar(s) {
-  const counts = { clients: pnClientsOf(s.id).length, webhooks: pnWebhooksOf(s.id).length, operations: pnDepositsOfService(s.id).length + pnPaymentsOfService(s.id).length };
+  const counts = { clients: pnClientsOf(s.id).length, webhooks: pnWebhooksOf(s.id).length, operations: pnServiceSbpPayments(s.id).length };
   return `<div class="cd-subtabs">${PN_TABS.map((k) => `<button type="button" class="cd-subtab${pnTab === k ? " is-active" : ""}" data-pn-tab="${k}"><span>${pn(`tabs.${k}`)}</span>${counts[k] != null ? `<span class="quick-tab-count">${counts[k]}</span>` : ""}</button>`).join("")}</div>`;
 }
 
@@ -315,20 +315,6 @@ function pnValueList(items, delAttr, emptyText) {
   return `<div class="pn-list">${items.map((v, i) => `<div class="pn-list-row"><span class="vb-mono">${pdEscape(v)}</span><button type="button" class="pn-x" ${delAttr}="${i}" title="${escapeAttr(pn("remove"))}" aria-label="${escapeAttr(pn("remove"))}"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 8 8M14 6l-8 8"/></svg></button></div>`).join("")}</div>`;
 }
 
-// Среда: до одобрения сервис работает в песочнице, после одобрения — в продакшене (заявка со scopes, callback-URL и IP проверяется нами)
-function pnEnvironmentCard(s) {
-  const env = s.status === "APPROVED" ? "PRODUCTION" : s.status === "BLOCKED" ? "BLOCKED" : "SANDBOX";
-  const rows = [
-    [pn("prod.scopes"), s.scopes.length ? pn("prod.count")(s.scopes.length) : "", s.scopes.length > 0],
-    [pn("prod.uris"), s.redirectUris.length ? pn("prod.count")(s.redirectUris.length) : "", s.redirectUris.length > 0],
-    [pn("prod.ips"), s.allowedIps.length ? pn("prod.count")(s.allowedIps.length) : "", s.allowedIps.length > 0],
-  ];
-  const badge = { PRODUCTION: "badge-success", SANDBOX: "badge-warning", BLOCKED: "badge-danger" }[env];
-  return `<div class="pn-env"><span class="badge ${badge}">${pn(`prod.env.${env}`)}</span></div>
-    <p class="table-cell-muted pn-hint">${pn(`prod.text.${env}`)}</p>
-    <div class="pn-check-list">${rows.map(([label, val, ok]) => `<div class="pn-check${ok ? " is-ok" : ""}"><span class="pn-check-mark">${ok ? CHECK_ICON_SVG : ""}</span><span>${label}</span><span class="table-cell-muted">${val || pn("prod.missing")}</span></div>`).join("")}</div>`;
-}
-
 function pnOverview(s) {
   const f = pn("fields");
   const main = `<div class="profile-fields profile-fields-grid">
@@ -337,11 +323,12 @@ function pnOverview(s) {
     ${detailField(f.created, s.createdAt)}${detailField(f.updated, s.updatedAt)}</div>`;
   const uris = `<div class="pn-block-head"><span class="pn-block-title">${pn("access.redirectUris")}</span><button type="button" class="btn-secondary pn-add-btn" data-pn-add="uri">${PLUS_ICON_SVG}<span>${pn("access.add")}</span></button></div>${pnValueList(s.redirectUris, "data-pn-del-uri", pn("access.noUris"))}<p class="table-cell-muted pn-hint">${pn("access.urisHint")}</p>`;
   const ips = `<div class="pn-block-head"><span class="pn-block-title">${pn("access.ips")}</span><button type="button" class="btn-secondary pn-add-btn" data-pn-add="ip">${PLUS_ICON_SVG}<span>${pn("access.add")}</span></button></div>${pnValueList(s.allowedIps, "data-pn-del-ip", pn("access.noIps"))}<p class="table-cell-muted pn-hint">${pn("access.ipsHint")}</p>`;
-  const scopes = s.scopes.length ? `<div class="pn-chips">${s.scopes.map((x) => `<div class="pn-scope"><span class="vb-mono">${x}</span><span class="table-cell-muted">${pn(`scopeDesc.${x}`)}</span></div>`).join("")}</div>` : `<div class="table-cell-muted">—</div>`;
-  const secret = `<p class="table-cell-muted">${pn("secret.card")(s.secretIssuedAt)}</p><button type="button" class="btn-secondary pn-reissue" data-pn-action2="reissue">${pn("secret.reissue")}</button>`;
+  const scopesList = s.scopes.length ? `<div class="pn-chips">${s.scopes.map((x) => `<div class="pn-scope"><span class="vb-mono">${x}</span><span class="table-cell-muted">${pn(`scopeDesc.${x}`)}</span></div>`).join("")}</div>` : `<div class="table-cell-muted">—</div>`;
+  const scopes = `${scopesList}<p class="table-cell-muted pn-hint">${pn("scopesHint")}</p><div class="card-more-link"><button type="button" class="table-link" id="pn-scopes-edit">${pn("scopesEdit")} →</button></div>`;
+  const secret = `${detailField(pn("secret.issuedLabel"), s.secretIssuedAt)}<button type="button" class="btn-secondary pn-reissue" data-pn-action2="reissue">${pn("secret.reissue")}</button>`;
   return `<div class="client-detail-grid">
     <div class="client-detail-grid-main"><div class="profile-flat-block">${flatSection(pn("sections.main"), main)}${flatSection(pn("sections.access"), `${uris}${ips}`)}</div></div>
-    <div class="client-detail-grid-side">${sectionCard(pn("sections.env"), pnEnvironmentCard(s))}${sectionCard(pn("sections.scopes"), `${scopes}<p class="table-cell-muted pn-hint">${pn("scopesHint")}</p>`)}${sectionCard(pn("sections.secret"), secret)}</div>
+    <div class="client-detail-grid-side">${sectionCard(pn("sections.scopes"), scopes)}${sectionCard(pn("sections.secret"), secret)}</div>
   </div>`;
 }
 
@@ -350,39 +337,46 @@ function pnAuth(s) {
   const d = pnDraftFor(s);
   const modes = ["FULL_OAUTH", "LIGHT"].map((m) => `<label class="pn-mode${d.authMode === m ? " is-active" : ""}"><input type="radio" name="pn-mode" value="${m}"${d.authMode === m ? " checked" : ""} />
       <div><div class="pn-mode-title">${pn(`mode.${m}.title`)}</div><div class="table-cell-muted">${pn(`mode.${m}.text`)}</div><ul class="pn-mode-list">${pn(`mode.${m}.points`).map((p) => `<li>${p}</li>`).join("")}</ul></div></label>`).join("");
-  const dirty = d.authMode !== s.authMode;
+  // Владение клиентами (OAuthExternalServiceEntity.clientOwnership) — задаёт администратор банка (в отличие от
+  // остального на этой вкладке — тем партнёр управляет сам), в LIGHT-режиме не действует (клиенты всегда свои).
+  const ownershipDisabled = d.authMode !== "FULL_OAUTH";
+  const ownership = ["ANY", "OWN"].map(
+    (v) => `<label class="pn-mode${d.clientOwnership === v ? " is-active" : ""}${ownershipDisabled ? " pn-mode-disabled" : ""}"><input type="radio" name="pn-ownership" value="${v}"${d.clientOwnership === v ? " checked" : ""}${ownershipDisabled ? " disabled" : ""} />
+      <div><div class="pn-mode-title">${pn(`ownership.${v}.title`)}</div><div class="table-cell-muted">${pn(`ownership.${v}.text`)}</div></div></label>`
+  ).join("");
+  const dirty = d.authMode !== s.authMode || d.clientOwnership !== (s.clientOwnership || "ANY");
   const flow = `<div class="pn-steps">${pn(`flow.${d.authMode}`).map((x, i) => `<div class="pn-step"><span class="pn-step-num">${i + 1}</span><span>${x}</span></div>`).join("")}</div>`;
   const rows = pnSessionsOf(s.id).sort((a, b) => b.createdDate - a.createdDate);
   const c = pn("columns");
   const sessions = vbMiniTable(
-    [c.session, c.client, c.account, c.kind, c.status, c.scopes, c.created, c.expires],
-    rows.map((x) => { const cl = pnClientById(x.clientId); return [vbIdCell(x.id), cl ? pdEscape(cl.name) : "—", cl ? pnAccountCell(cl) : "—", pn(`sessionKind.${x.kind}`), `<span class="badge ${x.status === "ACTIVE" ? "badge-success" : x.status === "USED" ? "badge-info" : "badge-neutral"}">${pn(`sessionStatus.${x.status}`)}</span>`, x.scopes.length, x.createdAt, x.expiresAt || "—"]; }),
+    [c.session, c.kind, c.status, c.scopes, c.created, c.expires],
+    rows.map((x) => [vbIdCell(x.id), pn(`sessionKind.${x.kind}`), `<span class="badge ${x.status === "ACTIVE" ? "badge-success" : x.status === "USED" ? "badge-info" : "badge-neutral"}">${pn(`sessionStatus.${x.status}`)}</span>`, x.scopes.length, x.createdAt, x.expiresAt || "—"]),
     pn("sessions.empty")
   );
   return `<div class="profile-flat-block">
-    ${flatSection(pn("auth.title"), `<p class="table-cell-muted pn-intro">${pn("auth.intro")}</p><div class="pn-modes">${modes}</div><div class="pn-block-title pn-flow-title">${pn("auth.flowTitle")}</div>${flow}<div class="pn-save-row"><button type="button" class="btn-primary" id="pn-auth-save"${dirty ? "" : " disabled"}>${pn("auth.save")}</button></div>`)}
+    ${flatSection(pn("auth.title"), `<p class="table-cell-muted pn-intro">${pn("auth.intro")}</p><div class="pn-modes">${modes}</div><div class="pn-block-title pn-flow-title">${pn("auth.flowTitle")}</div>${flow}<div class="pn-block-title pn-flow-title">${pn("ownership.title")}</div><p class="table-cell-muted pn-intro">${pn("ownership.intro")}${ownershipDisabled ? ` ${pn("ownership.lightNote")}` : ""}</p><div class="pn-modes">${ownership}</div><div class="pn-save-row"><button type="button" class="btn-primary" id="pn-auth-save"${dirty ? "" : " disabled"}>${pn("auth.save")}</button></div>`)}
     ${flatSection(`${pn("sessions.title")} · ${rows.length}`, `<p class="table-cell-muted pn-intro">${pn("sessions.intro")}</p>${sessions}`)}
   </div>`;
 }
 
 // ---- Вкладка «Платежи» ---------------------------------------------------------------------------------------------
+// ГРАНИЦЫ ПРОТОТИПА (проверено по apps/open-banking 01.10.2026): каналов на самой сущности ExternalServiceEntity
+// нет вовсе — поля channels нет. Раздел построен по более раннему внутреннему плану встречи (см. шапку файла),
+// не по актуальному Open Banking API. Похожий тумблер канала СБП по факту есть в СОСЕДНЕМ бэкенд-модуле
+// (apps/agents-program: Agent.canSbp/canQr, Client.sbpTopUp/qrTopUp) — но это другая сущность (Agent, не
+// ExternalService), больше похожая на реферальную программу, не на open banking. Оставлено как есть — честно
+// задокументировано, не привязывать к open-banking-доку. Блок "Рубли в крипту" (обмен через корпоративный счёт
+// партнёра) убран целиком — ни в open-banking, ни в agents-program такой концепции нет вообще.
 function pnPaymentsDirty(s, d) {
-  return d.exchangeMode !== s.exchange.mode || d.manual !== s.exchange.manual || PN_CHANNELS.some((c) => d.channels[c] !== s.channels[c]);
+  return PN_CHANNELS.some((c) => d.channels[c] !== s.channels[c]);
 }
 
 function pnPayments(s) {
   const d = pnDraftFor(s);
   const channels = PN_CHANNELS.map((c) => `<label class="pn-switch-row pn-channel"><input type="checkbox" data-pn-ch="${c}"${d.channels[c] ? " checked" : ""} /><span><strong>${pn(`channels.${c}.title`)}</strong><br><span class="table-cell-muted">${pn(`channels.${c}.text`)}</span></span></label>`).join("");
-  const exchange = ["NONE", "CORPORATE_ACCOUNT", "WITHDRAWAL"].map((m) => `<label class="pn-mode${d.exchangeMode === m ? " is-active" : ""}"><input type="radio" name="pn-ex" data-pn-ex="${m}"${d.exchangeMode === m ? " checked" : ""} /><div><div class="pn-mode-title">${pn(`exchange.${m}.title`)}</div><div class="table-cell-muted">${pn(`exchange.${m}.text`)}</div></div></label>`).join("");
-  const account = s.corporateAccount ? `<span class="vb-mono">${s.corporateAccount.number}</span> <span class="table-cell-muted">${s.corporateAccount.currency}</span>` : `<span class="table-cell-muted">${pn("exchange.noAccount")}</span>`;
-  const manual = d.exchangeMode === "NONE" ? "" : `<label class="pn-switch-row pn-manual"><input type="checkbox" id="pn-manual"${d.manual ? " checked" : ""} /><span><strong>${pn("exchange.manual")}</strong><br><span class="table-cell-muted">${pn("exchange.manualHint")}</span></span></label>`;
   const dirty = pnPaymentsDirty(s, d);
-  return `<div class="client-detail-grid">
-    <div class="client-detail-grid-main"><div class="profile-flat-block">
-      ${flatSection(pn("channels.title"), `<p class="table-cell-muted pn-intro">${pn("channels.intro")}</p>${channels}`)}
-      ${flatSection(pn("exchange.title"), `<p class="table-cell-muted pn-intro">${pn("exchange.intro")}</p><div class="pn-modes pn-modes-3">${exchange}</div>${manual}<div class="pn-account-row"><span class="table-cell-muted">${pn("exchange.account")}</span>${account}</div><div class="pn-save-row"><button type="button" class="btn-primary" id="pn-pay-save"${dirty ? "" : " disabled"}>${pn("channels.save")}</button></div>`)}
-    </div></div>
-    <div class="client-detail-grid-side">${sectionCard(pn("channels.limitsTitle"), `<p class="table-cell-muted">${pn("channels.limitsText")}</p>`)}</div>
+  return `<div class="profile-flat-block">
+    ${flatSection(pn("channels.title"), `<p class="table-cell-muted pn-intro">${pn("channels.intro")}</p>${channels}<div class="pn-save-row"><button type="button" class="btn-primary" id="pn-pay-save"${dirty ? "" : " disabled"}>${pn("channels.save")}</button></div>`)}
   </div>`;
 }
 
@@ -398,26 +392,43 @@ function pnClients(s) {
   return `<div class="profile-flat-block">${flatSection(`${pn("clients.title")} · ${rows.length}`, `<p class="table-cell-muted pn-intro">${pn("clients.intro")}</p>${table}`)}</div>`;
 }
 
-// ---- Вкладка «Операции» (документ, разделы 4-5: депозиты и выплаты по СБП, у сервиса и у всех его клиентов) --------
+// ---- Вкладка «Операции» (СБП-платежи клиентов сервиса) --------------------------------------------------------------
+// По сути это такие же платежи, что и на основном экране "Операции → Фиатные платежи" (operations-payments.js),
+// с рельсом paymentSystem: "SBP" — отдельной сущности для них в реальном бэкенде нет (документ описывает депозит/
+// выплату по СБП как обычные проводки, см. ГРАНИЦЫ ПРОТОТИПА у pnPaymentsDirty). Поэтому здесь не своя таблица, а
+// тот же центральный список платежей (OPERATIONS_PAYMENTS_MOCK), отфильтрованный по рельсу СБП и клиентам этого
+// сервиса (через internalId, см. PN_CLIENTS/mock/partners.mock.js), с теми же ячейками, что и на основном экране.
+function pnServiceSbpPayments(serviceId) {
+  const internalIds = new Set(pnClientsOf(serviceId).map((c) => c.internalId));
+  return OPERATIONS_PAYMENTS_MOCK.filter((r) => r.paymentSystem === "SBP" && (internalIds.has(r.senderClientId) || internalIds.has(r.recipientClientId))).sort((a, b) => b.createdDate - a.createdDate);
+}
+
+function pnOperationRow(row) {
+  const isExchangeAmount = row.sourceCurrency !== row.targetCurrency;
+  const amountHtml = isExchangeAmount
+    ? `${formatPaymentAmount(row.sourceAmount)} ${row.sourceCurrency} → ${formatPaymentAmount(row.targetAmount)} ${row.targetCurrency}`
+    : `${formatPaymentAmount(row.sourceAmount)} ${row.sourceCurrency}`;
+  return [
+    paymentOperationCellHtml(row),
+    paymentPartiesCellHtml(row),
+    amountHtml,
+    paymentRiskLevelCellHtml(row),
+    `<span class="badge ${paymentStatusBadgeClass(row.status)}">${paymentStatusLabel(row.status)}</span>`,
+    dateTimeCell(row.createdAt),
+    row.settledAt ? dateTimeCell(row.settledAt) : `<span class="table-cell-muted">${t("operationsPayments.noValue")}</span>`,
+  ];
+}
+
 function pnOperations(s) {
-  const c = pn("columns");
-  const deposits = pnDepositsOfService(s.id).sort((a, b) => b.createdDate - a.createdDate);
-  const payments = pnPaymentsOfService(s.id).sort((a, b) => b.createdDate - a.createdDate);
-  const depTable = vbMiniTable(
-    [c.client, c.depCost, c.depAmount, c.depFee, c.status, c.created],
-    deposits.map((d) => { const cl = pnClientById(d.clientId); return [cl ? pnClientCell(cl) : "—", tfNum(d.cost, "RUB"), `${d.amount} RUB`, `${d.totalFee} RUB`, pnDepositStatusBadge(d.status), d.createdAt]; }),
-    pn("operations.noDeposits")
-  );
-  const payTable = vbMiniTable(
-    [c.client, c.paySource, c.payTotal, c.payBank, c.status, c.created],
-    payments.map((p) => { const cl = pnClientById(p.clientId); return [cl ? pnClientCell(cl) : "—", `${p.sourceAmount} RUB`, `${p.totalAmount} RUB`, pdEscape(p.bankName), pnPaymentStatusBadge(p.status), p.createdAt]; }),
-    pn("operations.noPayments")
-  );
   if (!s.channels.SBP) return `<div class="profile-flat-block">${flatSection(pn("operations.title"), `<div class="table-cell-muted">${pn("operations.sbpDisabled")}</div>`)}</div>`;
-  return `<div class="profile-flat-block">
-    ${flatSection(`${pn("operations.deposits")} · ${deposits.length}`, `<p class="table-cell-muted pn-intro">${pn("operations.depositsIntro")}</p>${depTable}`)}
-    ${flatSection(`${pn("operations.payments")} · ${payments.length}`, `<p class="table-cell-muted pn-intro">${pn("operations.paymentsIntro")}</p>${payTable}`)}
-  </div>`;
+  const cols = t("operationsPayments.columns");
+  const rows = pnServiceSbpPayments(s.id);
+  const table = vbMiniTable(
+    [cols.directionSystem, cols.parties, cols.amount, cols.riskLevel, cols.status, cols.createdAt, cols.settledAt],
+    rows.map(pnOperationRow),
+    pn("operations.empty")
+  );
+  return `<div class="profile-flat-block">${flatSection(`${pn("operations.title")} · ${rows.length}`, `<p class="table-cell-muted pn-intro">${pn("operations.intro")}</p>${table}`)}</div>`;
 }
 
 // ---- Вкладка «Вебхуки» ----------------------------------------------------------------------------------------------
@@ -484,10 +495,9 @@ function pnTwofa(s) {
   const dirty = d.twofa !== s.twofa.enabled;
   const body = `<p class="table-cell-muted pn-intro">${pn("twofa.intro")}</p>
     <label class="pn-switch-row"><input type="checkbox" id="pn-twofa"${d.twofa ? " checked" : ""} /><span><strong>${pn("twofa.enable")}</strong><br><span class="table-cell-muted">${pn("twofa.enableHint")}</span></span></label>
-    <div class="pn-note">${d.twofa ? pn("twofa.onNote") : pn("twofa.offNote")}</div>
+    ${d.twofa ? `<div class="pn-note">${pn("twofa.onNote")}</div>` : ""}
     <div class="pn-save-row"><button type="button" class="btn-primary" id="pn-twofa-save"${dirty ? "" : " disabled"}>${pn("twofa.save")}</button></div>`;
-  const side = `<p class="table-cell-muted">${pn("twofa.contract")}</p><p class="table-cell-muted">${pn("twofa.later")}</p>`;
-  return `<div class="client-detail-grid"><div class="client-detail-grid-main"><div class="profile-flat-block">${flatSection(pn("twofa.title"), body)}</div></div><div class="client-detail-grid-side">${sectionCard(pn("twofa.sideTitle"), side)}</div></div>`;
+  return `<div class="profile-flat-block">${flatSection(pn("twofa.title"), body)}</div>`;
 }
 
 // ---- Обработчики вкладок ------------------------------------------------------------------------------------------
@@ -499,6 +509,14 @@ function pnBindTab(s, root) {
   }));
   root.querySelectorAll("[data-pn-del-uri]").forEach((b) => b.addEventListener("click", () => pnRemoveValue(s, "redirectUris", Number(b.dataset.pnDelUri))));
   root.querySelectorAll("[data-pn-del-ip]").forEach((b) => b.addEventListener("click", () => pnRemoveValue(s, "allowedIps", Number(b.dataset.pnDelIp))));
+  const scopesEditBtn = root.querySelector("#pn-scopes-edit");
+  if (scopesEditBtn) scopesEditBtn.addEventListener("click", () => pnOpenEditScopes(s));
+  root.querySelectorAll(".payment-link").forEach((b) => b.addEventListener("click", () => { window.location.hash = `#/operations-payments/${b.dataset.paymentId}`; }));
+  root.querySelectorAll("[data-party-hash]").forEach((b) => b.addEventListener("click", () => { window.location.hash = b.dataset.partyHash; }));
+  // ГРАНИЦЫ ПРОТОТИПА (проверено по apps/open-banking 01.10.2026): в реальном коде такой мутации нет —
+  // секрет выдаётся только один раз при создании сервиса (crypto.randomBytes в create()), перевыпуска нет
+  // нигде — ни в новом, ни в deprecated-резолвере, ни в REST (settings.controller.ts). Оставлено по прямому
+  // запросу — для прототипа это оправданно (админу нужен способ реагировать на утечку секрета).
   root.querySelectorAll("[data-pn-action2='reissue']").forEach((b) => b.addEventListener("click", () => vbConfirm({
     title: pn("secret.confirmTitle"), text: pn("secret.confirmText"), confirmLabel: pn("secret.reissue"), danger: true,
     onConfirm: () => requireAdmin2fa("partner_manage", () => { s.secretIssuedAt = formatDateTime(pdNow()); pnShowSecret(s, pnSecret(), false); }),
@@ -514,17 +532,21 @@ function pnBindTab(s, root) {
   }));
   const redraw = () => pnRefresh(s);
   root.querySelectorAll("input[name='pn-mode']").forEach((r) => r.addEventListener("change", () => { pnDraftFor(s).authMode = r.value; redraw(); }));
+  root.querySelectorAll("input[name='pn-ownership']").forEach((r) => r.addEventListener("change", () => { pnDraftFor(s).clientOwnership = r.value; redraw(); }));
   const authSave = root.querySelector("#pn-auth-save");
-  if (authSave) authSave.addEventListener("click", () => requireAdmin2fa("partner_manage", () => { s.authMode = pnDraftFor(s).authMode; s.updatedAt = formatDateTime(pdNow()); showToast(pn("saved")); render(); }));
+  if (authSave) authSave.addEventListener("click", () => requireAdmin2fa("partner_manage", () => {
+    const d = pnDraftFor(s);
+    s.authMode = d.authMode;
+    s.clientOwnership = d.clientOwnership;
+    s.updatedAt = formatDateTime(pdNow());
+    showToast(pn("saved"));
+    render();
+  }));
   root.querySelectorAll("[data-pn-ch]").forEach((i) => i.addEventListener("change", () => { pnDraftFor(s).channels[i.dataset.pnCh] = i.checked; redraw(); }));
-  root.querySelectorAll("[data-pn-ex]").forEach((i) => i.addEventListener("change", () => { pnDraftFor(s).exchangeMode = i.dataset.pnEx; redraw(); }));
-  const manual = root.querySelector("#pn-manual");
-  if (manual) manual.addEventListener("change", () => { pnDraftFor(s).manual = manual.checked; redraw(); });
   const paySave = root.querySelector("#pn-pay-save");
   if (paySave) paySave.addEventListener("click", () => {
     const d = pnDraftFor(s);
-    if (d.exchangeMode === "CORPORATE_ACCOUNT" && !s.corporateAccount) { showToast(pn("exchange.needAccount")); return; }
-    requireAdmin2fa("partner_manage", () => { s.channels = { ...d.channels }; s.exchange = { mode: d.exchangeMode, manual: d.manual }; showToast(pn("saved")); render(); });
+    requireAdmin2fa("partner_manage", () => { s.channels = { ...d.channels }; showToast(pn("saved")); render(); });
   });
   const tf = root.querySelector("#pn-twofa");
   if (tf) tf.addEventListener("change", () => { pnDraftFor(s).twofa = tf.checked; redraw(); });
@@ -556,6 +578,22 @@ function pnRemoveValue(s, field, index) {
   vbConfirm({
     title: pn("access.removeTitle"), text: pn("access.removeText")(pdEscape(value)), confirmLabel: pn("remove"), danger: true,
     onConfirm: () => requireAdmin2fa("partner_manage", () => { s[field].splice(index, 1); showToast(pn("saved")); render(); }),
+  });
+}
+
+// Права (scopes) — как и accessRoles у сотрудников компании, список заменяется целиком, не добавляется/снимается
+// по одному значению (updateOpenBankingExternalServices, apps/open-banking).
+function pnOpenEditScopes(s) {
+  vbOpenForm({
+    title: pn("sections.scopes"),
+    fieldsHtml: pnScopeChecklist(s.scopes),
+    submitLabel: vt("common.save"),
+    onSubmit: (el) => {
+      const scopes = [...el.querySelectorAll('.rt-client input[type="checkbox"]:checked')].map((c) => c.value);
+      closeModal();
+      requireAdmin2fa("partner_manage", () => { s.scopes = scopes; showToast(pn("saved")); render(); });
+      return null;
+    },
   });
 }
 
