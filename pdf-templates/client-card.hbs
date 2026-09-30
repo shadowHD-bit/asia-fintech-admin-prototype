@@ -1,0 +1,153 @@
+<!doctype html>
+{{!--
+  Шаблон PDF-выгрузки карточки клиента и компании (Handlebars).
+  Повторяет печатную версию из прототипа: assets/views/clients-users.js → clientCardPdfBody / exportClientCardPdf.
+
+  Данные (контекст):
+    kind            "user" | "company"
+    title           ФИО или email клиента / название компании
+    fileTitle       "Карточка клиента | {{title}}" — имя файла PDF
+    status          "Активен" | "Заблокирован" (у компании — "Активна" | "Заблокирована")
+    id              полный ID
+    labels          { main, kyc, accounts, operations, operationsLast10, tariff, empty, ... } — подписи разделов
+    mainSections    [{ title, fields: [{ label, value }] }]         вкладка "Основное"
+    kyc             { levels: [{ name, status, statusClass }], addresses: [{ label, value }],
+                      documents: [{ type, status, number }], checks: [{ name, status }] }
+    accountColumns  { id, description, balance, status }            подписи колонок
+    accounts        [{ id, description, balances: [{ amount, currency }], status }]
+    operationColumns { id, name, status, created }
+    operations      [{ id, name, status, createdAt }]              последние 10, от новых к старым
+    tariff          { name, updatedAt, billingPeriod, description } или null
+
+  Стили печати: цвета и фоны нужно печатать (print-color-adjust), иначе у завершённых уровней KYC
+  пропадает белая галочка на зелёной заливке. Если PDF рендерится headless-браузером —
+  включить printBackground: true.
+--}}
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>{{fileTitle}}</title>
+  <style>
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+    body { font-family: Inter, Arial, sans-serif; font-size: 13px; color: #111827; background: #fff; margin: 0; padding: 24px; }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    h2 { font-size: 17px; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; break-after: avoid; }
+    .meta { color: #6b7280; font-size: 13px; margin-bottom: 20px; }
+    .section { margin-top: 28px; }
+    .block-title { font-weight: 600; margin: 14px 0 8px; }
+    .fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 20px; }
+    .field-label { color: #6b7280; font-size: 12px; }
+    .field-value { font-weight: 500; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; color: #6b7280; font-weight: 500; font-size: 12px; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
+    td { padding: 8px 10px; border-bottom: 1px solid #f0f1f3; vertical-align: top; }
+    tr { break-inside: avoid; }
+    .note { color: #6b7280; }
+    /* Степпер уровней KYC */
+    .levels { display: flex; justify-content: space-around; text-align: center; margin: 12px 0; }
+    .level-circle { width: 36px; height: 36px; margin: 0 auto 6px; border-radius: 50%; border: 2px solid #d1d5db; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #6b7280; }
+    .level-circle.done { background: #16a34a; border-color: #16a34a; color: #fff; box-shadow: 0 0 0 3px #dcfce7; }
+    .level-circle.current { border-color: #6366f1; color: #4338ca; box-shadow: 0 0 0 4px #e0e7ff; }
+    .status-success { color: #16a34a; }
+    .status-danger { color: #dc2626; }
+    .status-warning { color: #d97706; }
+    .status-neutral { color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>{{title}}</h1>
+    <div class="meta">{{status}} · ID: {{id}}</div>
+  </div>
+
+  {{!-- Основное --}}
+  {{#each mainSections}}
+    <div class="block-title">{{title}}</div>
+    <div class="fields">
+      {{#each fields}}
+        <div><div class="field-label">{{label}}</div><div class="field-value">{{#if value}}{{value}}{{else}}—{{/if}}</div></div>
+      {{/each}}
+    </div>
+  {{/each}}
+
+  {{!-- KYC (у клиента) / KYB (у компании) --}}
+  <section class="section">
+    <h2>{{labels.kyc}}</h2>
+    <div class="levels">
+      {{#each kyc.levels}}
+        <div>
+          <div class="level-circle {{state}}">{{#if isDone}}✓{{else}}{{number}}{{/if}}</div>
+          <div>{{name}}</div>
+          <div class="status-{{statusClass}}">{{status}}</div>
+        </div>
+      {{/each}}
+    </div>
+    {{#if kyc.addresses.length}}
+      <div class="block-title">{{labels.addresses}}</div>
+      <div class="fields">
+        {{#each kyc.addresses}}<div><div class="field-label">{{label}}</div><div class="field-value">{{value}}</div></div>{{/each}}
+      </div>
+    {{/if}}
+    {{#if kyc.documents.length}}
+      <div class="block-title">{{labels.documents}}</div>
+      <table>
+        <tbody>
+          {{#each kyc.documents}}<tr><td>{{type}}</td><td>{{number}}</td><td>{{status}}</td></tr>{{/each}}
+        </tbody>
+      </table>
+    {{/if}}
+  </section>
+
+  {{!-- Счета: только счета клиента, без деления на типы --}}
+  <section class="section">
+    <h2>{{labels.accounts}}</h2>
+    {{#if accounts.length}}
+      <table>
+        <thead><tr><th>{{accountColumns.id}}</th><th>{{accountColumns.description}}</th><th>{{accountColumns.balance}}</th><th>{{accountColumns.status}}</th></tr></thead>
+        <tbody>
+          {{#each accounts}}
+            <tr>
+              <td>{{id}}</td>
+              <td>{{#if description}}{{description}}{{else}}—{{/if}}</td>
+              <td>{{#each balances}}{{amount}} {{currency}}{{#unless @last}}<br>{{/unless}}{{else}}—{{/each}}</td>
+              <td>{{status}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    {{else}}
+      <div class="note">{{labels.empty}}</div>
+    {{/if}}
+  </section>
+
+  {{!-- Операции: последние 10 --}}
+  <section class="section">
+    <h2>{{labels.operations}} ({{labels.operationsLast10}})</h2>
+    {{#if operations.length}}
+      <table>
+        <thead><tr><th>{{operationColumns.id}}</th><th>{{operationColumns.name}}</th><th>{{operationColumns.status}}</th><th>{{operationColumns.created}}</th></tr></thead>
+        <tbody>
+          {{#each operations}}<tr><td>{{id}}</td><td>{{name}}</td><td>{{status}}</td><td>{{createdAt}}</td></tr>{{/each}}
+        </tbody>
+      </table>
+    {{else}}
+      <div class="note">{{labels.empty}}</div>
+    {{/if}}
+  </section>
+
+  {{!-- Тариф --}}
+  <section class="section">
+    <h2>{{labels.tariff}}</h2>
+    {{#if tariff}}
+      <div class="fields">
+        <div><div class="field-label">{{labels.tariffName}}</div><div class="field-value">{{tariff.name}}</div></div>
+        <div><div class="field-label">{{labels.tariffUpdated}}</div><div class="field-value">{{tariff.updatedAt}}</div></div>
+        <div><div class="field-label">{{labels.tariffBilling}}</div><div class="field-value">{{tariff.billingPeriod}}</div></div>
+        <div><div class="field-label">{{labels.tariffDescription}}</div><div class="field-value">{{#if tariff.description}}{{tariff.description}}{{else}}—{{/if}}</div></div>
+      </div>
+    {{else}}
+      <div class="note">{{labels.empty}}</div>
+    {{/if}}
+  </section>
+</body>
+</html>
