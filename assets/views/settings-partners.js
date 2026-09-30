@@ -1,7 +1,8 @@
 /* ==========================================================================
-   "Клиенты → Внешние сервисы" (партнёры, подключённые по API через open banking) и "Клиенты → Внешние клиенты" (клиенты,
-   пришедшие через партнёра). Страница сервиса: обзор, авторизация, платежи, клиенты, вебхуки, 2FA. Данные и источники — в
-   mock/partners.mock.js. Списки — на createAccessList, формы — на vbOpenForm; все изменения — через код 2FA.
+   "Клиенты → Партнёрские сервисы" (партнёры, подключённые по API через open banking). Страница сервиса: обзор,
+   авторизация, платежи, клиенты, вебхуки, 2FA. Клиенты, пришедшие через партнёра, отдельного раздела в навигации не
+   имеют — открываются только из вкладки «Клиенты» на карточке сервиса. Данные и источники — в mock/partners.mock.js.
+   Списки — на createAccessList, формы — на vbOpenForm; все изменения — через код 2FA.
    ========================================================================== */
 
 function pn(path) {
@@ -46,7 +47,7 @@ function pnNameCell(s) {
   return `<div class="identity-cell">${vbLink(`#/clients-partners/${s.id}`, pdEscape(s.name))}${vbIdCell(s.id)}</div>`;
 }
 
-// Ссылка на карточку партнёрского клиента (внутри раздела «Внешние клиенты»)
+// Ссылка на карточку партнёрского клиента (открывается из вкладки «Клиенты» на карточке сервиса)
 function pnClientCell(c) {
   return `<div class="identity-cell">${vbLink(`#/clients-partner-users/${c.id}`, pdEscape(c.name))}${vbIdCell(c.id)}</div>`;
 }
@@ -558,46 +559,6 @@ function pnRemoveValue(s, field, index) {
   });
 }
 
-// ---- Клиенты → Внешние клиенты: клиенты всех партнёров одним списком ---------------------------------------------
-const pnUsersList = createAccessList({
-  key: "pn-users",
-  data: () => PN_CLIENTS,
-  searchPlaceholder: () => pn("users.search"),
-  searchText: (c) => `${c.name} ${c.email} ${c.id} ${(pnById(c.serviceId) || {}).name || ""}`,
-  tab: { get: (c) => c.status, values: ["ACTIVE", "BLOCKED"], label: (v) => pn(`clientStatus.${v}`) },
-  filters: [
-    { id: "service", kind: "multi", label: () => pn("columns.service"), get: (c) => c.serviceId, options: () => PN_SERVICES.map((s) => ({ value: s.id, label: s.name })) },
-    { id: "kind", kind: "multi", label: () => pn("columns.account"), get: (c) => c.internalKind, options: () => ["user", "company"].map((v) => ({ value: v, label: pn(`account.${v === "company" ? "CORPORATE" : "INDIVIDUAL"}`) })) },
-    { id: "kyc", kind: "multi", label: () => pn("columns.kyc"), get: (c) => c.kycStatus, options: () => ["NOT_STARTED", "IN_PROGRESS", "REJECTED_RETRY", "REJECTED_FINAL", "APPROVED"].map((v) => ({ value: v, label: pn(`kyc.status.${v}`) })) },
-    { id: "registered", kind: "date", label: () => pn("columns.registered"), get: (c) => c.registeredDate },
-  ],
-  defaultSort: (a, b) => b.registeredDate - a.registeredDate,
-  sorts: { name: (a, b) => a.name.localeCompare(b.name), registered: (a, b) => a.registeredDate - b.registeredDate },
-  columns: [
-    { label: () => pn("columns.client"), sort: "name", html: pnClientCell },
-    { label: () => pn("columns.email"), html: (c) => pdEscape(c.email) },
-    { label: () => pn("columns.service"), html: (c) => { const s = pnById(c.serviceId); return s ? vbLink(`#/clients-partners/${s.id}`, pdEscape(s.name)) : "—"; } },
-    { label: () => pn("columns.account"), html: pnAccountCell },
-    { label: () => pn("columns.kyc"), html: pnKycBadge },
-    { label: () => pn("columns.status"), html: (c) => `<span class="badge ${c.status === "ACTIVE" ? "badge-success" : "badge-danger"}">${pn(`clientStatus.${c.status}`)}</span>` },
-    { label: () => pn("columns.registered"), sort: "registered", html: (c) => dateTimeCell(c.registeredAt) },
-    { label: () => pn("columns.lastLogin"), html: (c) => dateTimeCell(c.lastLoginAt) },
-  ],
-  headerAction: () => `<span class="filters-bar-end">${exportMenuHtml("pn-export", pn("export.button"), pn("users.exportHint"))}</span>`,
-  attachHeaderAction: () => bindExportMenu("pn-export", (f) => {
-    exportTable("partner-clients", f, [pn("columns.client"), pn("columns.email"), pn("columns.service"), pn("columns.account"), pn("columns.kyc"), pn("columns.status"), pn("columns.registered")], PN_CLIENTS.map((c) => [c.name, c.email, (pnById(c.serviceId) || {}).name || "", pn(`account.${c.internalKind === "company" ? "CORPORATE" : "INDIVIDUAL"}`), pn(`kyc.status.${c.kycStatus}`), pn(`clientStatus.${c.status}`), c.registeredAt]));
-    showToast(pn("export.done"));
-  }),
-  attachRows: pnAttachRows,
-});
-
-function viewPartnerUsers() {
-  return `<div class="list-hero">${pageHeader(t("nav.clients-partner-users"), t("navDescriptions.clients-partner-users"), pnInfoButton(pn("users.info"), t("nav.clients-partner-users")))}</div>${pnUsersList.view()}`;
-}
-
-function initPartnerUsers() {
-  pnUsersList.init();
-}
 
 // ---- Карточка партнёрского клиента: его данные, KYC, привязанный аккаунт, счета, операции и сессии ----------------
 function pnKycBlock(c) {
@@ -655,7 +616,7 @@ function viewPartnerUserDetail(id) {
   );
   const accounts = pnAccountsOfClient(c);
   return `<div id="pn-user-root">
-    ${vbDetailHeader({ backHash: "#/clients-partner-users", title: pdEscape(c.name), badges: `<span class="badge ${c.status === "ACTIVE" ? "badge-success" : "badge-danger"}">${pn(`clientStatus.${c.status}`)}</span>`, subtitle: vbIdSubtitle(c.id, [pdEscape(c.email), c.registeredAt]) })}
+    ${vbDetailHeader({ backHash: svc ? `#/clients-partners/${svc.id}` : "#/clients-partners", title: pdEscape(c.name), badges: `<span class="badge ${c.status === "ACTIVE" ? "badge-success" : "badge-danger"}">${pn(`clientStatus.${c.status}`)}</span>`, subtitle: vbIdSubtitle(c.id, [pdEscape(c.email), c.registeredAt]) })}
     <div class="client-detail-grid">
       <div class="client-detail-grid-main"><div class="profile-flat-block">
         ${flatSection(pn("users.detail.general"), main)}

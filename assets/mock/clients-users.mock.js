@@ -51,7 +51,12 @@ function findCountry(id) {
   return COUNTRY_OPTIONS.find((c) => c.id === id) || null;
 }
 
+// Значения service, реально встречающиеся в identity (UsersService: 'BITBANKER', 'FCB', 'DEMO_STAND', 'ASIA_FINTECH' —
+// общий бэкенд обслуживает несколько white-label сервисов). В мастере создания клиента (SERVICE_OPTIONS) выбор уже сужен
+// до вариантов Азия Финтех — из бэк-офиса Азия Финтех нельзя завести клиента напрямую в чужой сервис; но среди
+// существующих клиентов исторически встречаются и другие — по service определяется бейдж "внутренний/внешний клиент".
 const SERVICE_OPTIONS = ["ASIA_FINTECH", "ASIA_FINTECH_KYC_IN_KYB"];
+const SERVICE_VALUES_ALL = [...SERVICE_OPTIONS, "BITBANKER", "FCB"];
 
 // KYCStepStatusEnum — из libs/bank-core-common/lib/enums/kyc-step-status.enum.ts
 const KYC_STATUS_OPTIONS = [
@@ -370,7 +375,7 @@ const CLIENTS_USERS_MOCK = Array.from({ length: 34 }).map((_, i) => {
     updatedDate,
     createdAt: formatDateTime(createdDate),
     updatedAt: formatDateTime(updatedDate),
-    service: pick(SERVICE_OPTIONS, seed),
+    service: pick(SERVICE_VALUES_ALL, seed),
     fullName: `${last} ${first}${middle ? ` ${middle}` : ""}`,
     firstName: first,
     lastName: last,

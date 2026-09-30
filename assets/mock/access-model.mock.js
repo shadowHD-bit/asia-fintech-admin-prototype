@@ -110,7 +110,7 @@ const ACM_FEATURES = [
     WRITE: ["Создание, правка, порядок и статусы правил, маршруты по умолчанию, retry и уведомления"],
   }, true),
   acmFeatureDef("partners", "CLIENTS", {
-    READ: ["Внешние сервисы и внешние клиенты: доступы, сессии, вебхуки"],
+    READ: ["Партнёрские сервисы и их клиенты: доступы, сессии, вебхуки"],
     WRITE: ["Создание сервиса, смена статуса, доступов, режима авторизации, платёжных каналов, вебхуков и 2FA"],
   }),
   acmFeatureDef("tariffs", "SETTINGS", {
@@ -180,7 +180,6 @@ const ACM_PAGES = [
   acmPageDef("settings-routing-settings", "settings", "payment_routing"),
   acmPageDef("settings-routing-executions", "settings", "payment_routing"),
   acmPageDef("clients-partners", "clients", "partners"),
-  acmPageDef("clients-partner-users", "clients", "partners"),
   ...["catalog", "operations", "limits", "restrictions", "commissions", "clients", "history"].map((id) => acmPageDef(`settings-tariffs-${id}`, "settings", "tariffs")),
   acmPageDef("settings-sanctions-individuals", "settings", "sanctions"),
   acmPageDef("settings-sanctions-companies", "settings", "sanctions"),

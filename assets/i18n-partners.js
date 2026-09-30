@@ -1,15 +1,14 @@
-/* Тексты разделов "Клиенты → Внешние сервисы и Внешние клиенты". Подмешиваются в I18N после i18n-rates.js (i18nMerge); ключей нет в EN — берутся из RU */
+/* Тексты раздела "Клиенты → Партнёрские сервисы". Подмешиваются в I18N после i18n-rates.js (i18nMerge); ключей нет в EN — берутся из RU */
 
 i18nMerge(I18N.ru, {
-  nav: { "clients-partners": "Внешние сервисы", "clients-partner-users": "Внешние клиенты" },
+  nav: { "clients-partners": "Партнёрские сервисы" },
   navDescriptions: {
     "clients-partners": "Партнёры, подключённые по API: доступы, режим авторизации, платёжные каналы, операции клиентов, вебхуки и 2FA",
-    "clients-partner-users": "Клиенты, пришедшие через внешние сервисы: привязанный аккаунт в системе, счета, KYC, статус, операции по СБП",
   },
-  accessMatrix: { features: { partners: "Внешние сервисы и клиенты" } },
+  accessMatrix: { features: { partners: "Партнёрские сервисы и их клиенты" } },
   twofa: { actions: { items: { partner_manage: "Управление внешним сервисом" } } },
   partners: {
-    title: "Внешние сервисы",
+    title: "Партнёрские сервисы",
     info: "Внешний сервис — компания-партнёр (первый — Walletverse), подключённая к платформе по API через open banking\nПартнёр перенаправляет клиента на нашу страницу: регистрация и KYC проходят у нас, логин и пароль партнёру не передаются\nРежим авторизации задаётся по сервису: полный OAuth 2.0 или лёгкий (идентификатор и тип клиента)\nСтатусы: на проверке → одобрен или отклонён; одобренный можно заблокировать",
     kycLevel: (n) => `KYC ${n}`,
     kycLevelHint: (n) => (n >= 4 ? "Уровень 4: через Госуслуги, для повышенных лимитов, по желанию клиента" : `Уровень ${n}: проверка на нашей странице — санкционные списки, IDX (паспорт и селфи), данные в Paygine и проверка телефона`),
@@ -129,8 +128,6 @@ i18nMerge(I18N.ru, {
     account: { INDIVIDUAL: "Физлицо", CORPORATE: "Компания" },
     companyRole: { REGISTRANT: "Регистрант, прошёл KYB", EMPLOYEE: "Сотрудник" },
     users: {
-      search: "Поиск по имени, почте, ID или сервису", exportHint: "Все внешние клиенты",
-      info: "Внешние клиенты — клиенты платформы, которые пришли через партнёра по ссылке на регистрацию и прошли KYC на нашей странице; логин и пароль партнёру не передаются\nЛёгкий режим (документ Open Banking, 2026-09-28) поддерживает только физлиц — колонка «Аккаунт» ведёт на реальную карточку клиента (или компании — для сервисов с полным OAuth, вне этого документа)\nKYC клиента — уровень и статус его проверки: NOT_STARTED/IN_PROGRESS/REJECTED_RETRY/REJECTED_FINAL/APPROVED. СБП открывается с уровня, где привязывается телефон",
       detail: { general: "Общая информация" },
     },
     webhooks: {
@@ -188,15 +185,14 @@ i18nMerge(I18N.ru, {
 });
 
 i18nMerge(I18N.en, {
-  nav: { "clients-partners": "External services", "clients-partner-users": "External clients" },
+  nav: { "clients-partners": "Partner services" },
   navDescriptions: {
     "clients-partners": "Partners connected via API: access, authorization mode, payment channels, clients, webhooks and 2FA",
-    "clients-partner-users": "Clients who came through external services: service, account type, KYC level, status, email duplicates with regular clients",
   },
-  accessMatrix: { features: { partners: "External services and clients" } },
+  accessMatrix: { features: { partners: "Partner services and their clients" } },
   twofa: { actions: { items: { partner_manage: "Manage external service" } } },
   partners: {
-    title: "External services",
+    title: "Partner services",
     status: { ON_REVIEW: "On review", APPROVED: "Approved", DECLINED: "Declined", BLOCKED: "Blocked" },
     tabs: { overview: "Overview", auth: "Authorization", payments: "Payments", operations: "Operations", clients: "Clients", webhooks: "Webhooks", twofa: "2FA" },
   },

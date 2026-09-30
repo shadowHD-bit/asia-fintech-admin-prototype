@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Флоу и экраны | Азия Финтех</title>
+<link rel="icon" type="image/svg+xml" href="assets/images/logo-icon.svg" />
+<link href="https://fonts.googleapis.com/css2?family=Bruno+Ace&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/tokens.css?v=79" />
+<link rel="stylesheet" href="assets/style.css?v=79" />
+<style>
+  body { background: var(--color-bg); color: var(--color-text); font-family: var(--font-family); margin: 0; }
+  .flows-page { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
+  .flows-brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 32px; font-family: var(--font-family-brand); font-size: 15px; color: var(--color-text-secondary); }
+  .flows-brand img { width: 24px; height: 24px; }
+  @media (max-width: 640px) { .flows-page { padding: 24px 16px 60px; } }
+</style>
+</head>
+<body>
+  <div class="flows-page">
+    <div class="flows-brand"><img src="assets/images/logo-icon.svg" alt="" /><span>Азия Финтех — Бэк-офис</span></div>
+    <div id="flows-root"></div>
+  </div>
+
+  <script src="assets/i18n.js?v=79"></script>
+  <script src="assets/i18n-rates.js?v=79"></script>
+  <script src="assets/i18n-partners.js?v=79"></script>
+  <script src="assets/i18n-routing.js?v=79"></script>
+  <script>
+    /* ==========================================================================
+       "Флоу и экраны" — полностью отдельная страница (НЕ часть SPA, не в сайдбаре):
+       открывается напрямую по файлу/ссылке flows.html. Карта разделов админки в
+       виде карточек: каждая открывает соответствующий экран в самом приложении.
+
+       NAV_TREE и ICONS ниже — копия структуры навигации из assets/app.js (не
+       грузим сюда app.js целиком: он на DOMContentLoaded сам инициализирует
+       сайдбар/шапку и ждёт их в DOM, которых на этой странице нет). Если состав
+       разделов в app.js меняется — обновите и здесь.
+       ========================================================================== */
+    const currentLang = "ru";
+    function t(path) {
+      const lookup = (dict) => path.split(".").reduce((acc, key) => (acc ? acc[key] : undefined), dict);
+      return lookup(I18N.ru) ?? path;
+    }
+    function pdEscape(value) {
+      return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    const ICONS = {
+      home: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 10 3l7 6.5"/><path d="M5 8.5V17h10V8.5"/><path d="M8 17v-4.5h4V17"/></svg>`,
+      clients: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="7" r="2.75"/><path d="M2.5 17c.4-3 2.4-4.8 5-4.8s4.6 1.8 5 4.8"/><circle cx="14.5" cy="6.5" r="2"/><path d="M13 12.3c2.2.2 3.7 1.9 4 4.7"/></svg>`,
+      user: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7" r="3"/><path d="M4 17c.6-3.6 2.9-5.5 6-5.5s5.4 1.9 6 5.5"/></svg>`,
+      building: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="10" height="14" rx="1"/><path d="M8 7h.01M11 7h.01M8 10h.01M11 10h.01M8 13h.01M11 13h.01"/></svg>`,
+      operations: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="15" height="10" rx="1.5"/><path d="M2.5 9.2h15"/><circle cx="14" cy="12.6" r="1"/></svg>`,
+      payments: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="15" height="9" rx="1.5"/><circle cx="10" cy="10" r="2"/><path d="M5 8v4M15 8v4"/></svg>`,
+      exchange: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10.5M14.5 7 11.5 4M14.5 7l-3 3"/><path d="M16 13H5.5M5.5 13l3-3M5.5 13l3 3"/></svg>`,
+      otc: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6.5" r="2.3"/><circle cx="14" cy="6.5" r="2.3"/><path d="M2.5 15c0-2.2 1.6-3.6 3.5-3.6 1 0 1.8.3 2.4.9M17.5 15c0-2.2-1.6-3.6-3.5-3.6-1 0-1.8.3-2.4.9M7.5 16h5"/></svg>`,
+      analytics: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17V3"/><path d="M3 17h14"/><rect x="6" y="10.5" width="2.4" height="6.5" rx="0.4"/><rect x="10.2" y="7" width="2.4" height="10" rx="0.4"/><rect x="14.4" y="12.5" width="2.4" height="4.5" rx="0.4"/></svg>`,
+      security: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 16 5v4.7c0 4-2.6 6.8-6 8.3-3.4-1.5-6-4.3-6-8.3V5l6-2.5Z"/><path d="M7.5 10 9 11.5 12.5 8"/></svg>`,
+      settings: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.6"/><path d="M10 3v1.6M10 15.4V17M17 10h-1.6M4.6 10H3M15 5l-1.2 1.2M6.2 13.8 5 15M15 15l-1.2-1.2M6.2 6.2 5 5"/></svg>`,
+      box: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 17 6v8l-7 3.5L3 14V6l7-3.5Z"/><path d="M3 6l7 3.5L17 6M10 9.5V17"/></svg>`,
+      lock: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="9" width="11" height="7.5" rx="1.5"/><path d="M6.5 9V6.5a3.5 3.5 0 0 1 7 0V9"/></svg>`,
+      accounts: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="15" height="11" rx="1.6"/><path d="M2.5 8h15"/><path d="M13 12.5h2.5"/></svg>`,
+    };
+
+    // Только то, что реально в NAV_TREE app.js сейчас (settings-masks выключен флагом TF_MASKS_ENABLED = false).
+    const NAV_TREE = [
+      { id: "home", icon: "home" },
+      { id: "clients", icon: "clients", children: [
+        { id: "clients-users", icon: "user" },
+        { id: "clients-companies", icon: "building" },
+        { id: "clients-partners", icon: "exchange" },
+      ] },
+      { id: "analytics-dashboards", icon: "analytics", children: [
+        { id: "analytics-users", icon: "user" },
+        { id: "analytics-operations", icon: "operations" },
+        { id: "analytics-accounts", icon: "accounts" },
+        { id: "analytics-eod", icon: "box" },
+        { id: "analytics-events", icon: "security" },
+        { id: "analytics-routing", icon: "exchange" },
+      ] },
+      { id: "operations", icon: "operations", children: [
+        { id: "operations-payments", icon: "payments" },
+        { id: "operations-crypto-payments", icon: "payments" },
+        { id: "operations-exchanges", icon: "exchange" },
+        { id: "operations-otc", icon: "otc" },
+      ] },
+      { id: "accounts-virtual", icon: "accounts" },
+      { id: "eod", icon: "operations", children: [
+        { id: "eod-dashboard", icon: "analytics" },
+        { id: "eod-discrepancies", icon: "security" },
+        { id: "eod-history", icon: "box" },
+      ] },
+      { id: "financial-reports", icon: "box" },
+      { id: "security", icon: "security", children: [
+        { id: "security-audit-logs", icon: "lock" },
+        { id: "security-aml-checks", icon: "exchange" },
+        { id: "security-system-access", icon: "lock" },
+        { id: "twofa-policy", icon: "lock" },
+      ] },
+      { id: "settings-operational", icon: "settings", children: [
+        { id: "settings-access", icon: "security" },
+        { id: "settings-rates", icon: "exchange" },
+        { id: "settings-vabs-accounts", icon: "accounts" },
+        { id: "settings-routing", icon: "payments", children: [
+          { id: "settings-routing-rules", icon: "box" },
+          { id: "settings-routing-settings", icon: "settings" },
+          { id: "settings-routing-executions", icon: "operations" },
+        ] },
+        { id: "settings-tariffs", icon: "payments", children: [
+          { id: "settings-tariffs-catalog", icon: "box" },
+          { id: "settings-tariffs-operations", icon: "operations" },
+          { id: "settings-tariffs-limits", icon: "security" },
+          { id: "settings-tariffs-restrictions", icon: "lock" },
+          { id: "settings-tariffs-commissions", icon: "payments" },
+        ] },
+        { id: "settings-sanctions", icon: "lock", children: [
+          { id: "settings-sanctions-individuals", icon: "user" },
+          { id: "settings-sanctions-companies", icon: "building" },
+        ] },
+        { id: "settings-eod", icon: "operations", children: [
+          { id: "settings-eod-day", icon: "settings" },
+          { id: "settings-eod-reconciliation", icon: "security" },
+        ] },
+      ] },
+      { id: "settings-core", icon: "lock", children: [
+        { id: "settings-verifications", icon: "security", children: [
+          { id: "settings-verif-kyc", icon: "user" },
+          { id: "settings-verif-kyb", icon: "building" },
+          { id: "settings-verif-documents", icon: "box" },
+          { id: "settings-verif-addresses", icon: "building" },
+        ] },
+        { id: "settings-kyt", icon: "security", children: [{ id: "settings-kyt-configs", icon: "box" }] },
+        { id: "settings-vabs", icon: "settings", children: [
+          { id: "settings-vabs-networks", icon: "exchange" },
+          { id: "settings-vabs-currencies", icon: "payments" },
+          { id: "settings-vabs-enums", icon: "box" },
+          { id: "settings-vabs-operations", icon: "operations" },
+          { id: "settings-vabs-providers", icon: "building" },
+        ] },
+      ] },
+    ];
+    const NAV_INDEX = {};
+    (function buildNavIndex(items) {
+      items.forEach((item) => {
+        NAV_INDEX[item.id] = item;
+        if (item.children) buildNavIndex(item.children);
+      });
+    })(NAV_TREE);
+
+    // Ссылка ведёт в само приложение (index.html), а не открывает файл — flows.html не роутится в SPA.
+    function flowAppLink(id) {
+      return `index.html#/${id}`;
+    }
+
+    function flowDesc(id) {
+      const d = t(`navDescriptions.${id}`);
+      return d.startsWith("navDescriptions.") ? "" : d;
+    }
+
+    function flowBuildSections() {
+      const sections = [];
+      (function walk(items) {
+        items.forEach((item) => {
+          if (item.children) {
+            const leafIds = item.children.filter((c) => !c.children).map((c) => c.id);
+            if (leafIds.length) sections.push({ groupId: item.id, leafIds });
+            walk(item.children);
+          } else {
+            sections.push({ groupId: item.id, leafIds: [item.id] });
+          }
+        });
+      })(NAV_TREE);
+      return sections;
+    }
+
+    const FLOW_GO_ICON = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 13 13 7"/><path d="M8 7h5v5"/></svg>`;
+
+    function flowCardHtml(id, showDesc) {
+      const desc = showDesc ? flowDesc(id) : "";
+      return `<a class="flow-card" href="${flowAppLink(id)}">
+        <div class="flow-card-head">
+          <h3 class="flow-card-title">${pdEscape(t(`nav.${id}`))}</h3>
+          <span class="flow-card-go">${FLOW_GO_ICON}</span>
+        </div>
+        ${desc ? `<p class="flow-card-desc">${pdEscape(desc)}</p>` : ""}
+        <div class="flow-card-path">#/${id}</div>
+      </a>`;
+    }
+
+    // Карточка на внешнюю (не #/route) страницу — например UI-кит: своя вёрстка, своя ссылка, свой путь в подписи.
+    function flowLinkCardHtml(title, desc, href, path) {
+      return `<a class="flow-card" href="${href}" target="_blank" rel="noopener">
+        <div class="flow-card-head">
+          <h3 class="flow-card-title">${pdEscape(title)}</h3>
+          <span class="flow-card-go">${FLOW_GO_ICON}</span>
+        </div>
+        <p class="flow-card-desc">${pdEscape(desc)}</p>
+        <div class="flow-card-path">${pdEscape(path)}</div>
+      </a>`;
+    }
+
+    function flowSectionHtml(sec) {
+      const navItem = NAV_INDEX[sec.groupId];
+      const icon = (navItem && ICONS[navItem.icon]) || "";
+      return `<section class="flow-section">
+        <header class="flow-section-head">
+          ${icon ? `<span class="flow-section-icon">${icon}</span>` : ""}
+          <div class="flow-section-main">
+            <h2 class="flow-section-title">${pdEscape(t(`nav.${sec.groupId}`))}</h2>
+          </div>
+          <span class="flow-section-count">${sec.leafIds.length}</span>
+        </header>
+        <div class="flow-cards">${sec.leafIds.map((id) => flowCardHtml(id, true)).join("")}</div>
+      </section>`;
+    }
+
+    function renderFlows() {
+      const s = t("flows");
+      const sections = flowBuildSections();
+      document.getElementById("flows-root").innerHTML = `
+        <div class="page-header">
+          <div class="page-header-main">
+            <h1 class="page-title">${s.title}</h1>
+          </div>
+        </div>
+        <div class="flow-sections">
+          <section class="flow-section">
+            <header class="flow-section-head">
+              <div class="flow-section-main"><h2 class="flow-section-title">Справка</h2></div>
+              <span class="flow-section-count">1</span>
+            </header>
+            <div class="flow-cards">${flowLinkCardHtml("UI-кит", "Компоненты интерфейса и правила их использования", "docs/ui-kit.html", "docs/ui-kit.html")}</div>
+          </section>
+          ${sections.map(flowSectionHtml).join("")}
+        </div>
+      `;
+    }
+
+    renderFlows();
+  </script>
+</body>
+</html>

@@ -49,7 +49,6 @@ const NAV_TREE = [
     children: [
       { id: "clients-users", icon: "user" },
       { id: "clients-companies", icon: "building" },
-      { id: "clients-partner-users", icon: "user" },
       { id: "clients-partners", icon: "exchange" },
     ],
   },
@@ -102,11 +101,14 @@ const NAV_TREE = [
     ],
   },
   {
-    id: "settings",
+    // Настройки, которыми пользуются часто и которые не затрагивают основу системы: роли, курсы,
+    // маршрутизация, тарифы, санкционные списки, расписание операционного дня.
+    id: "settings-operational",
     icon: "settings",
     children: [
       { id: "settings-access", icon: "security" },
       { id: "settings-rates", icon: "exchange" },
+      { id: "settings-vabs-accounts", icon: "accounts" },
       {
         id: "settings-routing",
         icon: "payments",
@@ -150,10 +152,21 @@ const NAV_TREE = [
         ],
       },
       {
-        id: "settings-kyt",
-        icon: "security",
-        children: [{ id: "settings-kyt-configs", icon: "box" }],
+        id: "settings-eod",
+        icon: "operations",
+        children: [
+          { id: "settings-eod-day", icon: "settings" },
+          { id: "settings-eod-reconciliation", icon: "security" },
+        ],
       },
+    ],
+  },
+  {
+    // Конфигурация основы системы: правила проверки клиентов, скоринг транзакций, справочники и
+    // интеграции ядра vABS. Меняется редко, ошибка задевает систему целиком.
+    id: "settings-core",
+    icon: "lock",
+    children: [
       {
         id: "settings-verifications",
         icon: "security",
@@ -165,12 +178,9 @@ const NAV_TREE = [
         ],
       },
       {
-        id: "settings-eod",
-        icon: "operations",
-        children: [
-          { id: "settings-eod-day", icon: "settings" },
-          { id: "settings-eod-reconciliation", icon: "security" },
-        ],
+        id: "settings-kyt",
+        icon: "security",
+        children: [{ id: "settings-kyt-configs", icon: "box" }],
       },
       {
         id: "settings-vabs",
@@ -181,7 +191,6 @@ const NAV_TREE = [
           { id: "settings-vabs-enums", icon: "box" },
           { id: "settings-vabs-operations", icon: "operations" },
           { id: "settings-vabs-providers", icon: "building" },
-          { id: "settings-vabs-accounts", icon: "accounts" },
         ],
       },
     ],
@@ -277,7 +286,7 @@ function activeNavId(routeId = currentRouteId()) {
   }
   if (routeId === "operations-otc-detail") return "operations-otc";
   if (routeId === "clients-partners-detail") return "clients-partners";
-  if (routeId === "clients-partner-users-detail") return "clients-partner-users";
+  if (routeId === "clients-partner-users-detail") return "clients-partners";
   if (routeId === "settings-routing-rule") return "settings-routing-rules";
   if (routeId === "settings-routing-execution") return "settings-routing-executions";
   return routeId;
@@ -540,7 +549,7 @@ function renderBreadcrumbs(routeId, navItem) {
   } else if (routeId === "settings-routing-rule") {
     const rrule = rgRuleRef() === "new" ? null : rgRuleById(rgRuleRef());
     parts = [
-      { label: navLabel(NAV_INDEX["settings"]) },
+      { label: navLabel(NAV_INDEX["settings-operational"]) },
       { label: navLabel(NAV_INDEX["settings-routing"]) },
       { label: navLabel(NAV_INDEX["settings-routing-rules"]), route: "settings-routing-rules" },
       { label: rrule ? rrule.name : (rgRuleRef() === "new" ? t("routing.rule.newTitle") : t("vabs.common.notFoundTitle")) },
@@ -548,7 +557,7 @@ function renderBreadcrumbs(routeId, navItem) {
   } else if (routeId === "settings-routing-execution") {
     const ex = RG_EXECUTIONS.find((x) => x.id === rgExecutionRef());
     parts = [
-      { label: navLabel(NAV_INDEX["settings"]) },
+      { label: navLabel(NAV_INDEX["settings-operational"]) },
       { label: navLabel(NAV_INDEX["settings-routing"]) },
       { label: navLabel(NAV_INDEX["settings-routing-executions"]), route: "settings-routing-executions" },
       { label: ex ? pdShort(ex.id) : t("vabs.common.notFoundTitle") },
@@ -562,16 +571,18 @@ function renderBreadcrumbs(routeId, navItem) {
     ];
   } else if (routeId === "clients-partner-users-detail") {
     const pu = pnClientById(currentPartnerUserId());
+    const svc = pu ? pnById(pu.serviceId) : null;
     parts = [
       { label: navLabel(NAV_INDEX["clients"]) },
-      { label: navLabel(NAV_INDEX["clients-partner-users"]), route: "clients-partner-users" },
+      { label: navLabel(NAV_INDEX["clients-partners"]), route: "clients-partners" },
+      { label: svc ? svc.name : t("vabs.common.notFoundTitle"), route: svc ? `clients-partners/${svc.id}` : undefined },
       { label: pu ? pu.name : t("vabs.common.notFoundTitle") },
     ];
   } else if (routeId === "tariffs-detail") {
     const ref = tfRef();
     const listId = { tariff: "settings-tariffs-catalog", limit: "settings-tariffs-limits", commission: "settings-tariffs-commissions", mask: "settings-masks-list" }[ref ? ref.kind : "tariff"];
     parts = [
-      { label: navLabel(NAV_INDEX["settings"]) },
+      { label: navLabel(NAV_INDEX["settings-operational"]) },
       { label: navLabel(NAV_INDEX[listId].parent) },
       { label: navLabel(NAV_INDEX[listId]), route: listId },
       { label: tfEntityTitle(ref) },
@@ -589,7 +600,7 @@ function renderBreadcrumbs(routeId, navItem) {
     const isConfig = ref && ref.kind === "config";
     const listId = isConfig ? "settings-kyt-configs" : "security-aml-checks";
     parts = [
-      { label: navLabel(NAV_INDEX[isConfig ? "settings" : "security"]) },
+      { label: navLabel(NAV_INDEX[isConfig ? "settings-core" : "security"]) },
       ...(isConfig ? [{ label: navLabel(NAV_INDEX["settings-kyt"]) }] : []),
       { label: navLabel(NAV_INDEX[listId]), route: listId },
       { label: ktEntityTitle(ref) },
@@ -598,7 +609,7 @@ function renderBreadcrumbs(routeId, navItem) {
     const ref = vfRef();
     const listId = `settings-verif-${ref ? ref.kind : "kyc"}`;
     parts = [
-      { label: navLabel(NAV_INDEX["settings"]) },
+      { label: navLabel(NAV_INDEX["settings-core"]) },
       { label: navLabel(NAV_INDEX["settings-verifications"]) },
       { label: navLabel(NAV_INDEX[listId]), route: listId },
       { label: vfEntityTitle(ref) },
@@ -607,7 +618,7 @@ function renderBreadcrumbs(routeId, navItem) {
     const ref = currentAccessRef();
     const entity = ref.kind === "role" ? acRoleById(ref.id) : acAdminById(ref.id);
     parts = [
-      { label: navLabel(NAV_INDEX["settings"]) },
+      { label: navLabel(NAV_INDEX["settings-operational"]) },
       { label: navLabel(NAV_INDEX["settings-access"]), route: "settings-access" },
       { label: entity ? entity.name : t("access.notFoundTitle") },
     ];
@@ -615,7 +626,7 @@ function renderBreadcrumbs(routeId, navItem) {
     const ref = vbRef();
     const listId = `settings-vabs-${ref ? ref.kind : "networks"}`;
     parts = [
-      { label: navLabel(NAV_INDEX["settings"]) },
+      { label: navLabel(NAV_INDEX["settings-core"]) },
       { label: navLabel(NAV_INDEX["settings-vabs"]) },
       { label: navLabel(NAV_INDEX[listId]), route: listId },
       { label: vbEntityTitle(ref) },
@@ -624,9 +635,9 @@ function renderBreadcrumbs(routeId, navItem) {
     const ref = currentAccountRef();
     const acc = ref && accFind(ref.kind, ref.id);
     const listId = ref && ref.kind !== "virtual" ? "settings-vabs-accounts" : "accounts-virtual";
-    // Счета клиентов — раздел верхнего уровня; реальные и корреспондентские — в настройках системы
+    // Счета клиентов — раздел верхнего уровня; реальные и корреспондентские — в операционных настройках
     parts = [
-      ...(ref && ref.kind !== "virtual" ? [{ label: navLabel(NAV_INDEX["settings"]) }, { label: navLabel(NAV_INDEX[listId].parent) }] : []),
+      ...(ref && ref.kind !== "virtual" ? [{ label: navLabel(NAV_INDEX[listId].parent) }] : []),
       { label: navLabel(NAV_INDEX[listId]), route: ref && ref.kind !== "virtual" ? `${listId}/${ref.kind}` : listId },
       { label: acc ? accTitle(acc) : t("accounts.notFoundTitle") },
     ];
@@ -1025,9 +1036,6 @@ function render() {
   } else if (routeId === "settings-rates") {
     content.innerHTML = viewSettingsRates();
     initSettingsRates();
-  } else if (routeId === "clients-partner-users") {
-    content.innerHTML = viewPartnerUsers();
-    initPartnerUsers();
   } else if (routeId === "clients-partner-users-detail") {
     const id = currentPartnerUserId();
     content.innerHTML = viewPartnerUserDetail(id);
@@ -1125,9 +1133,6 @@ function render() {
   } else if (routeId === "analytics-accounts") {
     content.innerHTML = viewAnalyticsAccounts();
     initAnalyticsAccounts();
-  } else if (routeId === "scenarios") {
-    content.innerHTML = viewScenarios();
-    initScenarios();
   } else if (routeId === "analytics-eod") {
     content.innerHTML = viewAnalyticsEod();
     initAnalyticsEod();

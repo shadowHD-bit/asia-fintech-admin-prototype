@@ -806,6 +806,10 @@ function renderClientsUsersRow(row) {
               ${COPY_ICON_SVG}
             </button>
           </div>
+          <div class="identity-cell-sub">
+            <span class="identity-cell-tag">${t("clientsUsers.serviceTag")}</span>
+            <span>${pdEscape(row.service)}</span>
+          </div>
         </div>
       </td>
       <td>${(() => { const b = !!(row.blockReasons && row.blockReasons.length); const l = t(b ? "clientDetail.blocked" : "clientDetail.active"); return `<span class="user-name-cell"><span class="status-dot ${b ? "is-blocked" : "is-active"}" title="${l}" aria-label="${l}"></span><span>${row.fullName}</span></span>`; })()}</td>
@@ -1203,12 +1207,19 @@ function formatBirthDate(date) {
   return `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)}.${date.getFullYear()}`;
 }
 
+// Внутренний/внешний клиент — по полю service (общий identity-бэкенд обслуживает несколько white-label сервисов,
+// см. SERVICE_VALUES_ALL): значения ASIA_FINTECH* — свой сервис, остальное (BITBANKER, FCB и т.д.) — чужой.
+function isExternalService(service) {
+  return !!service && !service.startsWith("ASIA_FINTECH");
+}
+
 // Заголовок карточки клиента: ФИО (если не указано — email) и статус блокировки
 // рядом, ниже — email (если в заголовке не он), ID и телефон (если указан).
 function renderClientDetailHeader(user) {
   const cd = t("clientDetail");
   const isBlocked = !!(user.blockReasons && user.blockReasons.length);
   const titleIsEmail = !user.fullName;
+  const isExternal = isExternalService(user.service);
 
   const subtitleParts = [
     titleIsEmail ? null : `<span class="inline-copy">${user.email}${copyIconButton(user.email)}</span>`,
@@ -1226,6 +1237,7 @@ function renderClientDetailHeader(user) {
         <div class="client-detail-title-row">
           <span class="page-title">${titleIsEmail ? user.email : user.fullName}</span>
           <span class="badge ${isBlocked ? "badge-danger" : "badge-success"}">${isBlocked ? cd.blocked : cd.active}</span>
+          <span class="badge badge-neutral">${isExternal ? cd.externalClient : cd.internalClient}</span>
         </div>
         <div class="client-detail-subtitle">
           ${subtitleParts.join(`<span class="client-detail-subtitle-sep">·</span>`)}
