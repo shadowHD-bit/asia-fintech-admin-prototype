@@ -903,6 +903,7 @@ body.docs-view-open {
   color: var(--color-text);
   margin: 0;
   letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
 }
 
 .page-title:not(:last-child) {
@@ -1057,6 +1058,8 @@ body.docs-view-open {
 .client-detail-title-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 4px;
   gap: var(--space-2);
 }
 
@@ -1064,6 +1067,8 @@ body.docs-view-open {
 .client-detail-subtitle {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 4px;
   gap: var(--space-2);
   font-size: var(--font-size-sm);
   color: var(--color-text-tertiary);
@@ -5685,6 +5690,8 @@ textarea.vb-mono { line-height: 1.45; }
 .pf-page { max-width: 760px; }
 .pf-hero { display: flex; align-items: center; gap: var(--space-4); padding-bottom: var(--space-5); }
 .pf-avatar { width: 64px; height: 64px; font-size: 22px; flex-shrink: 0; }
+.pf-hero-meta { min-width: 0; }
+.pf-hero-meta .profile-card-name, .pf-hero-meta .profile-card-role { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pf-contacts { display: flex; gap: var(--space-3); overflow-x: auto; padding-bottom: var(--space-2); scroll-snap-type: x proximity; }
 .pf-contact { flex: 0 0 auto; min-width: 230px; max-width: 280px; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); scroll-snap-align: start; }
 .pf-contact-avatar { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--color-brand-soft); color: var(--color-brand); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); flex-shrink: 0; }.pf-contact-main { display: flex; flex-direction: column; min-width: 0; }
@@ -5759,6 +5766,8 @@ textarea.vb-mono { line-height: 1.45; }
   .hm-tile-big { font-size: 34px; }
   .hm-pill { padding: 6px 12px; }
   .hm-map-chips { gap: 6px; }
+  .hm-tiles-head { flex-wrap: wrap; }
+  .hm-tiles-head .hm-link { flex: 1 1 auto; justify-content: center; }
 }
 
 /* Вкладка "Безопасность" клиента/компании */
@@ -5934,8 +5943,7 @@ textarea.vb-mono { line-height: 1.45; }
   .client-detail-header.cd-hero .cd-header-menu { margin-left: auto; order: 2; }
   .client-detail-header.cd-hero .client-detail-back { order: 1; }
   .client-detail-header.cd-hero .cd-avatar { order: 1; }
-  .client-detail-header.cd-hero .page-title { font-size: 22px; overflow-wrap: anywhere; }
-  .client-detail-header .client-detail-subtitle { flex-wrap: wrap; row-gap: 4px; }
+  .client-detail-header.cd-hero .page-title { font-size: 22px; }
   .cd-hero-pills { gap: var(--space-2); }
 
   /* Вкладки карточки — одной строкой со свайпом */
@@ -6230,6 +6238,16 @@ textarea.vb-mono { line-height: 1.45; }
   .modal-body { padding: var(--space-4); }
   .modal-footer { flex-wrap: wrap; }
   .modal-footer > .btn-primary, .modal-footer > .btn-secondary, .modal-footer > .btn-danger { flex: 1 1 auto; }
+  /* Спейсер футера настройки карточек (раздвигает "Сбросить" и "Отмена/Сохранить") сам
+     становится flex:1 1 auto наравне с кнопками на узком футере — убираем, иначе кнопки
+     садятся вперемешку с пустым растущим блоком между ними. */
+  .hm-card-foot-spacer { display: none; }
+
+  /* Настройка карточек главной: строка с чекбоксом/лейблом и выбором метрики — на телефоне
+     выбор метрики уезжает на свою строку на всю ширину, иначе вместе с 230px-дропдауном
+     лейбл карточки сжимается до нечитаемого обрезка. */
+  .hm-card-row { flex-wrap: wrap; row-gap: var(--space-2); }
+  .hm-card-dd { flex: 1 1 100%; width: auto; order: 1; }
 }
 @media (max-width: 560px) {
   /* Степпер мастера: подписи только у текущего шага, остальные — кружки */

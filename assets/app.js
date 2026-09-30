@@ -728,7 +728,7 @@ function viewProfile() {
       ${pageHeader(p.title, "", logout)}
       <div class="pf-hero">
         <div class="profile-card-avatar pf-avatar">${CURRENT_ADMIN.initials}</div>
-        <div><div class="profile-card-name">${pdEscape(CURRENT_ADMIN.name)}</div><div class="profile-card-role">${pdEscape(roleLabel)}</div></div>
+        <div class="pf-hero-meta"><div class="profile-card-name">${pdEscape(CURRENT_ADMIN.name)}</div><div class="profile-card-role">${pdEscape(roleLabel)}</div></div>
       </div>
     </div>
     <div class="cd-tabs-wrap pf-tabs"><div class="cd-subtabs">${["profile", "security"]
