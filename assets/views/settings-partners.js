@@ -63,6 +63,8 @@ function pnAccountCell(c) {
 function pnAttachRows(wrap) {
   vbAttachRows(wrap);
   wrap.querySelectorAll(".id-copy").forEach((btn) => btn.addEventListener("click", () => copyTextToClipboard(btn.dataset.copyValue).then(() => flashCopied(btn))));
+  wrap.querySelectorAll("[data-pn-open-id]").forEach((btn) => btn.addEventListener("click", () => { window.location.hash = `#/clients-partners/${btn.dataset.pnOpenId}`; }));
+  wrap.querySelectorAll("[data-pn-info]").forEach((btn) => { btn.style.cursor = "default"; btn.addEventListener("click", (e) => e.stopPropagation()); });
 }
 
 function pnInfoButton(text, label) {
@@ -85,29 +87,36 @@ const pnList = createAccessList({
   columns: [
     { label: () => pn("columns.service"), sort: "name", html: pnNameCell },
     { label: () => pn("columns.status"), html: (s) => pnStatusBadge(s.status) },
-    { label: () => pn("columns.mode"), html: (s) => pnModeBadge(s.authMode) },
-    { label: () => pn("columns.channels"), html: (s) => PN_CHANNELS.filter((c) => s.channels[c]).map((c) => pn(`channels.${c}.short`)).join(", ") || "—" },
-    { label: () => pn("columns.clients"), html: (s) => pnClientsOf(s.id).length },
-    { label: () => pn("columns.webhooks"), html: (s) => { const w = pnWebhooksOf(s.id); return w.length ? pn("list.webhooksActive")(w.filter((x) => x.isActive).length, w.length) : "—"; } },
-    { label: () => pn("columns.created"), sort: "created", html: (s) => dateTimeCell(s.createdAt) },
+    { label: () => pn("columns.mode"), tdClass: "col-hide-sm", html: (s) => pnModeBadge(s.authMode) },
+    { label: () => pn("columns.channels"), tdClass: "col-hide-sm", html: (s) => PN_CHANNELS.filter((c) => s.channels[c]).map((c) => pn(`channels.${c}.short`)).join(", ") || "—" },
+    { label: () => pn("columns.clients"), tdClass: "col-hide-sm", html: (s) => pnClientsOf(s.id).length },
+    { label: () => pn("columns.webhooks"), tdClass: "col-hide-sm", html: (s) => { const w = pnWebhooksOf(s.id); return w.length ? pn("list.webhooksActive")(w.filter((x) => x.isActive).length, w.length) : "—"; } },
+    { label: () => pn("columns.created"), sort: "created", tdClass: "col-hide-sm", html: (s) => dateTimeCell(s.createdAt) },
+    { label: () => "", tdClass: "col-show-sm", html: (s) => rowKebabMenu(`pn-km-${s.id}`, [
+      { label: `${pn("columns.mode")}: ${pn(`mode.${s.authMode}.short`)}`, icon: "", attrs: 'data-pn-info' },
+      { label: `${pn("columns.clients")}: ${pnClientsOf(s.id).length}`, icon: "", attrs: 'data-pn-info' },
+      { label: pn("list.open"), icon: ARROW_RIGHT_ICON_SVG, attrs: `data-pn-open-id="${s.id}"` },
+    ]) },
   ],
-  headerAction: () => `<span class="filters-bar-end">${exportMenuHtml("pn-export", pn("export.button"), pn("export.hint"))}<button type="button" class="btn-primary" id="pn-add">${PLUS_ICON_SVG}<span>${pn("list.add")}</span></button></span>`,
-  attachHeaderAction: () => {
-    bindExportMenu("pn-export", (f) => {
-      exportTable("external-services", f, [pn("columns.service"), pn("columns.status"), pn("columns.mode"), pn("columns.clients"), pn("columns.scopes"), "Email", pn("columns.created")], PN_SERVICES.map((s) => [s.name, pn(`status.${s.status}`), pn(`mode.${s.authMode}.short`), pnClientsOf(s.id).length, s.scopes.join(" "), s.email, s.createdAt]));
-      showToast(pn("export.done"));
-    });
-    document.getElementById("pn-add").addEventListener("click", pnOpenCreate);
-  },
   attachRows: pnAttachRows,
 });
 
 function viewPartners() {
-  return `<div class="list-hero">${pageHeader(t("nav.clients-partners"), t("navDescriptions.clients-partners"), pnInfoButton(pn("info"), pn("title")))}</div>${pnList.view()}`;
+  const heroActions = `<span class="filters-bar-end">${sectionHintBtn("pn-hint-btn", pn("info"))}<span class="hdr-desktop-only">${exportMenuHtml("pn-export", pn("export.button"), pn("export.hint"))}</span><button type="button" class="btn-primary hdr-desktop-only" id="pn-add">${PLUS_ICON_SVG}<span>${pn("list.add")}</span></button>${hdrActionsKebab("pn-hdr-km", [{ id: "pn-export-csv", label: `${pn("export.button")} CSV` }, { id: "pn-export-xlsx", label: `${pn("export.button")} XLSX` }, { id: "pn-add-m", icon: PLUS_ICON_SVG, label: pn("list.add") }])}</span>`;
+  return `<div class="list-hero">${pageHeader(t("nav.clients-partners"), t("navDescriptions.clients-partners"), heroActions)}</div>${pnList.view()}`;
 }
 
 function initPartners() {
   pnList.init();
+  const doExport = (f) => {
+    exportTable("external-services", f, [pn("columns.service"), pn("columns.status"), pn("columns.mode"), pn("columns.clients"), pn("columns.scopes"), "Email", pn("columns.created")], PN_SERVICES.map((s) => [s.name, pn(`status.${s.status}`), pn(`mode.${s.authMode}.short`), pnClientsOf(s.id).length, s.scopes.join(" "), s.email, s.createdAt]));
+    showToast(pn("export.done"));
+  };
+  bindExportMenu("pn-export", doExport);
+  document.getElementById("pn-add")?.addEventListener("click", pnOpenCreate);
+  document.getElementById("pn-export-csv")?.addEventListener("click", () => { closeAllRowKebabs(); doExport("csv"); });
+  document.getElementById("pn-export-xlsx")?.addEventListener("click", () => { closeAllRowKebabs(); doExport("xlsx"); });
+  document.getElementById("pn-add-m")?.addEventListener("click", () => { closeAllRowKebabs(); pnOpenCreate(); });
 }
 
 // ---- Создание сервиса ------------------------------------------------------------------------------------------
@@ -140,7 +149,7 @@ function pnOpenCreate() {
     width: 620,
     intro: f.createIntro,
     fieldsHtml: `${vbInput("pn-name", `${f.name} *`, "")}${vbInput("pn-desc", f.description, "")}${vbInput("pn-email", `${f.email} *`, "", 'type="email"')}${vbInput("pn-logo", `${f.logoUrl} *`, "", 'placeholder="https://"')}
-      ${vbSelect("pn-mode", f.mode, ["FULL_OAUTH", "LIGHT"].map((m) => ({ value: m, label: pn(`mode.${m}.title`) })), "FULL_OAUTH")}
+      <label class="filters-field vb-field"><span class="filters-field-label">${f.mode}</span>${mfSelect("pn-mode", ["FULL_OAUTH", "LIGHT"].map((m) => ({ v: m, l: pn(`mode.${m}.title`) })), "FULL_OAUTH")}</label>
       ${vbTextarea("pn-uris", `${f.redirectUris} *`, "", 2)}${vbTextarea("pn-ips", f.ips, "", 2)}${pnScopeChecklist([])}`,
     submitLabel: vt("common.create"),
     onSubmit: (el) => {
@@ -156,7 +165,7 @@ function pnOpenCreate() {
       if (!uris.length || !uris.every(pnIsUrl)) return e.uris;
       if (!ips.every(pnIsIp)) return e.ips;
       const scopes = [...el.querySelectorAll(".rt-clients input:checked")].map((i) => i.value);
-      const authMode = el.querySelector("#pn-mode").value;
+      const authMode = el.querySelector("#pn-mode")?.dataset.value || "FULL_OAUTH";
       closeModal();
       requireAdmin2fa("partner_manage", () => {
         const secret = pnSecret();

@@ -847,7 +847,7 @@ function attachClientsCompaniesTableHandlers() {
 }
 
 function viewClientsCompanies() {
-  const heroActions = `<span class="filters-bar-end">${exportMenuHtml("cc-export", t("clientsCompanies.export.button"), t("clientsCompanies.export.hint"))}<button type="button" class="btn-primary" id="cc-add">${PLUS_ICON_SVG}<span>${t("clientsCompanies.create.button")}</span></button></span>`;
+  const heroActions = `<span class="filters-bar-end">${sectionHintBtn("cc-hint-btn", t("clientsCompanies.info"))}<span class="hdr-desktop-only">${exportMenuHtml("cc-export", t("clientsCompanies.export.button"), t("clientsCompanies.export.hint"))}</span><button type="button" class="btn-primary hdr-desktop-only" id="cc-add">${PLUS_ICON_SVG}<span>${t("clientsCompanies.create.button")}</span></button>${hdrActionsKebab("cc-hdr-km", [{ id: "cc-export-csv", label: `${t("clientsCompanies.export.button")} CSV` }, { id: "cc-export-xlsx", label: `${t("clientsCompanies.export.button")} XLSX` }, { id: "cc-add-m", icon: PLUS_ICON_SVG, label: t("clientsCompanies.create.button") }])}</span>`;
   return `
     <div class="list-hero">${pageHeader(t("nav.clients-companies"), t("navDescriptions.clients-companies"), heroActions)}</div>
     ${renderCompanyMetricsCards()}
@@ -922,6 +922,9 @@ function initClientsCompaniesView() {
   attachClientsCompaniesTableHandlers();
   const addBtn = document.getElementById("cc-add");
   if (addBtn) addBtn.addEventListener("click", openCompanyCreateWizard);
+  document.getElementById("cc-export-csv")?.addEventListener("click", () => { closeAllRowKebabs(); openExportCompaniesModal("csv"); });
+  document.getElementById("cc-export-xlsx")?.addEventListener("click", () => { closeAllRowKebabs(); openExportCompaniesModal("xlsx"); });
+  document.getElementById("cc-add-m")?.addEventListener("click", () => { closeAllRowKebabs(); openCompanyCreateWizard(); });
 }
 
 // ---- Создание компании — по шагам, тот же степпер, что и у мастеров в clients-users.js. Поля — как в
@@ -991,51 +994,43 @@ function openCompanyCreateWizard() {
 
   function stepBodyHtml() {
     if (state.step === 1) {
-      return `
+      return `<div class="modal-form">
         <div class="filters-field">
-          <span class="filters-field-label">${c.registrant} *</span>
+          <span class="filters-field-label">${c.registrant}<span class="req-star">*</span></span>
           <p class="table-cell-muted" style="margin:0 0 var(--space-2)">${c.registrantHint}</p>
           <div class="pc-client-picker">
-            <div class="pc-client-search" id="cc-registrant-search-wrap"${state.registrant ? " hidden" : ""}>
-              <input type="text" class="address-form-input" id="cc-registrant-search" placeholder="${c.registrantSearch}" autocomplete="off" />
-              <div class="filter-search-list pc-client-list" id="cc-registrant-list">${ccRegistrantListHtml("")}</div>
+            <div id="cc-reg-trigger-wrap"${state.registrant ? " hidden" : ""}>
+              <button type="button" class="mf-select-btn" id="cc-registrant-trigger" data-cc-reg><span class="mf-select-label">—</span>${MF_CARET}</button>
             </div>
             <div class="pc-client-chip" id="cc-registrant-chip"${state.registrant ? "" : " hidden"}>${state.registrant ? ccRegistrantChipHtml(state.registrant) : ""}</div>
           </div>
         </div>
         <div class="form-error" id="cc-error" hidden></div>
-      `;
+      </div>`;
     }
     if (state.step === 2) {
-      return `
-        <label class="filters-field"><span class="filters-field-label">${c.name} *</span><input class="address-form-input" id="cc-name" value="${escapeAttr(state.name)}" /></label>
+      return `<div class="modal-form">
+        <label class="filters-field"><span class="filters-field-label">${c.name}<span class="req-star">*</span></span><input class="address-form-input" id="cc-name" value="${escapeAttr(state.name)}" /></label>
         <label class="filters-field"><span class="filters-field-label">${c.registeredBusinessName}</span><input class="address-form-input" id="cc-regName" value="${escapeAttr(state.registeredBusinessName)}" /></label>
         <label class="filters-field"><span class="filters-field-label">${c.tradingName}</span><input class="address-form-input" id="cc-tradingName" value="${escapeAttr(state.tradingName)}" /></label>
         <label class="filters-field">
           <span class="filters-field-label">${c.companyType}</span>
-          <select class="address-form-input" id="cc-companyType">
-            ${COMPANY_TYPE_NAMES.map((x) => `<option value="${x}"${state.companyTypeName === x ? " selected" : ""}>${x}</option>`).join("")}
-          </select>
+          ${mfSelect("cc-companyType", COMPANY_TYPE_NAMES.map((x) => ({ v: x, l: x })), state.companyTypeName)}
         </label>
         <label class="filters-field">
           <span class="filters-field-label">${c.country}</span>
-          <select class="address-form-input" id="cc-country">
-            <option value=""${!state.countryOfIncorporationId ? " selected" : ""}>—</option>
-            ${COUNTRY_OPTIONS.map((x) => `<option value="${x.id}"${state.countryOfIncorporationId === x.id ? " selected" : ""}>${x.name}</option>`).join("")}
-          </select>
+          ${mfSelect("cc-country", [{ v: "", l: "—" }, ...COUNTRY_OPTIONS.map((x) => ({ v: x.id, l: x.name }))], state.countryOfIncorporationId || "", true)}
         </label>
-        <label class="filters-field"><span class="filters-field-label">${c.dateOfIncorporation}</span><input class="address-form-input" type="date" id="cc-dateOfIncorporation" value="${state.dateOfIncorporation}" /></label>
+        <label class="filters-field"><span class="filters-field-label">${c.dateOfIncorporation}</span><input class="address-form-input" type="text" id="cc-dateOfIncorporation" value="${escapeAttr(state.dateOfIncorporation)}" placeholder="ДД.ММ.ГГГГ" /></label>
         <label class="filters-field">
           <span class="filters-field-label">${c.ownership}</span>
-          <select class="address-form-input" id="cc-ownership">
-            ${COMPANY_OWNERSHIP_STRUCTURES.map((x) => `<option value="${x}"${state.ownership === x ? " selected" : ""}>${c.ownershipOptions[x]}</option>`).join("")}
-          </select>
+          ${mfSelect("cc-ownership", COMPANY_OWNERSHIP_STRUCTURES.map((x) => ({ v: x, l: c.ownershipOptions[x] })), state.ownership)}
         </label>
         <div class="form-error" id="cc-error" hidden></div>
-      `;
+      </div>`;
     }
     if (state.step === 3) {
-      return `
+      return `<div class="modal-form">
         <label class="filters-field"><span class="filters-field-label">${c.businessEmail}</span><input class="address-form-input" type="email" id="cc-businessEmail" value="${escapeAttr(state.businessEmail)}" placeholder="office@company.com" /></label>
         <label class="filters-field"><span class="filters-field-label">${c.businessPhone}</span><input class="address-form-input" id="cc-businessPhone" value="${escapeAttr(state.businessPhone)}" /></label>
         <label class="filters-field"><span class="filters-field-label">${c.website}</span><input class="address-form-input" id="cc-website" value="${escapeAttr(state.website)}" placeholder="https://" /></label>
@@ -1049,12 +1044,10 @@ function openCompanyCreateWizard() {
         </label>
         <label class="filters-field">
           <span class="filters-field-label">${c.employees}</span>
-          <select class="address-form-input" id="cc-employees">
-            ${COMPANY_EMPLOYEE_BUCKETS.map((x) => `<option value="${x}"${state.employees === x ? " selected" : ""}>${x}</option>`).join("")}
-          </select>
+          ${mfSelect("cc-employees", COMPANY_EMPLOYEE_BUCKETS.map((x) => ({ v: x, l: x })), state.employees)}
         </label>
         <div class="form-error" id="cc-error" hidden></div>
-      `;
+      </div>`;
     }
     const country = findCountry(state.countryOfIncorporationId);
     const activity = BUSINESS_ACTIVITY_CODES.find((x) => x.code === state.businessActivityCode);
@@ -1090,10 +1083,10 @@ function openCompanyCreateWizard() {
     state.name = modalEl.querySelector("#cc-name").value.trim();
     state.registeredBusinessName = modalEl.querySelector("#cc-regName").value.trim();
     state.tradingName = modalEl.querySelector("#cc-tradingName").value.trim();
-    state.companyTypeName = modalEl.querySelector("#cc-companyType").value;
-    state.countryOfIncorporationId = modalEl.querySelector("#cc-country").value;
+    state.companyTypeName = modalEl.querySelector("#cc-companyType").dataset.value;
+    state.countryOfIncorporationId = modalEl.querySelector("#cc-country")?.dataset.value || "";
     state.dateOfIncorporation = modalEl.querySelector("#cc-dateOfIncorporation").value;
-    state.ownership = modalEl.querySelector("#cc-ownership").value;
+    state.ownership = modalEl.querySelector("#cc-ownership").dataset.value;
   }
   function readStep3(modalEl) {
     state.businessEmail = modalEl.querySelector("#cc-businessEmail").value.trim();
@@ -1102,30 +1095,75 @@ function openCompanyCreateWizard() {
     state.registrationNumber = modalEl.querySelector("#cc-registrationNumber").value.trim();
     state.taxNumber = modalEl.querySelector("#cc-taxNumber").value.trim();
     state.businessActivityCode = modalEl.querySelector("#cc-businessActivity").value;
-    state.employees = modalEl.querySelector("#cc-employees").value;
+    state.employees = modalEl.querySelector("#cc-employees").dataset.value;
   }
 
   function bindRegistrantPicker(modalEl) {
-    const searchInput = modalEl.querySelector("#cc-registrant-search");
-    const listEl = modalEl.querySelector("#cc-registrant-list");
-    if (!searchInput || !listEl) return;
-    const bindPicks = () => {
-      listEl.querySelectorAll("[data-cc-registrant-pick]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const user = CLIENTS_USERS_MOCK.find((u) => u.id === btn.dataset.ccRegistrantPick);
-          if (!user) return;
-          state.registrant = user;
-          render(modalEl);
+    const triggerBtn = modalEl.querySelector("#cc-registrant-trigger");
+    if (!triggerBtn) return;
+    let regPopup = null;
+
+    function closeRegPopup() {
+      if (regPopup) { regPopup.remove(); regPopup = null; }
+      triggerBtn.classList.remove("is-open");
+      document.removeEventListener("click", outsideReg, true);
+    }
+
+    function outsideReg(e) {
+      if (regPopup && !regPopup.contains(e.target) && !triggerBtn.contains(e.target)) closeRegPopup();
+    }
+
+    function openRegPopup() {
+      closeRegPopup();
+      regPopup = document.createElement("div");
+      regPopup.className = "mf-popup";
+
+      const searchEl = document.createElement("input");
+      searchEl.type = "text";
+      searchEl.className = "address-form-input mf-popup-search";
+      searchEl.placeholder = t("clientsCompanies.create.registrantSearch");
+      searchEl.autocomplete = "off";
+      regPopup.appendChild(searchEl);
+
+      const listBody = document.createElement("div");
+      listBody.className = "mf-popup-body filter-search-list pc-client-list";
+      listBody.innerHTML = ccRegistrantListHtml("");
+      regPopup.appendChild(listBody);
+
+      document.body.appendChild(regPopup);
+      const r = triggerBtn.getBoundingClientRect();
+      regPopup.style.top = `${r.bottom + 4}px`;
+      regPopup.style.left = `${r.left}px`;
+      regPopup.style.width = `${Math.max(r.width, 280)}px`;
+
+      triggerBtn.classList.add("is-open");
+
+      const bindPicks = () => {
+        listBody.querySelectorAll("[data-cc-registrant-pick]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const user = CLIENTS_USERS_MOCK.find((u) => u.id === btn.dataset.ccRegistrantPick);
+            if (!user) return;
+            state.registrant = user;
+            closeRegPopup();
+            render(modalEl);
+          });
         });
-      });
-    };
-    bindPicks();
-    searchInput.addEventListener("input", () => {
-      listEl.innerHTML = ccRegistrantListHtml(searchInput.value);
+      };
       bindPicks();
+      searchEl.addEventListener("input", () => {
+        listBody.innerHTML = ccRegistrantListHtml(searchEl.value);
+        bindPicks();
+      });
+      setTimeout(() => { searchEl.focus(); document.addEventListener("click", outsideReg, true); }, 0);
+    }
+
+    triggerBtn.addEventListener("click", () => {
+      if (regPopup) closeRegPopup();
+      else openRegPopup();
     });
+
     const chipEl = modalEl.querySelector("#cc-registrant-chip");
-    const changeBtn = chipEl ? chipEl.querySelector("[data-cc-registrant-change]") : null;
+    const changeBtn = chipEl?.querySelector("[data-cc-registrant-change]");
     if (changeBtn) changeBtn.addEventListener("click", () => { state.registrant = null; render(modalEl); });
   }
 

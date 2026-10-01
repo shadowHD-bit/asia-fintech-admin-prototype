@@ -179,10 +179,11 @@ function createAccessList(cfg) {
 
   // ---- Таблица --------------------------------------------------------------------------------
   const sortHeader = (col) => {
-    if (!col.sort) return `<th>${col.label()}</th>`;
+    const cls = col.tdClass ? ` class="${col.tdClass}"` : '';
+    if (!col.sort) return `<th${cls}>${col.label()}</th>`;
     const active = s.sortBy === col.sort;
     const icon = active ? (s.sortDir === "asc" ? SORT_ICON_ASC : SORT_ICON_DESC) : SORT_ICON_NEUTRAL;
-    return `<th><button type="button" class="th-sort${active ? " is-active" : ""}" data-sort="${col.sort}">${col.label()}<span class="th-sort-icon">${icon}</span></button></th>`;
+    return `<th${cls}><button type="button" class="th-sort${active ? " is-active" : ""}" data-sort="${col.sort}">${col.label()}<span class="th-sort-icon">${icon}</span></button></th>`;
   };
 
   const renderTable = () => {

@@ -5,6 +5,10 @@
    Тексты берутся из assets/i18n.js через t('namespace.key').
    ========================================================================== */
 
+if (window.mermaid) {
+  mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "loose" });
+}
+
 // ---- Иконки (inline SVG, без внешних иконок-шрифтов/CDN) -----------------
 const ICONS = {
   home: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 10 3l7 6.5"/><path d="M5 8.5V17h10V8.5"/><path d="M8 17v-4.5h4V17"/></svg>`,
@@ -459,7 +463,7 @@ function updateDocsFab(routeId) {
   const btn = document.getElementById("docs-fab");
   const doc = sectionDocsFor(routeId);
   btn.classList.toggle("is-visible", !!doc);
-  btn.title = doc ? SECTION_DOCS_COMMON.eyebrow : "";
+  btn.title = "";
 }
 
 function openSectionDocsView() {
@@ -468,10 +472,11 @@ function openSectionDocsView() {
   document.getElementById("docs-view-eyebrow").textContent = SECTION_DOCS_COMMON.eyebrow;
   document.getElementById("docs-view-title").textContent = doc.title;
   document.getElementById("docs-view-body").innerHTML = `<p class="docs-view-intro">${doc.intro}</p>${doc.blocks
-    .map((b) => `<div class="docs-view-block"><h2 class="docs-view-block-heading">${b.heading}</h2><p class="docs-view-block-text">${b.text}</p></div>`)
+    .map((b) => `<div class="docs-view-block"><h2 class="docs-view-block-heading">${b.heading}</h2>${b.mermaid ? `<pre class="mermaid">${b.mermaid}</pre>` : `<div class="docs-view-block-text">${b.text}</div>`}</div>`)
     .join("")}`;
   document.getElementById("docs-view").classList.add("is-open");
   document.body.classList.add("docs-view-open");
+  if (window.mermaid) mermaid.run({ nodes: document.querySelectorAll("#docs-view-body .mermaid") });
 }
 
 function closeSectionDocsView() {

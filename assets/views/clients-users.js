@@ -768,6 +768,117 @@ function initRowKebabDelegation() {
 }
 initRowKebabDelegation();
 
+// Клик на "?" — позиционированный тёмный попап рядом с кнопкой (аналог js-tooltip, но по клику).
+// Нужно для мобильных: hover там не работает. Переиспользует стили .js-tooltip.
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".section-hint-btn");
+  document.querySelectorAll(".hint-click-pop").forEach((el) => el.remove());
+  if (!btn) return;
+  const text = btn.dataset.tt || btn.getAttribute("title");
+  if (!text) return;
+  const pop = document.createElement("div");
+  pop.className = "js-tooltip hint-click-pop";
+  pop.textContent = text;
+  document.body.appendChild(pop);
+  const r = btn.getBoundingClientRect();
+  const pr = pop.getBoundingClientRect();
+  let top = r.top - pr.height - 8;
+  if (top < 4) top = r.bottom + 8;
+  let left = r.left + r.width / 2 - pr.width / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - pr.width - 8));
+  pop.style.top = `${top}px`;
+  pop.style.left = `${left}px`;
+  const close = () => pop.remove();
+  setTimeout(() => {
+    document.addEventListener("click", close, { once: true, capture: false });
+    window.addEventListener("scroll", close, { once: true });
+  }, 0);
+});
+
+// ---- Кастомный single-select для форм (mfSelect) --------------------------------
+// Popup аппендится в document.body — корректно работает внутри модалок со своим stacking context
+const MF_CARET = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 8 4 4 4-4"/></svg>`;
+const _mfOpts = new Map(); // id → { options, searchable }
+let _mfPopupEl = null;
+let _mfAnchorBtn = null;
+
+function mfSelect(id, options, selectedValue, searchable) {
+  _mfOpts.set(id, { options, searchable: !!searchable });
+  const sel = options.find((o) => o.v === selectedValue) || options[0] || { v: "", l: "—" };
+  return `<div class="mf-select"><button type="button" class="mf-select-btn" id="${id}" data-value="${escapeAttr(sel.v)}"><span class="mf-select-label">${sel.l}</span>${MF_CARET}</button></div>`;
+}
+
+function closeMfPopup() {
+  if (_mfPopupEl) { _mfPopupEl.remove(); _mfPopupEl = null; }
+  if (_mfAnchorBtn) { _mfAnchorBtn.classList.remove("is-open"); _mfAnchorBtn = null; }
+  document.removeEventListener("click", _mfOutside, true);
+}
+
+function openMfPopup(btn) {
+  closeMfPopup();
+  const reg = _mfOpts.get(btn.id);
+  if (!reg) return;
+  const { options, searchable } = reg;
+  const selectedValue = btn.dataset.value;
+
+  const popup = document.createElement("div");
+  popup.className = "mf-popup";
+
+  let searchEl = null;
+  if (searchable) {
+    searchEl = document.createElement("input");
+    searchEl.type = "text";
+    searchEl.className = "address-form-input mf-popup-search";
+    searchEl.placeholder = "Поиск...";
+    popup.appendChild(searchEl);
+  }
+
+  const body = document.createElement("div");
+  body.className = "mf-popup-body";
+  const renderOpts = (q) => {
+    const fl = q ? options.filter((o) => o.l.toLowerCase().includes(q.toLowerCase())) : options;
+    body.innerHTML = fl.length
+      ? fl.map((o) => `<button type="button" class="mf-select-opt${o.v === selectedValue ? " is-sel" : ""}" data-mf-v="${escapeAttr(o.v)}">${o.l}</button>`).join("")
+      : `<div class="mf-popup-empty">Ничего не найдено</div>`;
+  };
+  renderOpts("");
+  if (searchEl) searchEl.addEventListener("input", () => renderOpts(searchEl.value));
+  popup.appendChild(body);
+  document.body.appendChild(popup);
+
+  const r = btn.getBoundingClientRect();
+  popup.style.top = `${r.bottom + 4}px`;
+  popup.style.left = `${r.left}px`;
+  popup.style.width = `${Math.max(r.width, 180)}px`;
+
+  _mfPopupEl = popup;
+  _mfAnchorBtn = btn;
+  btn.classList.add("is-open");
+
+  popup.addEventListener("click", (e) => {
+    const opt = e.target.closest("[data-mf-v]");
+    if (!opt) return;
+    btn.dataset.value = opt.dataset.mfV;
+    btn.querySelector(".mf-select-label").textContent = opt.textContent.trim();
+    closeMfPopup();
+  });
+
+  if (searchEl) setTimeout(() => searchEl.focus(), 0);
+  setTimeout(() => document.addEventListener("click", _mfOutside, true), 0);
+}
+
+function _mfOutside(e) {
+  if (_mfPopupEl && !_mfPopupEl.contains(e.target) && !(_mfAnchorBtn && _mfAnchorBtn.contains(e.target))) closeMfPopup();
+}
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".mf-select-btn");
+  if (!btn) return;
+  if ("ccReg" in btn.dataset) return;
+  if (_mfAnchorBtn === btn) closeMfPopup();
+  else openMfPopup(btn);
+});
+
 const DOCUMENT_ICON_SVG = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h6l3 3V16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1Z"/><path d="M12 2.5V6h3M7 10h6M7 13h6"/></svg>`;
 const PLUS_ICON_SVG = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>`;
 const EYE_ICON_SVG = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10s2.8-5.5 8-5.5S18 10 18 10s-2.8 5.5-8 5.5S2 10 2 10Z"/><circle cx="10" cy="10" r="2.2"/></svg>`;
@@ -1121,8 +1232,18 @@ function exportClientsUsers(format) {
   showToast(x.done(rows.length));
 }
 
+const SECTION_HINT_ICON_SVG = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M7.9 7.8a2.2 2.2 0 1 1 3.4 1.9c-.8.5-1.3 1-1.3 1.9"/><circle cx="10" cy="14.2" r=".4" fill="currentColor"/></svg>`;
+
+function sectionHintBtn(id, infoText) {
+  return `<button type="button" class="client-detail-actions-btn acm-info-btn section-hint-btn" id="${id}" title="${escapeAttr(infoText)}">${SECTION_HINT_ICON_SVG}</button>`;
+}
+
+function hdrActionsKebab(menuId, items) {
+  return `<div class="row-kebab hdr-actions-kebab" data-row-kebab="${menuId}"><button type="button" class="row-kebab-btn" data-row-kebab-btn title="Действия">${KEBAB_ICON_SVG}</button><div class="row-kebab-menu">${items.map((i) => `<button type="button" class="user-menu-item"${i.id ? ` id="${i.id}"` : ""}>${i.icon || ""}<span>${i.label}</span></button>`).join("")}</div></div>`;
+}
+
 function viewClientsUsers() {
-  const heroActions = `<span class="filters-bar-end">${exportMenuHtml("cu-export", t("clientsUsers.export.button"), t("clientsUsers.export.hint"))}<button type="button" class="btn-primary" id="cu-add">${PLUS_ICON_SVG}<span>${t("clientsUsers.create.button")}</span></button></span>`;
+  const heroActions = `<span class="filters-bar-end">${sectionHintBtn("cu-hint-btn", t("clientsUsers.info"))}<span class="hdr-desktop-only">${exportMenuHtml("cu-export", t("clientsUsers.export.button"), t("clientsUsers.export.hint"))}</span><button type="button" class="btn-primary hdr-desktop-only" id="cu-add">${PLUS_ICON_SVG}<span>${t("clientsUsers.create.button")}</span></button>${hdrActionsKebab("cu-hdr-km", [{ id: "cu-export-csv", label: `${t("clientsUsers.export.button")} CSV` }, { id: "cu-export-xlsx", label: `${t("clientsUsers.export.button")} XLSX` }, { id: "cu-add-m", icon: PLUS_ICON_SVG, label: t("clientsUsers.create.button") }])}</span>`;
   return `
     <div class="list-hero">${pageHeader(t("nav.clients-users"), t("navDescriptions.clients-users"), heroActions)}</div>
     ${renderUserMetricsCards()}
@@ -1141,6 +1262,9 @@ function initClientsUsersView() {
   attachClientsUsersTableHandlers();
   const addBtn = document.getElementById("cu-add");
   if (addBtn) addBtn.addEventListener("click", openUserCreateWizard);
+  document.getElementById("cu-export-csv")?.addEventListener("click", () => { closeAllRowKebabs(); openExportUsersModal("csv"); });
+  document.getElementById("cu-export-xlsx")?.addEventListener("click", () => { closeAllRowKebabs(); openExportUsersModal("xlsx"); });
+  document.getElementById("cu-add-m")?.addEventListener("click", () => { closeAllRowKebabs(); openUserCreateWizard(); });
 }
 
 // ---- Карточка клиента (минимальная — раскрывать по мере готовности бэкенда) ------
@@ -2162,46 +2286,40 @@ function openUserCreateWizard() {
     email: "", phone: "",
   };
 
+  const COUNTRY_OPTS = [{ v: "", l: "—" }, ...COUNTRY_OPTIONS.map((x) => ({ v: x.id, l: x.name }))];
   const countrySelect = (id, label, value) => `
     <label class="filters-field">
       <span class="filters-field-label">${label}</span>
-      <select class="address-form-input" id="${id}">
-        <option value=""${!value ? " selected" : ""}>—</option>
-        ${COUNTRY_OPTIONS.map((x) => `<option value="${x.id}"${value === x.id ? " selected" : ""}>${x.name}</option>`).join("")}
-      </select>
+      ${mfSelect(id, COUNTRY_OPTS, value || "", true)}
     </label>`;
 
   function stepBodyHtml() {
     if (state.step === 1) {
-      return `
-        <label class="filters-field"><span class="filters-field-label">${c.lastName} *</span><input class="address-form-input" id="uc-lastName" value="${escapeAttr(state.lastName)}" /></label>
-        <label class="filters-field"><span class="filters-field-label">${c.firstName} *</span><input class="address-form-input" id="uc-firstName" value="${escapeAttr(state.firstName)}" /></label>
+      return `<div class="modal-form">
+        <label class="filters-field"><span class="filters-field-label">${c.lastName}<span class="req-star">*</span></span><input class="address-form-input" id="uc-lastName" value="${escapeAttr(state.lastName)}" /></label>
+        <label class="filters-field"><span class="filters-field-label">${c.firstName}<span class="req-star">*</span></span><input class="address-form-input" id="uc-firstName" value="${escapeAttr(state.firstName)}" /></label>
         <label class="filters-field"><span class="filters-field-label">${c.middleName}</span><input class="address-form-input" id="uc-middleName" value="${escapeAttr(state.middleName)}" /></label>
         <label class="filters-field">
           <span class="filters-field-label">${c.gender}</span>
-          <select class="address-form-input" id="uc-gender">
-            ${["MALE", "FEMALE"].map((g) => `<option value="${g}"${state.gender === g ? " selected" : ""}>${c.genderOptions[g]}</option>`).join("")}
-          </select>
+          ${mfSelect("uc-gender", ["MALE", "FEMALE"].map((g) => ({ v: g, l: c.genderOptions[g] })), state.gender)}
         </label>
         <label class="filters-field">
           <span class="filters-field-label">${c.service}</span>
-          <select class="address-form-input" id="uc-service">
-            ${SERVICE_OPTIONS.map((s) => `<option value="${s}"${state.service === s ? " selected" : ""}>${s}</option>`).join("")}
-          </select>
+          ${mfSelect("uc-service", SERVICE_OPTIONS.map((s) => ({ v: s, l: s })), state.service)}
         </label>
         <div class="form-error" id="uc-error" hidden></div>
-      `;
+      </div>`;
     }
     if (state.step === 2) {
-      return `
-        <label class="filters-field"><span class="filters-field-label">${c.email} *</span><input class="address-form-input" type="email" id="uc-email" value="${escapeAttr(state.email)}" placeholder="name@company.com" /></label>
+      return `<div class="modal-form">
+        <label class="filters-field"><span class="filters-field-label">${c.email}<span class="req-star">*</span></span><input class="address-form-input" type="email" id="uc-email" value="${escapeAttr(state.email)}" placeholder="name@company.com" /></label>
         <label class="filters-field"><span class="filters-field-label">${c.phone}</span><input class="address-form-input" id="uc-phone" value="${escapeAttr(state.phone)}" placeholder="+7..." /></label>
-        <label class="filters-field"><span class="filters-field-label">${c.birthDate}</span><input class="address-form-input" type="date" id="uc-birthDate" value="${state.birthDate}" /></label>
+        <label class="filters-field"><span class="filters-field-label">${c.birthDate}</span><input class="address-form-input" type="text" id="uc-birthDate" value="${escapeAttr(state.birthDate)}" placeholder="ДД.ММ.ГГГГ" /></label>
         ${countrySelect("uc-residence", c.country, state.residenceCountryId)}
         ${countrySelect("uc-nationality", c.nationality, state.nationalityCountryId)}
         ${countrySelect("uc-birthCountry", c.placeOfBirth, state.placeOfBirthCountryId)}
         <div class="form-error" id="uc-error" hidden></div>
-      `;
+      </div>`;
     }
     const nationality = findCountry(state.nationalityCountryId);
     const residence = findCountry(state.residenceCountryId);
@@ -2238,16 +2356,16 @@ function openUserCreateWizard() {
     state.lastName = modalEl.querySelector("#uc-lastName").value.trim();
     state.firstName = modalEl.querySelector("#uc-firstName").value.trim();
     state.middleName = modalEl.querySelector("#uc-middleName").value.trim();
-    state.gender = modalEl.querySelector("#uc-gender").value;
-    state.service = modalEl.querySelector("#uc-service").value;
+    state.gender = modalEl.querySelector("#uc-gender").dataset.value;
+    state.service = modalEl.querySelector("#uc-service").dataset.value;
   }
   function readStep2(modalEl) {
     state.email = modalEl.querySelector("#uc-email").value.trim();
     state.phone = modalEl.querySelector("#uc-phone").value.trim();
     state.birthDate = modalEl.querySelector("#uc-birthDate").value;
-    state.residenceCountryId = modalEl.querySelector("#uc-residence").value;
-    state.nationalityCountryId = modalEl.querySelector("#uc-nationality").value;
-    state.placeOfBirthCountryId = modalEl.querySelector("#uc-birthCountry").value;
+    state.residenceCountryId = modalEl.querySelector("#uc-residence")?.dataset.value || "";
+    state.nationalityCountryId = modalEl.querySelector("#uc-nationality")?.dataset.value || "";
+    state.placeOfBirthCountryId = modalEl.querySelector("#uc-birthCountry")?.dataset.value || "";
   }
 
   function bind(modalEl) {

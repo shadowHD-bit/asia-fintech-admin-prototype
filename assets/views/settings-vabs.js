@@ -165,7 +165,7 @@ function vbOpenForm({ title, width = 480, intro, fieldsHtml, submitLabel, danger
   openModal({
     title,
     width,
-    bodyHtml: `${intro ? `<p class="modal-confirm-text pd-modal-intro">${intro}</p>` : ""}${fieldsHtml}<div class="form-error" id="vb-modal-error" hidden></div>`,
+    bodyHtml: `${intro ? `<p class="modal-confirm-text pd-modal-intro">${intro}</p>` : ""}<div class="modal-form">${fieldsHtml}</div><div class="form-error" id="vb-modal-error" hidden></div>`,
     footerHtml: `<button type="button" class="btn-secondary" id="vb-cancel">${vt("common.cancel")}</button><button type="button" class="${danger ? "btn-danger" : "btn-primary"}" id="vb-submit">${submitLabel}</button>`,
     onMount: (el) => {
       const err = el.querySelector("#vb-modal-error");
