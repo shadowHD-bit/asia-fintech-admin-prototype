@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Азия Финтех | Бэк-офис</title>
+    <title>РђР·РёСЏ Р¤РёРЅС‚РµС… | Р‘СЌРє-РѕС„РёСЃ</title>
     <link rel="icon" type="image/svg+xml" href="assets/images/logo-icon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,7 +12,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="assets/tokens.css" />
-    <link rel="stylesheet" href="assets/style.css?v=168" />
+    <link rel="stylesheet" href="assets/style.css?v=173" />
   </head>
   <body>
     <div class="app-shell">
@@ -24,15 +24,16 @@
             <span class="sidebar-brand-title">
               <span class="brand-word">Asia</span> <span class="brand-word-accent">Fintech</span>
             </span>
-            <span class="sidebar-brand-subtitle" id="sidebar-brand-subtitle">Бэк-офис</span>
+            <span class="sidebar-brand-subtitle" id="sidebar-brand-subtitle">Р‘СЌРє-РѕС„РёСЃ</span>
           </div>
         </div>
 
-        <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Свернуть меню">
+        <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="РЎРІРµСЂРЅСѓС‚СЊ РјРµРЅСЋ">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 4.5 6.5 10l6 5.5"/></svg>
         </button>
 
         <nav class="sidebar-nav" id="sidebar-nav"></nav>
+        <nav class="sidebar-nav-pinned" id="sidebar-nav-pinned"></nav>
       </aside>
 
       <!-- ============ Main column ============ -->
@@ -60,14 +61,14 @@
               </button>
 
               <div class="lang-dropdown-menu" id="lang-dropdown-menu">
-                <div class="lang-dropdown-label" id="lang-dropdown-label">Язык интерфейса</div>
+                <div class="lang-dropdown-label" id="lang-dropdown-label">РЇР·С‹Рє РёРЅС‚РµСЂС„РµР№СЃР°</div>
 
                 <button type="button" class="lang-dropdown-item is-active" data-lang="ru">
                   <span class="lang-dropdown-item-label">
                     <span class="flag-icon">
                       <svg viewBox="0 0 20 14" width="100%" height="100%"><rect width="20" height="14" fill="#fff"/><rect y="4.67" width="20" height="9.33" fill="#0039A6"/><rect y="9.33" width="20" height="4.67" fill="#D52B1E"/></svg>
                     </span>
-                    <span class="lang-dropdown-item-names"><span>Русский</span><span class="lang-dropdown-item-sub">Russian</span></span>
+                    <span class="lang-dropdown-item-names"><span>Р СѓСЃСЃРєРёР№</span><span class="lang-dropdown-item-sub">Russian</span></span>
                   </span>
                   <svg class="lang-dropdown-check" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 10.5 3.3 3.3L15.5 6.5"/></svg>
                 </button>
@@ -96,12 +97,12 @@
               <div class="user-menu" id="user-menu">
                 <button type="button" class="user-menu-item" data-action="profile">
                   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7" r="3"/><path d="M4 17c.6-3.6 2.9-5.5 6-5.5s5.4 1.9 6 5.5"/></svg>
-                  <span id="user-menu-profile-label">Профиль</span>
+                  <span id="user-menu-profile-label">РџСЂРѕС„РёР»СЊ</span>
                 </button>
                 <div class="user-menu-divider"></div>
                 <button type="button" class="user-menu-item is-danger" data-action="logout">
                   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 14v.5a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v.5"/><path d="M8 10h9M14 6.5 17.5 10 14 13.5"/></svg>
-                  <span id="user-menu-logout-label">Выйти</span>
+                  <span id="user-menu-logout-label">Р’С‹Р№С‚Рё</span>
                 </button>
               </div>
             </div>
@@ -113,14 +114,14 @@
       </div>
     </div>
 
-    <!-- Плавающая кнопка документации раздела — вне основного канваса, поверх всего.
-         Видна только там, где для раздела уже есть описание (см. i18n.js: sectionDocs). -->
+    <!-- РџР»Р°РІР°СЋС‰Р°СЏ РєРЅРѕРїРєР° РґРѕРєСѓРјРµРЅС‚Р°С†РёРё СЂР°Р·РґРµР»Р° вЂ” РІРЅРµ РѕСЃРЅРѕРІРЅРѕРіРѕ РєР°РЅРІР°СЃР°, РїРѕРІРµСЂС… РІСЃРµРіРѕ.
+         Р’РёРґРЅР° С‚РѕР»СЊРєРѕ С‚Р°Рј, РіРґРµ РґР»СЏ СЂР°Р·РґРµР»Р° СѓР¶Рµ РµСЃС‚СЊ РѕРїРёСЃР°РЅРёРµ (СЃРј. i18n.js: sectionDocs). -->
     <button type="button" class="docs-fab" id="docs-fab" title="">
-      <span class="docs-fab-text">Спецификация к разделу</span>
+      <span class="docs-fab-text">РЎРїРµС†РёС„РёРєР°С†РёСЏ Рє СЂР°Р·РґРµР»Сѓ</span>
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h6l3 3V16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1Z"/><path d="M12 2.5V6h3M7 10h6M7 13h6"/></svg>
     </button>
 
-    <!-- Полноэкранная спека раздела — открывается кнопкой выше поверх всего приложения -->
+    <!-- РџРѕР»РЅРѕСЌРєСЂР°РЅРЅР°СЏ СЃРїРµРєР° СЂР°Р·РґРµР»Р° вЂ” РѕС‚РєСЂС‹РІР°РµС‚СЃСЏ РєРЅРѕРїРєРѕР№ РІС‹С€Рµ РїРѕРІРµСЂС… РІСЃРµРіРѕ РїСЂРёР»РѕР¶РµРЅРёСЏ -->
     <div class="docs-view" id="docs-view">
       <div class="docs-view-header">
         <button type="button" class="docs-view-close" id="docs-view-close">
@@ -136,80 +137,76 @@
       </div>
     </div>
 
-    <script src="assets/i18n.js?v=168"></script>
-    <script src="assets/i18n-rates.js?v=168"></script>
-    <script src="assets/i18n-partners.js?v=168"></script>
-    <script src="assets/i18n-routing.js?v=168"></script>
-    <script src="assets/i18n-accounting.js?v=168"></script>
-    <script src="assets/i18n-maker-checker.js?v=168"></script>
-    <script src="assets/section-docs.js?v=168"></script>
-    <script src="assets/mock/clients-users.mock.js?v=168"></script>
-    <script src="assets/mock/clients-companies.mock.js?v=168"></script>
-    <script src="assets/mock/operations-payments.mock.js?v=168"></script>
-    <script src="assets/mock/operations-exchanges.mock.js?v=168"></script>
-    <script src="assets/mock/operations-payment-details.mock.js?v=168"></script>
-    <script src="assets/mock/access-model.mock.js?v=168"></script>
-    <script src="assets/mock/settings-access.mock.js?v=168"></script>
-    <script src="assets/mock/maker-checker.mock.js?v=168"></script>
-    <script src="assets/mock/security-audit-logs.mock.js?v=168"></script>
-    <script src="assets/mock/otc-deals.mock.js?v=168"></script>
-    <script src="assets/mock/rates.mock.js?v=168"></script>
-    <script src="assets/mock/partners.mock.js?v=168"></script>
-    <script src="assets/mock/accounts.mock.js?v=168"></script>
-    <script src="assets/mock/fx-rates.mock.js?v=168"></script>
-    <script src="assets/mock/settings-vabs.mock.js?v=168"></script>
-    <script src="assets/mock/settings-sanctions.mock.js?v=168"></script>
-    <script src="assets/mock/settings-verifications.mock.js?v=168"></script>
-    <script src="assets/mock/security-kyt.mock.js?v=168"></script>
-    <script src="assets/mock/eod.mock.js?v=168"></script>
-    <script src="assets/mock/settings-tariffs.mock.js?v=168"></script>
-    <script src="assets/mock/routing.mock.js?v=168"></script>
-    <script src="assets/mock/accounting-coa.mock.js?v=168"></script>
-    <script src="assets/mock/accounting-rules.mock.js?v=168"></script>
-    <script src="assets/mock/accounting-gl.mock.js?v=168"></script>
-    <script src="assets/components/select-dropdown.js?v=168"></script>
-    <script src="assets/components/date-range-picker.js?v=168"></script>
-    <script src="assets/components/modal.js?v=168"></script>
-    <script src="assets/components/toast.js?v=168"></script>
-    <script src="assets/components/export.js?v=168"></script>
-    <script src="assets/components/switch.js?v=168"></script>
-    <script src="assets/components/tooltip.js?v=168"></script>
-    <script src="assets/components/admin-2fa.js?v=168"></script>
-    <script src="assets/components/page-size-select.js?v=168"></script>
-    <script src="assets/views/clients-users.js?v=168"></script>
-    <script src="assets/views/clients-companies.js?v=168"></script>
-    <script src="assets/views/operations-payments.js?v=168"></script>
-    <script src="assets/views/operations-exchanges.js?v=168"></script>
-    <script src="assets/views/security-system-access.js?v=168"></script>
-    <script src="assets/views/login.js?v=168"></script>
-    <script src="assets/views/operations-payment-detail.js?v=168"></script>
-    <script src="assets/views/settings-access.js?v=168"></script>
-    <script src="assets/views/maker-checker.js?v=168"></script>
-    <script src="assets/views/access-roles.js?v=168"></script>
-    <script src="assets/views/twofa-policy.js?v=168"></script>
-    <script src="assets/views/operations-otc.js?v=168"></script>
-    <script src="assets/views/security-audit-logs.js?v=168"></script>
-    <script src="assets/views/accounts.js?v=168"></script>
-    <script src="assets/views/settings-vabs.js?v=168"></script>
-    <script src="assets/views/settings-vabs-ops.js?v=168"></script>
-    <script src="assets/views/settings-rates.js?v=168"></script>
-    <script src="assets/views/settings-partners.js?v=168"></script>
-    <script src="assets/views/settings-routing.js?v=168"></script>
-    <script src="assets/views/settings-sanctions.js?v=168"></script>
-    <script src="assets/views/settings-verifications.js?v=168"></script>
-    <script src="assets/views/security-kyt.js?v=168"></script>
-    <script src="assets/views/eod.js?v=168"></script>
-    <script src="assets/views/settings-tariffs.js?v=168"></script>
-    <script src="assets/views/settings-tariffs-limits.js?v=168"></script>
-    <script src="assets/views/settings-tariffs-clients.js?v=168"></script>
-    <script src="assets/views/analytics.js?v=168"></script>
-    <script src="assets/views/financial-reports.js?v=168"></script>
-    <script src="assets/views/accounting-coa.js?v=168"></script>
-    <script src="assets/views/accounting-gl.js?v=168"></script>
-    <script src="assets/views/accounting-rules.js?v=168"></script>
-    <script src="assets/views/home-dashboard.js?v=168"></script>
+    <script src="assets/i18n.js?v=173"></script>
+    <script src="assets/i18n-rates.js?v=173"></script>
+    <script src="assets/i18n-partners.js?v=173"></script>
+    <script src="assets/i18n-routing.js?v=173"></script>
+    <script src="assets/i18n-accounting.js?v=173"></script>
+    <script src="assets/i18n-maker-checker.js?v=173"></script>
+    <script src="assets/section-docs.js?v=173"></script>
+    <script src="assets/mock/clients-users.mock.js?v=173"></script>
+    <script src="assets/mock/clients-companies.mock.js?v=173"></script>
+    <script src="assets/mock/operations-payments.mock.js?v=173"></script>
+    <script src="assets/mock/operations-exchanges.mock.js?v=173"></script>
+    <script src="assets/mock/operations-payment-details.mock.js?v=173"></script>
+    <script src="assets/mock/access-model.mock.js?v=173"></script>
+    <script src="assets/mock/settings-access.mock.js?v=173"></script>
+    <script src="assets/mock/maker-checker.mock.js?v=173"></script>
+    <script src="assets/mock/security-audit-logs.mock.js?v=173"></script>
+    <script src="assets/mock/otc-deals.mock.js?v=173"></script>
+    <script src="assets/mock/rates.mock.js?v=173"></script>
+    <script src="assets/mock/partners.mock.js?v=173"></script>
+    <script src="assets/mock/accounts.mock.js?v=173"></script>
+    <script src="assets/mock/fx-rates.mock.js?v=173"></script>
+    <script src="assets/mock/settings-vabs.mock.js?v=173"></script>
+    <script src="assets/mock/settings-sanctions.mock.js?v=173"></script>
+    <script src="assets/mock/settings-verifications.mock.js?v=173"></script>
+    <script src="assets/mock/security-kyt.mock.js?v=173"></script>
+    <script src="assets/mock/eod.mock.js?v=173"></script>
+    <script src="assets/mock/settings-tariffs.mock.js?v=173"></script>
+    <script src="assets/mock/routing.mock.js?v=173"></script>
+    <script src="assets/mock/accounting-coa.mock.js?v=173"></script>
+    <script src="assets/components/select-dropdown.js?v=173"></script>
+    <script src="assets/components/date-range-picker.js?v=173"></script>
+    <script src="assets/components/modal.js?v=173"></script>
+    <script src="assets/components/toast.js?v=173"></script>
+    <script src="assets/components/export.js?v=173"></script>
+    <script src="assets/components/switch.js?v=173"></script>
+    <script src="assets/components/tooltip.js?v=173"></script>
+    <script src="assets/components/admin-2fa.js?v=173"></script>
+    <script src="assets/components/page-size-select.js?v=173"></script>
+    <script src="assets/views/clients-users.js?v=173"></script>
+    <script src="assets/views/clients-companies.js?v=173"></script>
+    <script src="assets/views/operations-payments.js?v=173"></script>
+    <script src="assets/views/operations-exchanges.js?v=173"></script>
+    <script src="assets/views/security-system-access.js?v=173"></script>
+    <script src="assets/views/login.js?v=173"></script>
+    <script src="assets/views/operations-payment-detail.js?v=173"></script>
+    <script src="assets/views/settings-access.js?v=173"></script>
+    <script src="assets/views/maker-checker.js?v=173"></script>
+    <script src="assets/views/access-roles.js?v=173"></script>
+    <script src="assets/views/twofa-policy.js?v=173"></script>
+    <script src="assets/views/operations-otc.js?v=173"></script>
+    <script src="assets/views/security-audit-logs.js?v=173"></script>
+    <script src="assets/views/accounts.js?v=173"></script>
+    <script src="assets/views/settings-vabs.js?v=173"></script>
+    <script src="assets/views/settings-vabs-ops.js?v=173"></script>
+    <script src="assets/views/settings-rates.js?v=173"></script>
+    <script src="assets/views/settings-partners.js?v=173"></script>
+    <script src="assets/views/settings-routing.js?v=173"></script>
+    <script src="assets/views/settings-sanctions.js?v=173"></script>
+    <script src="assets/views/settings-verifications.js?v=173"></script>
+    <script src="assets/views/security-kyt.js?v=173"></script>
+    <script src="assets/views/eod.js?v=173"></script>
+    <script src="assets/views/settings-tariffs.js?v=173"></script>
+    <script src="assets/views/settings-tariffs-limits.js?v=173"></script>
+    <script src="assets/views/settings-tariffs-clients.js?v=173"></script>
+    <script src="assets/views/analytics.js?v=173"></script>
+    <script src="assets/views/financial-reports.js?v=173"></script>
+    <script src="assets/views/accounting-coa.js?v=173"></script>
+    <script src="assets/views/home-dashboard.js?v=173"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-    <script src="assets/app.js?v=168"></script>
+    <script src="assets/app.js?v=173"></script>
   </body>
 </html>
 

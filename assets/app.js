@@ -81,9 +81,6 @@ const NAV_TREE = [
       { id: "operations-otc", icon: "otc" },
     ],
   },
-  // Клиентам и админам в основном разделе — просто "Счета" (в БД это виртуальные). Реальные и корреспондентские счета —
-  // служебные, живут в "Настройки системы".
-  { id: "accounts-virtual", icon: "accounts" },
   {
     id: "eod",
     icon: "operations",
@@ -94,16 +91,18 @@ const NAV_TREE = [
     ],
   },
   {
-    // Бухгалтерия: «Финансовые отчёты» — реальный раздел (см. docs/financial-reports-spec.md).
-    // «План счетов»/«Главная книга» — допущение прототипа: раздела нет в реальном бэкенде,
-    // построены по FRD (research-gl-coa.md, general-ledger-i-chart-of-accounts.md).
+    // Бухгалтерия: «Пользовательские счета» (в БД — виртуальные) перенесены сюда из основного
+    // раздела 05.10.2026. «Финансовые отчёты» — реальный раздел (см. docs/financial-reports-spec.md).
+    // «План счетов» — допущение прототипа: раздела нет в реальном бэкенде, построен по FRD
+    // (research-gl-coa.md, general-ledger-i-chart-of-accounts.md). Без отдельной Главной книги/
+    // Правил проводок (убраны 05.10.2026) — остатки План счетов считает прямо из проводок ВА/РА,
+    // как и в реальной архитектуре отчётности vABS (read-слой без отдельного GL-сервиса).
     id: "accounting",
     icon: "box",
     children: [
-      { id: "financial-reports", icon: "box" },
+      { id: "accounts-virtual", icon: "accounts" },
       { id: "accounting-coa", icon: "box" },
-      { id: "accounting-gl", icon: "box" },
-      { id: "accounting-rules", icon: "box" },
+      { id: "financial-reports", icon: "box" },
     ],
   },
   {
@@ -150,7 +149,6 @@ const NAV_TREE = [
         icon: "payments",
         children: [
           { id: "settings-tariffs-catalog", icon: "box" },
-          { id: "settings-tariffs-operations", icon: "operations" },
           { id: "settings-tariffs-limits", icon: "security" },
           { id: "settings-tariffs-restrictions", icon: "lock" },
           { id: "settings-tariffs-commissions", icon: "payments" },
@@ -210,6 +208,7 @@ const NAV_TREE = [
         icon: "security",
         children: [{ id: "settings-kyt-configs", icon: "box" }],
       },
+      { id: "settings-tariffs-operations", icon: "operations" },
       {
         id: "settings-vabs",
         icon: "settings",
@@ -271,14 +270,24 @@ function navParentLabel(item) {
 }
 
 // ---- Рендер сайдбара ----------------------------------------------------------
+// «Системные настройки» закреплены отдельным блоком внизу сайдбара (не скроллится вместе
+// с остальным меню) — редкий и рискованный раздел, который не должен тонуть среди
+// операционных пунктов. См. SIDEBAR_PINNED_IDS.
+const SIDEBAR_PINNED_IDS = ["settings-core"];
+
 function renderSidebar() {
   const nav = document.getElementById("sidebar-nav");
+  const pinnedNav = document.getElementById("sidebar-nav-pinned");
   let html = "";
+  let pinnedHtml = "";
   NAV_TREE.forEach((item) => {
-    if (item.section) html += `<div class="sidebar-group-label">${t(`navSections.${item.section}`)}</div>`;
-    html += renderNavNode(item);
+    const target = SIDEBAR_PINNED_IDS.includes(item.id) ? "pinned" : "main";
+    const itemHtml = (item.section ? `<div class="sidebar-group-label">${t(`navSections.${item.section}`)}</div>` : "") + renderNavNode(item);
+    if (target === "pinned") pinnedHtml += itemHtml;
+    else html += itemHtml;
   });
   nav.innerHTML = html;
+  pinnedNav.innerHTML = pinnedHtml;
 }
 
 // Для страниц деталей подсвечиваем и раскрываем пункт списка, из которого они открыты
@@ -315,8 +324,6 @@ function activeNavId(routeId = currentRouteId()) {
   if (routeId === "operations-otc-detail") return "operations-otc";
   if (routeId === "clients-partners-detail") return "clients-partners";
   if (routeId === "accounting-coa-detail") return "accounting-coa";
-  if (routeId === "accounting-gl-detail") return "accounting-gl";
-  if (routeId === "accounting-rules-detail") return "accounting-rules";
   if (routeId === "settings-maker-checker-request-detail") return "settings-maker-checker-requests";
   if (routeId === "settings-routing-rule") return "settings-routing-rules";
   if (routeId === "settings-routing-execution") return "settings-routing-executions";
@@ -364,7 +371,9 @@ function renderNavRow(item, { clickable, indent, depth = 0, toggle, hasActiveChi
 
 // ---- Клики по сайдбару: делегирование, переживает перерисовку -------------------
 function initSidebarNav() {
-  const nav = document.getElementById("sidebar-nav");
+  // Делегирование с #sidebar (не #sidebar-nav), т.к. закреплённый блок "Системные настройки"
+  // (#sidebar-nav-pinned) — отдельный соседний <nav>, тоже внутри #sidebar.
+  const nav = document.getElementById("sidebar");
 
   nav.addEventListener("click", (e) => {
     const toggleEl = e.target.closest("[data-toggle]");
@@ -608,20 +617,6 @@ function renderBreadcrumbs(routeId, navItem) {
       { label: navLabel(NAV_INDEX["accounting-coa"]), route: "accounting-coa" },
       { label: acc ? `${acc.code} · ${acc.name}` : t("vabs.common.notFoundTitle") },
     ];
-  } else if (routeId === "accounting-gl-detail") {
-    const e = glById(glRef());
-    parts = [
-      { label: navLabel(NAV_INDEX["accounting"]) },
-      { label: navLabel(NAV_INDEX["accounting-gl"]), route: "accounting-gl" },
-      { label: e ? e.entryId : t("vabs.common.notFoundTitle") },
-    ];
-  } else if (routeId === "accounting-rules-detail") {
-    const r = arById(arRef());
-    parts = [
-      { label: navLabel(NAV_INDEX["accounting"]) },
-      { label: navLabel(NAV_INDEX["accounting-rules"]), route: "accounting-rules" },
-      { label: r ? `${r.code} · ${r.name}` : t("vabs.common.notFoundTitle") },
-    ];
   } else if (routeId === "settings-maker-checker-request-detail") {
     const r = mcById(mcRef());
     parts = [
@@ -687,9 +682,8 @@ function renderBreadcrumbs(routeId, navItem) {
     const ref = currentAccountRef();
     const acc = ref && accFind(ref.kind, ref.id);
     const listId = ref && ref.kind !== "virtual" ? "settings-vabs-accounts" : "accounts-virtual";
-    // Счета клиентов — раздел верхнего уровня; реальные и корреспондентские — в операционных настройках
     parts = [
-      ...(ref && ref.kind !== "virtual" ? [{ label: navLabel(NAV_INDEX[listId].parent) }] : []),
+      ...(NAV_INDEX[listId].parent ? [{ label: navLabel(NAV_INDEX[listId].parent) }] : []),
       { label: navLabel(NAV_INDEX[listId]), route: ref && ref.kind !== "virtual" ? `${listId}/${ref.kind}` : listId },
       { label: acc ? accTitle(acc) : t("accounts.notFoundTitle") },
     ];
@@ -1010,8 +1004,6 @@ function currentRouteId() {
   if (/^clients-users\/.+/.test(hash)) return "clients-users-detail";
   if (/^clients-companies\/.+/.test(hash)) return "clients-companies-detail";
   if (/^accounting-coa\/.+/.test(hash)) return "accounting-coa-detail";
-  if (/^accounting-gl\/.+/.test(hash)) return "accounting-gl-detail";
-  if (/^accounting-rules\/.+/.test(hash)) return "accounting-rules-detail";
   if (/^settings-maker-checker-requests\/.+/.test(hash)) return "settings-maker-checker-request-detail";
   if (/^operations-otc\/.+/.test(hash)) return "operations-otc-detail";
   if (/^operations-(payments|exchanges)\/.+/.test(hash)) return "operations-payment-detail";
@@ -1105,20 +1097,6 @@ function render() {
     const id = coaRef();
     content.innerHTML = viewAccountingCoaDetail(id);
     initAccountingCoaDetail(id);
-  } else if (routeId === "accounting-gl") {
-    content.innerHTML = viewAccountingGl();
-    initAccountingGl();
-  } else if (routeId === "accounting-gl-detail") {
-    const id = glRef();
-    content.innerHTML = viewAccountingGlDetail(id);
-    initAccountingGlDetail(id);
-  } else if (routeId === "accounting-rules") {
-    content.innerHTML = viewAccountingRules();
-    initAccountingRules();
-  } else if (routeId === "accounting-rules-detail") {
-    const id = arRef();
-    content.innerHTML = viewAccountingRuleDetail(id);
-    initAccountingRuleDetail(id);
   } else if (routeId === "settings-maker-checker-rules") {
     content.innerHTML = viewMakerCheckerRules();
     initMakerCheckerRules();
@@ -1353,7 +1331,7 @@ function initBottomNav() {
     if (e.target.closest("[data-bottom-menu]")) setMobileMenu(!document.body.classList.contains("mobile-menu-open"));
   });
   overlay.addEventListener("click", () => setMobileMenu(false));
-  document.getElementById("sidebar-nav").addEventListener("click", (e) => { if (e.target.closest("[data-route]")) setMobileMenu(false); });
+  document.getElementById("sidebar").addEventListener("click", (e) => { if (e.target.closest("[data-route]")) setMobileMenu(false); });
 }
 function init() {
   renderStaticTexts();

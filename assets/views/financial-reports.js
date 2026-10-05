@@ -29,9 +29,10 @@
      расчёта комиссии через тарифный движок (assets/mock/settings-tariffs.mock.js,
      tfTotalFee) там, где операцию и клиента можно сопоставить с тарифом.
    - "Оборотно-сальдовая ведомость" (добавлена 2026-10-02, после того как в
-     прототипе появился "Бухгалтерия → План счетов"/"Главная книга") —
-     assets/mock/accounting-gl.mock.js (GL_JOURNAL_ENTRIES), сгруппированные
-     по счёту плана счетов и валюте, см. frTrialBalanceRows ниже.
+     прототипе появился "Бухгалтерия → План счетов"; пересчитана 2026-10-05
+     после отказа от отдельной Главной книги) — реальные проводки ВА/РА из
+     assets/mock/accounts.mock.js (ACCOUNT_TRANSACTIONS) через coaTxOfAccount,
+     сгруппированные по счёту плана счетов и валюте, см. frTrialBalanceRows ниже.
    Балансовый отчёт, P&L и cash flow из каталога бэкенда сюда пока не входят —
    у плана счетов есть классификация (класс/сторона), но нет ещё одной
    дополнительной сущности из §5 бэкенда (account_role/account_kind) и шаблона
@@ -331,8 +332,9 @@ function frOpTypeTurnoverRows() {
 // карточке счёта в "План счетов") и валюте: входящий остаток считается по
 // проводкам ДО начала периода, обороты — по проводкам ВНУТРИ периода,
 // исходящий = входящий + чистый оборот (знак — по normalBalance счёта, как и
-// в coaBalancesByCurrency). Источник — реальные проводки Главной книги
-// (assets/mock/accounting-gl.mock.js, GL_JOURNAL_ENTRIES), не отдельный расчёт.
+// в coaBalancesByCurrency). Источник — те же реальные проводки ВА/РА
+// (coaTxOfAccount/ACCOUNT_TRANSACTIONS), что и остатки в "План счетов", без
+// отдельной Главной книги — см. заголовок accounting-coa.mock.js (05.10.2026).
 // ============================================================================
 function frTrialBalanceRows() {
   const from = frPeriodFrom(frPeriod);
@@ -340,14 +342,14 @@ function frTrialBalanceRows() {
   COA_ACCOUNTS.filter((a) => a.nodeType !== "GROUP").forEach((a) => {
     const normalFactor = a.normalBalance === "DEBIT" ? 1 : -1;
     const byCurrency = {};
-    glEntriesForAccount(a.code).filter((e) => e.status === "POSTED").forEach((e) => {
-      if (frCurrency !== "all" && e.currency !== frCurrency) return;
-      const b = (byCurrency[e.currency] = byCurrency[e.currency] || { opening: 0, debit: 0, credit: 0 });
-      const isDebitSide = e.debitAccountCode === a.code;
-      if (from && e.effectiveDate < from) {
-        b.opening += (isDebitSide ? 1 : -1) * normalFactor * e.amount;
-      } else if (!from || e.effectiveDate >= from) {
-        if (isDebitSide) b.debit += e.amount; else b.credit += e.amount;
+    coaTxOfAccount(a).filter((tx) => tx.status === "CONFIRMED").forEach((tx) => {
+      if (frCurrency !== "all" && tx.currency !== frCurrency) return;
+      const b = (byCurrency[tx.currency] = byCurrency[tx.currency] || { opening: 0, debit: 0, credit: 0 });
+      const isDebitSide = tx.transferType === "DEBIT";
+      if (from && tx.createdDate < from) {
+        b.opening += (isDebitSide ? 1 : -1) * normalFactor * tx.amount;
+      } else if (!from || tx.createdDate >= from) {
+        if (isDebitSide) b.debit += tx.amount; else b.credit += tx.amount;
       }
     });
     Object.keys(byCurrency).forEach((cur) => {

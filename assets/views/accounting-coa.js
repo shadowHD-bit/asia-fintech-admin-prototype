@@ -48,10 +48,9 @@ function coaFormatMoney(n, currency) {
   return currency ? `${txt} ${currency}` : txt;
 }
 
-// Остаток — реальная разбивка по валютам из проводок (coaBalancesByCurrency, mock/accounting-gl.mock.js), не
+// Остаток — реальная разбивка по валютам из проводок ВА/РА (coaBalancesByCurrency, mock/accounting-coa.mock.js), не
 // одно число: валюты разных типов не складываются в одну сумму (та же логика, что в карточке "Объём на
-// счетах" на главной). Для группы это тоже честная разбивка — сумма потомков по каждой валюте отдельно,
-// больше не нужно гадать "совпадают ли валюты у потомков", как было до Главной книги.
+// счетах" на главной). Для группы это тоже честная разбивка — сумма потомков по каждой валюте отдельно.
 function coaBalanceDisplay(a) {
   const byCur = coaBalancesByCurrency(a);
   const list = Object.keys(byCur);
