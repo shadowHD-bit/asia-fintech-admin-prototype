@@ -589,7 +589,7 @@ function openExchangeRowApproveModal(row) {
   const m = t("paymentDetail.modals");
   openConfirmModal({
     title: m.approveTitle,
-    text: m.approveText(formatPaymentAmount(row.sourceAmount), row.sourceCurrency, pdShort(row.recipientClientId)),
+    text: m.approveText(formatPaymentAmount(row.sourceAmount), row.sourceCurrency, row.recipientClientName || pdShort(row.recipientClientId)),
     confirmLabel: t("paymentDetail.actions.approve"),
     cancelLabel: t("paymentDetail.common.cancel"),
     danger: false,
@@ -929,7 +929,7 @@ function attachOperationsExchangesTableHandlers() {
 }
 
 function viewOperationsExchanges() {
-  const heroActions = `<span class="filters-bar-end">${exportMenuHtml("oe-export", t("operationsExchanges.export.button"), t("operationsExchanges.export.hint"))}<button type="button" class="btn-primary" id="oe-create-btn">${PLUS_ICON_SVG}<span>${t("operationsExchanges.create.button")}</span></button></span>`;
+  const heroActions = `<span class="filters-bar-end">${sectionHintBtn("oe-hint-btn", t("operationsExchanges.info"))}${exportMenuHtml("oe-export", t("operationsExchanges.export.button"), t("operationsExchanges.export.hint"))}<button type="button" class="btn-primary" id="oe-create-btn">${PLUS_ICON_SVG}<span>${t("operationsExchanges.create.button")}</span></button></span>`;
   return `
     <div class="list-hero">${pageHeader(t("nav.operations-exchanges"), t("navDescriptions.operations-exchanges"), heroActions)}</div>
     ${renderExchangeMetricsCards()}

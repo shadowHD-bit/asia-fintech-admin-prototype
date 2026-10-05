@@ -187,7 +187,11 @@ function createAccessList(cfg) {
   };
 
   const renderTable = () => {
-    const rows = sortedRows(filteredRows());
+    // cfg.rowFilter(rows) — доп. фильтр ПОСЛЕ поиска/табов/фильтров/сортировки, только для того, что реально
+    // рисуется в таблице (например, схлопнутые ветки дерева в "Плане счетов") — метрики, счётчики табов и
+    // экспорт на него не завязаны и считаются по полному filteredRows(), иначе цифры "плавали" бы при сворачивании
+    const base = sortedRows(filteredRows());
+    const rows = cfg.rowFilter ? cfg.rowFilter(base) : base;
     const totalPages = Math.max(1, Math.ceil(rows.length / s.pageSize));
     if (s.page > totalPages) s.page = totalPages;
     // cfg.noPager — все строки на одной странице без футера (например, правила маршрутизации: порядок строк важен);
@@ -206,7 +210,7 @@ function createAccessList(cfg) {
       ${cfg.tableNote ? cfg.tableNote() : ""}
       <div class="table-scroll"><table class="data-table${cfg.tableClass ? ` ${cfg.tableClass}` : ""}">
         <thead><tr>${cfg.columns.map(sortHeader).join("")}</tr></thead>
-        <tbody>${pageRows.map((r) => `<tr${cfg.rowAttrs ? ` ${cfg.rowAttrs(r)}` : ""}>${cfg.columns.map((c) => `<td${c.tdClass ? ` class="${c.tdClass}"` : ""}>${c.html(r)}</td>`).join("")}</tr>`).join("")}</tbody>
+        <tbody>${pageRows.map((r) => `<tr${cfg.rowAttrs ? ` ${cfg.rowAttrs(r)}` : ""}>${cfg.columns.map((c) => `<td${c.tdClass ? ` class="${c.tdClass}"` : ""}${c.tdStyle ? ` style="${escapeAttr(c.tdStyle(r))}"` : ""}>${c.html(r)}</td>`).join("")}</tr>`).join("")}</tbody>
       </table></div>
       ${cfg.noPager ? "" : `<div class="table-footer">
         <span class="table-footer-total">${t("access.common.total")(rows.length)}</span>
@@ -586,7 +590,7 @@ function viewSettingsAccess() {
   const m = window.location.hash.match(/^#\/?settings-access\/(roles|permissions|admins)$/);
   if (m) accessActiveTab = m[1] === "admins" ? "admins" : "roles";
   return `
-    <div class="list-hero">${pageHeader(t("access.title"), t("navDescriptions.settings-access"))}</div>
+    <div class="list-hero">${pageHeader(t("access.title"), t("navDescriptions.settings-access"), sectionHintBtn("ac-hint-btn", t("access.info")))}</div>
     <div class="cd-tabs-wrap ac-tabs" id="ac-tabs">${renderAccessTabsBar()}</div>
     <div id="ac-tab-content">${accessLists()[accessActiveTab].view()}</div>
   `;
@@ -649,17 +653,47 @@ function acAdminActions(admin) {
   const primary = (act, label) => `<button type="button" class="btn-primary" data-ac-action="${act}">${label}</button>`;
   const del = !lastSuper && !self ? [item("delete", ad.delete, TRASH_ICON_SVG, true)] : [];
   const suspend = !lastSuper && !self ? [item("suspend", ad.suspend, ICONS.lock, true)] : [];
+  const terminateSession = admin.hasActiveSession && !self ? [item("terminate-session", ad.terminateSession, ICONS.lock, true)] : [];
   let main = "";
   let items = [];
   switch (admin.status) {
     case "INVITED": items = [item("rename", ad.rename, EDIT_ICON_SVG), ...del]; break;
     case "EXPIRED": main = primary("resend", ad.resend); items = [...del]; break;
-    case "ACTIVE": main = primary("roles", ad.roles); items = [item("rename", ad.rename, EDIT_ICON_SVG), ...suspend, ...del]; break;
+    case "ACTIVE": main = primary("roles", ad.roles); items = [item("rename", ad.rename, EDIT_ICON_SVG), ...terminateSession, ...suspend, ...del]; break;
     case "SUSPENDED":
     case "INACTIVE": main = primary("activate", ad.activate); items = [...del]; break;
     default: break;
   }
   return `${main}${items.length ? rowKebabMenu("ac-admin-menu", items) : ""}`;
+}
+
+// 2FA статуса для себя (CURRENT_ADMIN) — живое состояние admin2fa (components/admin-2fa.js),
+// а не статичное мок-поле: карточка иначе разъехалась бы с реальным переключателем в Профиле.
+function acAdminTwoFaStatus(admin) {
+  return acIsSelf(admin) ? admin2fa.methods.OTP.enabled : admin.twoFactorEnabled;
+}
+
+let acAdminTab = "info";
+
+// Последние события этого админа из аудит-лога — не полноценный список (поиск/фильтры), а
+// компактная сводка с переходом в карточку события; та же логика, что у "Проводок" на карточке
+// счёта плана счетов (accounting-coa.js) — читать полный журнал с фильтром по актору ходят в
+// "Безопасность → Аудит-логи" напрямую.
+function acAdminLogsBody(admin) {
+  const ad = t("access.adminDetail");
+  const rows = AUDIT_LOGS_MOCK.filter((r) => r.actor.type === "ADMIN" && r.actor.id === admin.id)
+    .sort((a, b) => b.createdDate - a.createdDate)
+    .slice(0, 20);
+  return vbMiniTable(
+    [t("audit.columns.event"), t("audit.columns.time"), t("audit.columns.category"), t("audit.columns.result")],
+    rows.map((r) => [
+      `<button type="button" class="table-link" data-ac-audit-hash="#/security-audit-logs/${r.id}">${r.event && r.event.action !== "UNKNOWN" ? auEnum("action", r.event.action) : t("audit.notDescribed")}</button>`,
+      dateTimeCell(r.createdAt),
+      r.event ? auEnum("category", r.event.category) : t("audit.common.noValue"),
+      auResultBadge(r.result.status),
+    ]),
+    ad.noLogs
+  );
 }
 
 // Страница администратора: голубая шапка со статусом, главное действие и меню «⋯», сводка, слева плоские секции
@@ -673,23 +707,20 @@ function viewAdminDetail(admin) {
   const isPending = admin.status === "INVITED" || admin.status === "EXPIRED";
   const sectionsCount = Object.keys(grants).filter((c) => acmFeature(c)).length;
 
-  // Реального письма нет — демо-ссылка на #/accept-invite/:id (views/login.js: viewAcceptInvite) заменяет его,
-  // пока приглашение не принято (иначе ссылка уже не нужна — учётка есть, экран приглашения её не примет).
-  const inviteLinkField =
-    admin.status === "INVITED" && !admin.hasIdentity
-      ? copyableField(ad.fields.inviteLink, `${window.location.origin}${window.location.pathname}#/accept-invite/${admin.id}`, `<a class="table-link" href="#/accept-invite/${admin.id}">${ad.inviteLinkOpen}</a>`)
-      : "";
-
   const main = `<div class="profile-fields profile-fields-grid profile-fields-grid-3">
       ${copyableField(ad.fields.name, admin.name)}
       ${copyableField(ad.fields.email, admin.email)}
       ${detailField(ad.fields.status, acAdminStatusBadge(admin.status))}
       ${detailField(ad.fields.identity, admin.hasIdentity ? a.admins.identityYes : a.admins.identityNo)}
       ${detailField(ad.fields.invited, admin.invitedAt)}
-      ${copyableField("ID", admin.id)}
+      ${copyableField("ID", admin.code)}
       ${detailField(ad.fields.created, admin.createdAt)}
       ${detailField(ad.fields.updated, admin.updatedAt)}
-      ${inviteLinkField}
+    </div>`;
+
+  const security = `<div class="profile-fields profile-fields-grid profile-fields-grid-3">
+      ${detailField(ad.fields.twoFactor, `<span class="badge ${acAdminTwoFaStatus(admin) ? "badge-success" : "badge-neutral"}">${acAdminTwoFaStatus(admin) ? ad.twoFactorOn : ad.twoFactorOff}</span>`)}
+      ${detailField(ad.fields.session, `<span class="badge ${admin.hasActiveSession ? "badge-success" : "badge-neutral"}">${admin.hasActiveSession ? ad.sessionActive : ad.sessionNone}</span>`)}
     </div>`;
 
   const rolesBody = `${isPending ? `<div class="table-cell-muted ac-rule-desc">${ad.pendingRolesHint}</div>` : ""}
@@ -709,20 +740,30 @@ function viewAdminDetail(admin) {
       </div>
       ${lastSuper ? `<div class="card client-block-card"><div class="table-cell-muted">${ad.lastSuperHint}</div></div>` : ""}
       ${admin.status === "SUSPENDED" && admin.suspensionReason ? `<div class="card client-block-card"><div class="detail-section-title">${ad.sections.reason}</div><ul class="block-reasons-list"><li>${pdEscape(admin.suspensionReason)}</li></ul></div>` : ""}
-      <div class="client-detail-grid">
+      <div class="cd-tabs-wrap"><div class="cd-subtabs">${["info", "logs"]
+        .map((k) => `<button type="button" class="cd-subtab${acAdminTab === k ? " is-active" : ""}" data-ac-tab="${k}"><span>${ad.tabs[k]}</span></button>`)
+        .join("")}</div></div>
+      ${
+        acAdminTab === "logs"
+          ? `<div class="profile-flat-block">${flatSection(ad.sections.logs, acAdminLogsBody(admin))}</div>`
+          : `<div class="client-detail-grid">
         <div class="client-detail-grid-main">
           <div class="profile-flat-block">
             ${flatSection(ad.sections.main, main)}
+            ${flatSection(ad.sections.security, security)}
             ${flatSection(`${ad.sections.roles} · ${roles.length}`, rolesBody)}
             ${flatSection(`${ad.sections.access} · ${sectionsCount}`, acmAdminAccessHtml(roles, ad))}
           </div>
         </div>
         <div class="client-detail-grid-side">${acmPagesCardHtml(null, grants)}</div>
-      </div>
+      </div>`
+      }
     </div>`;
 }
 
 function attachAdminDetail(admin, root) {
+  root.querySelectorAll("[data-ac-tab]").forEach((btn) => btn.addEventListener("click", () => { acAdminTab = btn.dataset.acTab; render(); }));
+  root.querySelectorAll("[data-ac-audit-hash]").forEach((b) => b.addEventListener("click", () => { window.location.hash = b.dataset.acAuditHash; }));
   root.querySelectorAll("[data-ac-action]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const act = btn.dataset.acAction;
@@ -732,7 +773,24 @@ function attachAdminDetail(admin, root) {
       if (act === "activate") confirmActivateAdmin(admin);
       if (act === "resend") confirmResendInvitation(admin);
       if (act === "delete") confirmDeleteAdmin(admin);
+      if (act === "terminate-session") confirmTerminateSession(admin);
     });
+  });
+}
+
+function confirmTerminateSession(admin) {
+  const ad = t("access.adminDetail");
+  vbConfirm({
+    title: ad.actions.terminateSessionTitle,
+    text: ad.actions.terminateSessionText(pdEscape(admin.name)),
+    confirmLabel: ad.actions.terminateSession,
+    danger: true,
+    onConfirm: () => {
+      admin.hasActiveSession = false;
+      acTouch(admin);
+      render();
+      showToast(ad.actions.terminateSessionToast);
+    },
   });
 }
 

@@ -38,7 +38,7 @@ const ktConfigsList = createAccessList({
   key: "kt-cfg",
   data: () => KYT_CONFIGS,
   searchPlaceholder: () => kt("configs.search"),
-  searchText: (c) => [c.id, c.name, c.type, c.description].filter(Boolean).join(" "),
+  searchText: (c) => [c.code, c.name, c.type, c.description].filter(Boolean).join(" "),
   tab: { get: (c) => (c.isActive ? "active" : "inactive"), values: ["active", "inactive"], label: (v) => kt(`configs.tabs.${v}`) },
   filters: [
     { id: "created", kind: "date", label: () => kt("filters.created"), get: (c) => c.createdDate },
@@ -57,7 +57,7 @@ const ktConfigsList = createAccessList({
     ];
   },
   columns: [
-    { label: () => kt("columns.id"), html: (c) => `<div class="identity-cell-primary">${vbLink(`#/settings-kyt-configs/${c.id}`, pdShort(c.id))}${copyIconButton(c.id)}</div>` },
+    { label: () => kt("columns.id"), html: (c) => `<div class="identity-cell-primary">${vbLink(`#/settings-kyt-configs/${c.id}`, c.code)}${copyIconButton(c.code)}</div>` },
     { label: () => kt("columns.name"), sort: "name", html: (c) => pdEscape(c.name) },
     { label: () => kt("columns.description"), html: (c) => slTrunc(c.description, true) },
     { label: () => kt("columns.created"), sort: "created", html: (c) => dateTimeCell(c.createdAt) },
@@ -178,7 +178,7 @@ function viewKytConfigDetail(id) {
   const f = kt("fields");
   const d = kt("configs.detail");
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, c.id)}${detailField(f.name, pdEscape(c.name))}${detailField(f.description, c.description ? pdEscape(c.description) : "—")}${detailField(f.type, `<span class="vb-mono">${pdEscape(c.type)}</span>`)}
+    ${copyableField(f.id, c.code)}${detailField(f.name, pdEscape(c.name))}${detailField(f.description, c.description ? pdEscape(c.description) : "—")}${detailField(f.type, `<span class="vb-mono">${pdEscape(c.type)}</span>`)}
     ${detailField(f.created, c.createdAt)}${detailField(f.updated, c.updatedAt)}${detailField(f.version, c.configVersion)}${detailField(f.state, vfStateBadge(c.isActive))}</div>`;
   const events = vbMiniTable([f.event, f.pattern], c.notify.rmq.events.map((e) => [`<strong>${e.event}</strong>`, `<span class="vb-mono">${pdEscape(e.pattern)}</span>`]), d.noEvents);
   const notify = `${c.notify.rmq.exchange ? `<div class="profile-fields">${detailField(f.exchange, `<span class="vb-mono">${pdEscape(c.notify.rmq.exchange)}</span>`)}</div>` : ""}${events}`;
@@ -196,10 +196,10 @@ function viewKytConfigDetail(id) {
     )
     .join("");
   const checks = ktTxOfConfig(c.id);
-  const rows = checks.slice(0, 10).map((x) => [vbLink(`#/security-aml-checks/${x.id}`, pdShort(x.id)), x.createdAt, ktStatusBadge(x.status), x.totalScore === null ? "—" : x.totalScore, `<span class="vb-mono">${pdEscape(x.trackerId || "—")}</span>`]);
+  const rows = checks.slice(0, 10).map((x) => [vbLink(`#/security-aml-checks/${x.id}`, x.code), x.createdAt, ktStatusBadge(x.status), x.totalScore === null ? "—" : x.totalScore, `<span class="vb-mono">${pdEscape(x.trackerId || "—")}</span>`]);
   const checksBlock = `${vbMiniTable([kt("columns.id"), kt("columns.created"), kt("columns.status"), kt("columns.totalScore"), kt("columns.trackerId")], rows, d.noChecks)}${checks.length ? `<p class="table-cell-muted vb-note">${d.checksNote(Math.min(10, checks.length), checks.length)} ${vbLink("#/security-aml-checks", d.openChecks)}</p>` : ""}`;
   return `<div id="kt-root">
-    ${vbDetailHeader({ backHash: "#/settings-kyt-configs", title: d.title, badges: `${vfStateBadge(c.isActive)}<span class="badge badge-neutral">v${c.configVersion}</span>`, subtitle: vbIdSubtitle(c.id, [`<span class="vb-mono">${pdEscape(c.type)}</span>`, c.createdAt]), actions: "" })}
+    ${vbDetailHeader({ backHash: "#/settings-kyt-configs", title: d.title, badges: `${vfStateBadge(c.isActive)}<span class="badge badge-neutral">v${c.configVersion}</span>`, subtitle: vbCodeSubtitle(c.code, [`<span class="vb-mono">${pdEscape(c.type)}</span>`, c.createdAt]), actions: "" })}
     <div class="vf-banner"><span>${d.banner}</span><button type="button" class="btn-secondary" data-kt-action="newVersion">${d.newVersion}</button></div>
     <div class="pd-grid">
       <div class="pd-col"><div class="profile-flat-block">${flatSection(d.general, main)}${steps}${flatSection(`${d.checks} · ${checks.length}`, checksBlock)}</div></div>
@@ -251,7 +251,7 @@ const ktChecksList = createAccessList({
   key: "kt-chk",
   data: () => KYT_TRANSACTIONS,
   searchPlaceholder: () => kt("checks.search"),
-  searchText: (x) => [x.id, x.trackerId, x.client && x.client.id, x.client && x.client.name, x.data.address, x.data.transaction].filter(Boolean).join(" "),
+  searchText: (x) => [x.code, x.trackerId, x.client && x.client.id, x.client && x.client.name, x.data.address, x.data.transaction].filter(Boolean).join(" "),
   tab: { get: (x) => x.status, values: KYT_STATUSES, label: (v) => ktStatusLabel(v) },
   filters: [
     { id: "created", kind: "date", label: () => kt("filters.created"), get: (x) => x.createdDate },
@@ -263,7 +263,7 @@ const ktChecksList = createAccessList({
   defaultSort: (a, b) => b.createdDate - a.createdDate,
   sorts: { created: (a, b) => a.createdDate - b.createdDate, updated: (a, b) => a.updatedDate - b.updatedDate },
   columns: [
-    { label: () => kt("columns.id"), html: (x) => `<div class="identity-cell-primary">${vbLink(`#/security-aml-checks/${x.id}`, pdShort(x.id))}${copyIconButton(x.id)}</div>` },
+    { label: () => kt("columns.id"), html: (x) => `<div class="identity-cell-primary">${vbLink(`#/security-aml-checks/${x.id}`, x.code)}${copyIconButton(x.code)}</div>` },
     { label: () => kt("columns.config"), html: (x) => { const c = ktConfigById(x.configId); return c ? vbLink(`#/settings-kyt-configs/${c.id}`, pdEscape(c.name)) : "—"; } },
     { label: () => kt("columns.created"), sort: "created", html: (x) => dateTimeCell(x.createdAt) },
     { label: () => kt("columns.updated"), sort: "updated", html: (x) => dateTimeCell(x.updatedAt) },
@@ -273,7 +273,7 @@ const ktChecksList = createAccessList({
     { label: () => kt("columns.error"), html: (x) => slTrunc(x.errorMessage, true) },
     // Операция — только у проверок по крипто-транзакции, у которых бэкенд реально связывает KYT-кейс с
     // конкретной crypto-provider операцией (coreOperationId); у проверок по адресу и без связи — прочерк.
-    { label: () => kt("columns.operation"), html: (x) => (x.operationId ? vbLink(`#/settings-vabs-operations/${x.operationId}`, pdShort(x.operationId)) : "—") },
+    { label: () => kt("columns.operation"), html: (x) => { if (!x.operationId) return "—"; const op = vbOperationById(x.operationId); return vbLink(`#/settings-vabs-operations/${x.operationId}`, op ? op.code : pdShort(x.operationId)); } },
     { label: () => "", html: (x) => ktCheckRowActionsMenu(x) },
   ],
   attachRows: (wrap) => {
@@ -312,7 +312,7 @@ function ktOpenChecksExportModal(format) {
 function ktExportChecksTable(format) {
   const x = kt("checks.export");
   const rows = ktChecksList.exportRows().map((r) => [
-    r.id, ktConfigById(r.configId) ? ktConfigById(r.configId).name : "", r.createdAt, r.updatedAt,
+    r.code, ktConfigById(r.configId) ? ktConfigById(r.configId).name : "", r.createdAt, r.updatedAt,
     r.client ? r.client.name : "", ktStatusLabel(r.status), r.totalScore === null ? "" : r.totalScore, r.trackerId || "", r.errorMessage || "", r.operationId || "",
   ]);
   exportTable(`aml_checks_${new Date().toISOString().slice(0, 10)}`, format, x.columns, rows);
@@ -413,7 +413,7 @@ const ktExceptionsList = createAccessList({
   key: "kt-exc",
   data: () => KYT_EXCEPTIONS,
   searchPlaceholder: () => ke("search"),
-  searchText: (x) => [x.id, x.client.id, x.client.name, x.address].join(" "),
+  searchText: (x) => [x.code, x.client.id, x.client.name, x.address].join(" "),
   tab: { get: (x) => x.status, values: KYT_EXCEPTION_STATUSES, label: (v) => ke(`enums.status.${v}`) },
   filters: [
     { id: "created", kind: "date", label: () => ke("filters.created"), get: (x) => x.createdDate },
@@ -423,7 +423,7 @@ const ktExceptionsList = createAccessList({
   defaultSort: (a, b) => b.createdDate - a.createdDate,
   sorts: { created: (a, b) => a.createdDate - b.createdDate, expires: (a, b) => a.expiresDate - b.expiresDate },
   columns: [
-    { label: () => ke("columns.id"), html: (x) => `<div class="identity-cell-primary">${pdShort(x.id)}${copyIconButton(x.id)}</div>` },
+    { label: () => ke("columns.id"), html: (x) => `<div class="identity-cell-primary">${x.code}${copyIconButton(x.code)}</div>` },
     { label: () => ke("columns.client"), html: (x) => vbLink(x.client.link, pdEscape(x.client.name)) },
     { label: () => ke("columns.address"), html: (x) => `<span class="vb-mono">${pdEscape(x.address)}</span>` },
     { label: () => ke("columns.currency"), html: (x) => `${x.currency} <span class="table-cell-muted">· ${x.network}</span>` },
@@ -468,7 +468,7 @@ function ktOpenExceptionsExportModal(format) {
 function ktExportExceptionsTable(format) {
   const x = ke("export");
   const rows = ktExceptionsList.exportRows().map((r) => [
-    r.id, r.client.name, r.address, `${r.currency} · ${r.network}`, ke(`enums.direction.${r.direction}`), r.createdBy, r.expiresAt, ke(`enums.status.${r.status}`),
+    r.code, r.client.name, r.address, `${r.currency} · ${r.network}`, ke(`enums.direction.${r.direction}`), r.createdBy, r.expiresAt, ke(`enums.status.${r.status}`),
   ]);
   exportTable(`kyt_exceptions_${new Date().toISOString().slice(0, 10)}`, format, x.columns, rows);
   showToast(x.done(rows.length));
@@ -683,13 +683,13 @@ function viewKytCheckDetail(id) {
   if (x.status === "NEED_ACTION" && step.manualCheckRequired) actions.push(`<button type="button" class="btn-primary" data-kt-action="decide">${d.decide}</button>`);
   if (x.status === "ERROR" || x.status === "PENDING") actions.push(`<button type="button" class="btn-secondary" data-kt-action="rerun">${d.rerun}</button>`);
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, x.id)}${detailField(f.config, cfg ? vbLink(`#/settings-kyt-configs/${cfg.id}`, pdEscape(ktCfgLabel(cfg))) : "—")}${detailField(f.status, ktStatusBadge(x.status))}
+    ${copyableField(f.id, x.code)}${detailField(f.config, cfg ? vbLink(`#/settings-kyt-configs/${cfg.id}`, pdEscape(ktCfgLabel(cfg))) : "—")}${detailField(f.status, ktStatusBadge(x.status))}
     ${detailField(f.totalScore, x.totalScore === null ? "—" : x.totalScore)}${x.trackerId ? copyableField(f.trackerId, x.trackerId) : detailField(f.trackerId, "—")}
     ${detailField(f.client, x.client ? vbLink(x.client.link, pdEscape(x.client.name)) : "—")}${detailField(f.created, x.createdAt)}${detailField(f.updated, x.updatedAt)}
     ${x.errorMessage ? detailField(f.error, pdEscape(x.errorMessage)) : ""}</div>`;
   const errorBlock = x.errorMessage ? `<div class="card client-block-card"><div class="detail-section-title">${d.errorTitle}</div><ul class="block-reasons-list"><li>${pdEscape(x.errorMessage)}</li></ul></div>` : "";
   return `<div id="kt-root">
-    ${vbDetailHeader({ backHash: "#/security-aml-checks", title: `${d.title} #${pdShort(x.id)}`, badges: ktStatusBadge(x.status), subtitle: vbIdSubtitle(x.id, [x.trackerId ? `<span class="vb-mono">${pdEscape(x.trackerId)}</span>` : d.noTracker, x.createdAt]), actions: actions.join("") })}
+    ${vbDetailHeader({ backHash: "#/security-aml-checks", title: `${d.title} ${x.code}`, badges: ktStatusBadge(x.status), subtitle: vbCodeSubtitle(x.code, [x.trackerId ? `<span class="vb-mono">${pdEscape(x.trackerId)}</span>` : d.noTracker, x.createdAt]), actions: actions.join("") })}
     ${errorBlock}
     <div class="pd-grid">
       <div class="pd-col">${sectionCard(d.general, main)}${x.steps.map((s) => ktStepCard(x, s)).join("")}</div>
@@ -751,7 +751,7 @@ function ktOpenDecision(x) {
 
 // ==== Точки входа для маршрутизации ==============================================================================
 function viewKytConfigs() {
-  return `<div class="list-hero">${pageHeader(kt("titles.configs"), t("navDescriptions.settings-kyt-configs"), `<button type="button" class="btn-primary" id="kt-cfg-create">+ ${kt("configs.create")}</button>`)}</div>${ktConfigsList.view()}`;
+  return `<div class="list-hero">${pageHeader(kt("titles.configs"), t("navDescriptions.settings-kyt-configs"), `${sectionHintBtn("kt-cfg-hint-btn", kt("info.configs"))}<button type="button" class="btn-primary" id="kt-cfg-create">+ ${kt("configs.create")}</button>`)}</div>${ktConfigsList.view()}`;
 }
 function initKytConfigs() {
   ktConfigsList.init();
@@ -800,7 +800,7 @@ function bindKtChecksHeroActions() {
 }
 
 function viewKytChecks() {
-  return `<div class="list-hero">${pageHeader(kt("titles.checks"), t("navDescriptions.security-aml-checks"), `<span id="kt-checks-hero-actions" style="display:contents">${ktChecksHeroActionsHtml()}</span>`)}</div>
+  return `<div class="list-hero">${pageHeader(kt("titles.checks"), t("navDescriptions.security-aml-checks"), `${sectionHintBtn("kt-checks-hint-btn", kt("info.checks"))}<span id="kt-checks-hero-actions" style="display:contents">${ktChecksHeroActionsHtml()}</span>`)}</div>
     <div class="cd-tabs-wrap" id="kt-checks-tabs">${ktChecksTabsBarHtml()}</div>
     <div id="kt-checks-content">${ktChecksTabContentHtml()}</div>`;
 }
@@ -839,5 +839,5 @@ function ktEntityTitle(ref) {
   if (!ref) return vt("common.notFoundTitle");
   if (ref.kind === "config") { const c = ktConfigById(ref.id); return c ? ktCfgLabel(c) : vt("common.notFoundTitle"); }
   const x = ktTxById(ref.id);
-  return x ? pdShort(x.id) : vt("common.notFoundTitle");
+  return x ? x.code : vt("common.notFoundTitle");
 }

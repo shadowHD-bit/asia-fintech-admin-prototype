@@ -184,7 +184,7 @@ function rtTabsBar() {
 function viewSettingsRates() {
   const m = window.location.hash.match(/^#\/?settings-rates\/(pairs|markups|individual|providers)$/);
   if (m) ratesTab = m[1];
-  const info = `<button type="button" class="client-detail-actions-btn acm-info-btn" title="${escapeAttr(rt("info"))}" aria-label="${escapeAttr(rt("title"))}">${ACM_INFO_ICON}</button>`;
+  const info = sectionHintBtn("rt-hint-btn", rt("info"));
   return `
     <div class="list-hero">${pageHeader(t("nav.settings-rates"), t("navDescriptions.settings-rates"), info)}</div>
     <div class="cd-tabs-wrap" id="rt-tabs">${rtTabsBar()}</div>
@@ -284,7 +284,26 @@ function rtOpenMarkupForm(kind, pairId) {
       if (description.length < 3) return e.description;
       if (description.length > 500) return e.descriptionLong;
       closeModal();
-      requireAdmin2fa("rates_markup_change", () => rtCreateMarkup(kind, { pair, type, value, description, clientIds }));
+      requireAdmin2fa("rates_markup_change", () => {
+        // Maker-Checker: ручная наценка — единственное правило с requiredApprovals:2 (шесть глаз),
+        // см. mock/maker-checker.mock.js. Если правило отключено — применяется сразу, как раньше.
+        const apply = () => rtCreateMarkup(kind, { pair, type, value, description, clientIds });
+        const gate = mcTryGate({
+          actionType: "UPDATE",
+          entity: "Rate",
+          targetType: "RATE_MARKUP",
+          targetId: null,
+          targetLabel: `${ratePairLabel(pair)} ${rt(`type.${type}`)} ${value}`,
+          summary: mcCreateSummary([
+            { label: f.pair, value: ratePairLabel(pair) },
+            { label: f.type, value: rt(`type.${type}`) },
+            { label: f.value, value },
+            { label: f.description, value: description },
+          ]),
+          apply,
+        });
+        if (gate.gated) showToast(mc("gate.createdToast"));
+      });
       return null;
     },
   });
@@ -325,18 +344,29 @@ function rtConfirmCancel(id) {
   const a = RATE_GLOBAL_ADJUSTMENTS.find((x) => x.id === id) || RATE_INDIVIDUAL_ADJUSTMENTS.find((x) => x.id === id);
   if (!a) return;
   const pair = ratePairById(a.pairId);
-  vbConfirm({
+  const e = rt("form.errors");
+  vbOpenForm({
     title: rt("cancel.title"),
-    text: rt("cancel.text")(ratePairLabel(pair), rateMarkupText(a)),
-    confirmLabel: rt("actions.cancel"),
+    width: 480,
+    intro: rt("cancel.text")(ratePairLabel(pair), rateMarkupText(a)),
+    fieldsHtml: vbTextarea("rt-cancel-reason", rt("cancel.reason"), "", 3),
+    submitLabel: rt("actions.cancel"),
     danger: true,
-    onConfirm: () => requireAdmin2fa("rates_markup_change", () => {
-      const now = pdNow();
-      a.status = "CANCELLED";
-      a.cancelledDate = now;
-      a.cancelledAt = formatDateTime(now);
-      showToast(rt("cancel.done"));
-      render();
-    }),
+    onSubmit: (el) => {
+      const reason = el.querySelector("#rt-cancel-reason").value.trim();
+      if (reason.length < 3) return e.cancelReason;
+      if (reason.length > 500) return e.cancelReasonLong;
+      closeModal();
+      requireAdmin2fa("rates_markup_change", () => {
+        const now = pdNow();
+        a.status = "CANCELLED";
+        a.cancelledDate = now;
+        a.cancelledAt = formatDateTime(now);
+        a.cancelReason = reason;
+        showToast(rt("cancel.done"));
+        render();
+      });
+      return null;
+    },
   });
 }

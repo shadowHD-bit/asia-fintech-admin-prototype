@@ -89,7 +89,7 @@ function slMakeIndividual(seed, override) {
   else if (seed % 5 === 0) dob = { day: null, month: dob.month, year };
   const createdDate = new Date(MOCK_NOW.getTime() - 12 * 24 * 60 * 60 * 1000);
   const rec = {
-    id: seedToPaymentUuid(11000 + seed),
+    id: seedToPaymentUuid(11000 + seed), code: entityCode("SLI", 11000 + seed),
     externalId: String(seed + 1),
     lastName, firstName, middleName,
     lastNameEn: slTranslit(lastName), firstNameEn: slTranslit(firstName), middleNameEn: slTranslit(middleName),
@@ -135,7 +135,7 @@ function slMakeCompany(seed, override) {
   const foreign = seed % 10 === 0;
   const createdDate = new Date(MOCK_NOW.getTime() - 12 * 24 * 60 * 60 * 1000);
   const rec = {
-    id: seedToPaymentUuid(12000 + seed),
+    id: seedToPaymentUuid(12000 + seed), code: entityCode("SLC", 12000 + seed),
     externalId: String(seed + 1),
     name: `${opf} "${stem}"`,
     nameEn: seed % 4 === 0 ? `LLC ${slTranslit(stem)}` : null,
@@ -171,6 +171,19 @@ SANCTION_COMPANIES.forEach(slRecomputeCompany);
   slStamp(SANCTION_COMPANIES[k], new Date(MOCK_NOW.getTime() - (k + 1) * 24 * 60 * 60 * 1000 - 5 * 3600 * 1000));
 });
 SANCTION_COMPANIES.sort((a, b) => b.createdDate - a.createdDate);
+
+// ---- Страны ------------------------------------------------------------------------------------------
+// Запрещённые страны: минимальная запись — страна + дата добавления (по аналогии со списком физлиц/юрлиц,
+// но без прочих полей, т.к. сопоставление с клиентами по стране не предусмотрено в этой версии прототипа).
+function slMakeCountrySanction(seed, countryId, daysAgo) {
+  const createdDate = new Date(MOCK_NOW.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+  return slStamp({ id: seedToPaymentUuid(13000 + seed), code: entityCode("SLN", 13000 + seed), countryId }, createdDate, createdDate);
+}
+
+const SANCTION_COUNTRIES = [
+  slMakeCountrySanction(1, "ru", 40),
+  slMakeCountrySanction(2, "az", 15),
+].sort((a, b) => b.createdDate - a.createdDate);
 
 // ---- Перепроверка: сопоставление клиентов со списками ------------------------------------------------------------
 const SL_FIO_THRESHOLD_NOTE = 0.7;

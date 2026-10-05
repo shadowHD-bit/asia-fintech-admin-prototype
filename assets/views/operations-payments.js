@@ -794,14 +794,13 @@ function paymentInternalAccount(row, side) {
   const currency = side === "sender" ? row.sourceCurrency : row.targetCurrency;
   const explicit = row[`${side}AccountId`];
   const acc = (explicit && ACCOUNTS_VIRTUAL_MOCK.find((a) => a.id === explicit)) || ensureClientAccount(clientId, currency);
-  return acc ? { id: acc.id, currency, href: accHref(acc) } : null;
+  return acc ? { id: acc.id, code: acc.code, currency, href: accHref(acc) } : null;
 }
 
 function paymentAccountLineHtml(acc, withCurrency) {
   if (!acc) return "";
-  const short = acc.id.length > 20 ? `…${acc.id.slice(-8)}` : acc.id;
-  const label = acc.href ? `<button type="button" class="table-link" data-party-hash="${acc.href}">${short}</button>` : `<span>${short}</span>`;
-  return `<div class="payment-account-line"><span class="identity-cell-tag">${t("paymentDetail.fields.accountNumber")}</span>${withCurrency ? `<span class="table-cell-muted">${acc.currency}</span>` : ""}${label}${copyIconButton(acc.id)}</div>`;
+  const label = acc.href ? `<button type="button" class="table-link" data-party-hash="${acc.href}">${acc.code}</button>` : `<span>${acc.code}</span>`;
+  return `<div class="payment-account-line"><span class="identity-cell-tag">${t("paymentDetail.fields.accountNumber")}</span>${withCurrency ? `<span class="table-cell-muted">${acc.currency}</span>` : ""}${label}${copyIconButton(acc.code)}</div>`;
 }
 
 function paymentClientCellHtml(row, side, opts = {}) {  const clientId = row[`${side}ClientId`];
@@ -939,7 +938,7 @@ function openPaymentRowApproveModal(row) {
   const m = t("paymentDetail.modals");
   openConfirmModal({
     title: m.approveTitle,
-    text: m.approveText(formatPaymentAmount(row.sourceAmount), row.sourceCurrency, row.recipientClientId ? pdShort(row.recipientClientId) : ""),
+    text: m.approveText(formatPaymentAmount(row.sourceAmount), row.sourceCurrency, row.recipientClientName || ""),
     confirmLabel: t("paymentDetail.actions.approve"),
     cancelLabel: t("paymentDetail.common.cancel"),
     danger: false,
@@ -1586,7 +1585,7 @@ function pcAccountDropdownHtml(side, options, selected) {
                   return `
                     <div class="pc-account-item${isSelected ? " is-selected" : ""}" data-pc-account-pick="${side}:${o.value}">
                       <span class="badge badge-neutral">${o.currency}</span>
-                      <button type="button" class="table-link" data-pc-account-open="${o.accountId}">${pdShort(o.accountId)}</button>
+                      <button type="button" class="table-link" data-pc-account-open="${o.accountId}">${(ACCOUNTS_VIRTUAL_MOCK.find((a) => a.id === o.accountId) || {}).code || pdShort(o.accountId)}</button>
                       ${isSelected ? `<span class="pc-account-item-check">${CHECK_ICON_SVG}</span>` : ""}
                     </div>`;
                 })
@@ -2704,7 +2703,7 @@ function viewOperationsPayments(kind = "fiat") {  // Фильтры/поиск �
     <div class="list-hero">${pageHeader(
       t(`nav.${navKey}`),
       t(`navDescriptions.${navKey}`),
-      `${exportMenuHtml("op-export", t("operationsPayments.export.button"), t("operationsPayments.export.hint"))}<button type="button" class="btn-primary" id="op-create-btn">${PLUS_ICON_SVG}<span>${t("operationsPayments.create.button")}</span></button>`
+      `${sectionHintBtn("op-payments-hint-btn", t("operationsPayments.info"))}${exportMenuHtml("op-export", t("operationsPayments.export.button"), t("operationsPayments.export.hint"))}<button type="button" class="btn-primary" id="op-create-btn">${PLUS_ICON_SVG}<span>${t("operationsPayments.create.button")}</span></button>`
     )}</div>
     ${renderPaymentMetricsCards()}
     <div class="card list-card">

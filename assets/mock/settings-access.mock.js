@@ -87,6 +87,10 @@ const ACCESS_ROLES = [
 // [имя, статус, роли, дней назад создан, причина приостановки]
 const ACCESS_ADMIN_SEEDS = [
   ["Админ Тестовый", "ACTIVE", ["role-super"], 380, null, "admin@asiafin.tech"],
+  // Второй активный суперадмин — нужен для Maker-Checker: если бы CURRENT_ADMIN был единственным активным
+  // SUPER, особый случай "единственный суперадмин" (maker-checker.md, §"Особый случай: Superadmin") обходил
+  // бы проверку всегда, и правила с ролью SUPER в checkerRoleIds нельзя было бы продемонстрировать вживую.
+  ["Марат Эсенов", "ACTIVE", ["role-super"], 340, null],
   ["Айгерим Бекешова", "ACTIVE", ["role-admin"], 300, null],
   ["Тилек Асанов", "ACTIVE", ["role-operations-operator"], 210, null],
   ["Нурбек Кадыров", "ACTIVE", ["role-payments-approver"], 180, null],
@@ -108,6 +112,7 @@ const ACCESS_ADMINS = ACCESS_ADMIN_SEEDS.map(([name, status, roleIds, daysAgo, s
   const invited = status === "INVITED" || status === "EXPIRED" ? created : new Date(created.getTime() - 60 * 60 * 1000);
   return {
     id: seedToPaymentUuid(i + 300),
+    code: entityCode("ADM", i + 300),
     name,
     email: email || `staff.${String(i + 1).padStart(2, "0")}@asiafin.tech`,
     status,
@@ -116,6 +121,12 @@ const ACCESS_ADMINS = ACCESS_ADMIN_SEEDS.map(([name, status, roleIds, daysAgo, s
     invitedAt: formatDateTime(invited),
     suspensionReason,
     hasIdentity: !(status === "INVITED" || status === "EXPIRED"),
+    // 2FA и активная сессия — условные поля (реального бэкенда для админской 2FA/сессий в
+    // read-only репозиториях не нашлось), детерминированы по индексу, не случайны при перезагрузке.
+    // Для CURRENT_ADMIN (i===0) карточка показывает не это статичное поле, а живое состояние
+    // admin2fa (components/admin-2fa.js) — см. acAdminTwoFaStatus в settings-access.js.
+    twoFactorEnabled: i % 3 !== 0,
+    hasActiveSession: (status === "INVITED" || status === "EXPIRED") ? false : i % 4 !== 0,
     createdDate: created, createdAt: formatDateTime(created),
     updatedDate: updated, updatedAt: formatDateTime(updated),
   };

@@ -18,7 +18,7 @@
    vabs, а не в bb2 — её содержимое READ-ONLY доступом не открывается, поэтому
    расчёты в прототипе собраны заново из данных, которые у нас реально есть.
 
-   В этом заходе реализованы 4 из 8 отчётов бэкенда — те, для которых в
+   В этом заходе реализованы 5 из 8 отчётов бэкенда — те, для которых в
    прототипе есть на что опереться:
    - "Снимок балансов" — assets/mock/accounts.mock.js (текущие остатки счёта).
    - "Клиентские остатки и обороты" — остатки из accounts.mock.js + реальные
@@ -28,10 +28,15 @@
      operations-exchanges.mock.js, otc-deals.mock.js), плюс попытка реального
      расчёта комиссии через тарифный движок (assets/mock/settings-tariffs.mock.js,
      tfTotalFee) там, где операцию и клиента можно сопоставить с тарифом.
-   Оборотно-сальдовая ведомость, балансовый отчёт, P&L и cash flow из каталога
-   бэкенда сюда не входят — все четыре требуют плана счетов (account_class /
-   account_role: ASSET/LIABILITY/EQUITY/REVENUE/EXPENSE и т.д.), которого в
-   прототипе нет ни у одного счёта. ГРАНИЦА ПРОТОТИПА, полная спецификация и
+   - "Оборотно-сальдовая ведомость" (добавлена 2026-10-02, после того как в
+     прототипе появился "Бухгалтерия → План счетов"/"Главная книга") —
+     assets/mock/accounting-gl.mock.js (GL_JOURNAL_ENTRIES), сгруппированные
+     по счёту плана счетов и валюте, см. frTrialBalanceRows ниже.
+   Балансовый отчёт, P&L и cash flow из каталога бэкенда сюда пока не входят —
+   у плана счетов есть классификация (класс/сторона), но нет ещё одной
+   дополнительной сущности из §5 бэкенда (account_role/account_kind) и шаблона
+   строк отчёта (row_aggr_type из budget-спеки) — это следующий шаг, не
+   реализовано в этом заходе. ГРАНИЦА ПРОТОТИПА, полная спецификация и
    таблица допущений — docs/financial-reports-spec.md.
 
    Экспорт — только XLSX (exportTable из assets/components/export.js), без
@@ -321,6 +326,44 @@ function frOpTypeTurnoverRows() {
 }
 
 // ============================================================================
+// 5. Оборотно-сальдовая ведомость — по каждому счёту плана счетов (ANALYTICAL/
+// TECHNICAL, группы не включены — их остаток уже виден как сумма детей на
+// карточке счёта в "План счетов") и валюте: входящий остаток считается по
+// проводкам ДО начала периода, обороты — по проводкам ВНУТРИ периода,
+// исходящий = входящий + чистый оборот (знак — по normalBalance счёта, как и
+// в coaBalancesByCurrency). Источник — реальные проводки Главной книги
+// (assets/mock/accounting-gl.mock.js, GL_JOURNAL_ENTRIES), не отдельный расчёт.
+// ============================================================================
+function frTrialBalanceRows() {
+  const from = frPeriodFrom(frPeriod);
+  const rows = [];
+  COA_ACCOUNTS.filter((a) => a.nodeType !== "GROUP").forEach((a) => {
+    const normalFactor = a.normalBalance === "DEBIT" ? 1 : -1;
+    const byCurrency = {};
+    glEntriesForAccount(a.code).filter((e) => e.status === "POSTED").forEach((e) => {
+      if (frCurrency !== "all" && e.currency !== frCurrency) return;
+      const b = (byCurrency[e.currency] = byCurrency[e.currency] || { opening: 0, debit: 0, credit: 0 });
+      const isDebitSide = e.debitAccountCode === a.code;
+      if (from && e.effectiveDate < from) {
+        b.opening += (isDebitSide ? 1 : -1) * normalFactor * e.amount;
+      } else if (!from || e.effectiveDate >= from) {
+        if (isDebitSide) b.debit += e.amount; else b.credit += e.amount;
+      }
+    });
+    Object.keys(byCurrency).forEach((cur) => {
+      const b = byCurrency[cur];
+      const closing = b.opening + (b.debit - b.credit) * normalFactor;
+      if (!b.opening && !b.debit && !b.credit && !closing) return;
+      rows.push({
+        accountCode: a.code, accountName: a.name, category: a.category, normalBalance: a.normalBalance, currency: cur,
+        opening: +b.opening.toFixed(2), debitTurnover: +b.debit.toFixed(2), creditTurnover: +b.credit.toFixed(2), closing: +closing.toFixed(2),
+      });
+    });
+  });
+  return rows.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+}
+
+// ============================================================================
 // Определение отчётов экрана: строки предпросмотра/экспорта, применимые
 // фильтры и заголовки колонок (переиспользуются и таблицей на экране, и XLSX).
 // ============================================================================
@@ -354,6 +397,13 @@ function frReportDefs() {
       columns: Object.values(f.columns.opTypeTurnover),
       rows: frOpTypeTurnoverRows,
       toRow: (r) => [f.categories[r.category], r.currency, r.count, r.debitTurnover, r.creditTurnover, r.revenue, r.revenueSource, r.expense],
+    },
+    trialBalance: {
+      title: f.reports.trialBalance.title, desc: f.reports.trialBalance.desc, note: f.notes.trialBalance,
+      filters: { period: true, currency: true, accountKind: false, opCategory: false, client: false },
+      columns: Object.values(f.columns.trialBalance),
+      rows: frTrialBalanceRows,
+      toRow: (r) => [`${r.accountCode} · ${r.accountName}`, co(`category.${r.category}`), co(`normalBalance.${r.normalBalance}`), r.currency, r.opening, r.debitTurnover, r.creditTurnover, r.closing],
     },
   };
 }
@@ -420,7 +470,7 @@ function viewFinancialReports() {
   const defs = frReportDefs();
   const def = defs[frReport];
   return `
-    <div class="list-hero">${pageHeader(t("nav.financial-reports"), f.lead)}</div>
+    <div class="list-hero">${pageHeader(t("nav.financial-reports"), f.lead, sectionHintBtn("fr-hint-btn", f.info))}</div>
     <div class="quick-tabs fr-report-tabs">${Object.keys(defs).map((id) => `<button type="button" class="quick-tab${id === frReport ? " is-active" : ""}" data-fr-report="${id}">${defs[id].title}</button>`).join("")}</div>
     <div class="card fr-card">
       <div class="fr-card-head">

@@ -53,6 +53,11 @@ function tfId() {
   tfSeq += 1;
   return seedToPaymentUuid(60000 + tfSeq);
 }
+// Читаемый код сущности — вызывать сразу после tfId() в том же литерале (использует то же значение
+// tfSeq, порядок вычисления полей объекта слева направо это гарантирует); префикс различает сущности.
+function tfCode(prefix) {
+  return entityCode(prefix, 60000 + tfSeq);
+}
 
 const TF_D0 = new Date(2026, 2, 12, 10, 0);
 const TF_D1 = new Date(2026, 6, 15, 12, 30);
@@ -74,7 +79,7 @@ const TF_OPERATION_SPECS = [
   ["CRYPTO_ACQUIRING_OFFCHAIN", "Off-chain crypto acquiring payment", "CRYPTO", "INTERNAL_PAYMENT", "OUR", "YES"],
 ];
 const TF_OPERATIONS = TF_OPERATION_SPECS.map(([name, description, domain, direction, start, integration]) =>
-  tfStamp({ id: tfId(), name, description, domain, direction, start, integration }, TF_D0, TF_D0)
+  tfStamp({ id: tfId(), code: tfCode("TFO"), name, description, domain, direction, start, integration }, TF_D0, TF_D0)
 );
 
 function tfOperationById(id) {
@@ -89,7 +94,7 @@ const TF_RESTRICTIONS = [
   ["Crypto self-limit cap", "Cap for self-configured crypto limits of individual clients", "USDT", 2000, 5000, 10000, 50000, null, null],
   ["Fiat self-limit cap", "Cap for self-configured fiat limits", "RUB", 500000, 1500000, 5000000, 30000000, 100, 1000000],
 ].map(([name, description, currencyTicker, maxDaily, maxWeekly, maxMonthly, maxAnnual, min, max]) =>
-  tfStamp({ id: tfId(), name, description, currencyTicker, maxDaily, maxWeekly, maxMonthly, maxAnnual, min, max }, TF_D1)
+  tfStamp({ id: tfId(), code: tfCode("TFR"), name, description, currencyTicker, maxDaily, maxWeekly, maxMonthly, maxAnnual, min, max }, TF_D1)
 );
 
 function tfRestrictionById(id) {
@@ -113,7 +118,7 @@ const TF_TARIFF_SPECS = [
   ["Corporate Standard", "Base tariff for legal entities", "CORPORATE", { kybLevel: 1 }, [...TF_CRYPTO_OPS, ...TF_FIAT_OPS], { otherPermission: { forceTwoStepApproval: { enabled: true, authType: "Email" } } }],
 ];
 const TF_TARIFFS = TF_TARIFF_SPECS.map(([name, description, clientCategory, conditions, ops, extra], i) =>
-  tfStamp({ id: tfId(), name, description, clientCategory, conditions: JSON.stringify(conditions), permissions: tfPermissions(ops, extra), ownerClientId: null, sourceTariffId: null, deleted: false }, TF_D0, TF_D1)
+  tfStamp({ id: tfId(), code: tfCode("TFT"), name, description, clientCategory, conditions: JSON.stringify(conditions), permissions: tfPermissions(ops, extra), ownerClientId: null, sourceTariffId: null, deleted: false }, TF_D0, TF_D1)
 );
 
 const TF_TARIFF_OPS = []; // { id, tariffId, operationId }
@@ -174,7 +179,7 @@ const TF_LIMIT_SPECS = [
   ["Corporate Fiat Outgoing", "Fiat outgoing pool for legal entities", "RUB", true, false, 5000000, 20000000, 80000000, 800000000, null, null, ["Corporate Standard"], OUT_FIAT],
 ];
 const TF_LIMITS = TF_LIMIT_SPECS.map(([name, description, currencyTicker, isBaseCurrency, isRolling, daily, weekly, monthly, annual, min, max, tariffNames, opNames], i) =>
-  tfStamp({ id: tfId(), name, description, currencyTicker, isBaseCurrency, isRolling, daily, weekly, monthly, annual, min, max, clientId: null, restrictionId: null, tariffOperationIds: tfBind(tariffNames, opNames), changes: [] }, TF_D0, TF_D1)
+  tfStamp({ id: tfId(), code: tfCode("TFL"), name, description, currencyTicker, isBaseCurrency, isRolling, daily, weekly, monthly, annual, min, max, clientId: null, restrictionId: null, tariffOperationIds: tfBind(tariffNames, opNames), changes: [] }, TF_D0, TF_D1)
 );
 
 function tfLimitById(id) {
@@ -197,7 +202,7 @@ TF_LIMITS.forEach((l) => tfSnapshotLimit(l, l.createdDate));
 
 // ---- Комиссии ----------------------------------------------------------------------------------------------------------
 function tfFactor(order, name, type, fields) {
-  return { id: tfId(), order, name, description: null, type, amountFrom: 0, amountTo: 1000000000, min: null, max: null, percent: null, fixed: null, formula: null, conditions: null, ...fields };
+  return { id: tfId(), code: tfCode("TFF"), order, name, description: null, type, amountFrom: 0, amountTo: 1000000000, min: null, max: null, percent: null, fixed: null, formula: null, conditions: null, ...fields };
 }
 
 // [имя, описание, тикер, тарифы, операции, факторы]
@@ -211,7 +216,7 @@ const TF_COMMISSION_SPECS = [
   ["Corporate crypto withdrawal fee", "Legal entities: withdrawal", "USDT", ["Corporate Standard"], ["NEURON_CRYPTO_OUT"], [tfFactor(1, "System fee", "SYSTEM", { amountTo: 100000, percent: 0.5, min: 5 }), tfFactor(2, "System fee (large)", "SYSTEM", { amountFrom: 100000, percent: 0.2, max: 1000 })]],
 ];
 const TF_COMMISSIONS = TF_COMMISSION_SPECS.map(([name, description, currencyTicker, tariffNames, opNames, factors]) =>
-  tfStamp({ id: tfId(), name, description, currencyTicker, isBaseCurrency: true, whitelabelId: null, clientId: null, tariffOperationIds: tfBind(tariffNames, opNames), factors }, TF_D0, TF_D1)
+  tfStamp({ id: tfId(), code: tfCode("TFC"), name, description, currencyTicker, isBaseCurrency: true, whitelabelId: null, clientId: null, tariffOperationIds: tfBind(tariffNames, opNames), factors }, TF_D0, TF_D1)
 );
 
 function tfCommissionById(id) {
@@ -224,7 +229,7 @@ CLIENTS_USERS_MOCK.forEach((u, i) => {
   const risky = !!u.blockReasons;
   const level = u.kycLevel || 1;
   const tariff = tfTariffByName(risky ? "High risk" : `KYC Level ${level}`);
-  const c = tfStamp({ id: u.id, name: u.fullName || u.email, category: "INDIVIDUAL", tariffId: tariff.id, billingPeriod: new Date(u.createdDate.getFullYear(), u.createdDate.getMonth(), u.createdDate.getDate()), kind: "user", link: `#/clients-users/${u.id}`, changes: [] }, u.createdDate, u.createdDate);
+  const c = tfStamp({ id: u.id, code: u.code, name: u.fullName || u.email, category: "INDIVIDUAL", tariffId: tariff.id, billingPeriod: new Date(u.createdDate.getFullYear(), u.createdDate.getMonth(), u.createdDate.getDate()), kind: "user", link: `#/clients-users/${u.id}`, changes: [] }, u.createdDate, u.createdDate);
   c.changes.unshift({ id: tfId(), tariffId: tfTariffByName("KYC Level 1").id, billingPeriod: c.billingPeriod, createdDate: u.createdDate, createdAt: formatDateTime(u.createdDate) });
   if (!risky && level > 1) c.changes.unshift({ id: tfId(), tariffId: tariff.id, billingPeriod: c.billingPeriod, createdDate: new Date(u.createdDate.getTime() + 36 * 3600 * 1000), createdAt: formatDateTime(new Date(u.createdDate.getTime() + 36 * 3600 * 1000)) });
   if (risky) c.changes.unshift({ id: tfId(), tariffId: tariff.id, billingPeriod: c.billingPeriod, createdDate: new Date(u.createdDate.getTime() + 60 * 3600 * 1000), createdAt: formatDateTime(new Date(u.createdDate.getTime() + 60 * 3600 * 1000)) });
@@ -232,7 +237,7 @@ CLIENTS_USERS_MOCK.forEach((u, i) => {
 });
 CLIENTS_COMPANIES_MOCK.slice(0, 8).forEach((co) => {
   const tariff = tfTariffByName("Corporate Standard");
-  const c = tfStamp({ id: co.id, name: co.name, category: "CORPORATE", tariffId: tariff.id, billingPeriod: new Date(co.createdDate.getFullYear(), co.createdDate.getMonth(), co.createdDate.getDate()), kind: "company", link: `#/clients-companies/${co.id}`, changes: [] }, co.createdDate, co.createdDate);
+  const c = tfStamp({ id: co.id, code: co.code, name: co.name, category: "CORPORATE", tariffId: tariff.id, billingPeriod: new Date(co.createdDate.getFullYear(), co.createdDate.getMonth(), co.createdDate.getDate()), kind: "company", link: `#/clients-companies/${co.id}`, changes: [] }, co.createdDate, co.createdDate);
   c.changes.unshift({ id: tfId(), tariffId: tariff.id, billingPeriod: c.billingPeriod, createdDate: co.createdDate, createdAt: formatDateTime(co.createdDate) });
   TF_CLIENTS.push(c);
 });
@@ -255,7 +260,7 @@ function tfClientById(id) {
 function tfCopyTariff({ sourceTariffId, clientId, name, description, limitOverrides = {}, factorOverrides = {} }, at) {
   const src = tfTariffById(sourceTariffId);
   const suffix = clientId ? "(personal)" : "(copy)";
-  const copy = tfStamp({ id: tfId(), name: name || `${src.name} ${suffix}`, description: description || src.description, clientCategory: src.clientCategory, conditions: src.conditions, permissions: JSON.parse(JSON.stringify(src.permissions)), ownerClientId: clientId || null, sourceTariffId: src.id, deleted: false }, at);
+  const copy = tfStamp({ id: tfId(), code: tfCode("TFT"), name: name || `${src.name} ${suffix}`, description: description || src.description, clientCategory: src.clientCategory, conditions: src.conditions, permissions: JSON.parse(JSON.stringify(src.permissions)), ownerClientId: clientId || null, sourceTariffId: src.id, deleted: false }, at);
   TF_TARIFFS.push(copy);
   const opMap = {};
   tfTariffOpsOf(src.id).forEach((x) => {
@@ -266,12 +271,12 @@ function tfCopyTariff({ sourceTariffId, clientId, name, description, limitOverri
   // лимиты: копируем только общие лимиты, привязанные исключительно к тарифу-источнику; общие пулы переезжают копиями
   TF_LIMITS.filter((l) => !l.clientId && l.tariffOperationIds.some((id) => opMap[id])).forEach((l) => {
     const o = limitOverrides[l.id] || {};
-    const nl = tfStamp({ ...l, id: tfId(), name: o.name || l.name, description: l.description, daily: o.daily ?? l.daily, weekly: o.weekly ?? l.weekly, monthly: o.monthly ?? l.monthly, annual: o.annual ?? l.annual, min: o.min !== undefined ? o.min : l.min, max: o.max !== undefined ? o.max : l.max, isRolling: o.isRolling ?? l.isRolling, tariffOperationIds: l.tariffOperationIds.filter((id) => opMap[id]).map((id) => opMap[id]), changes: [] }, at);
+    const nl = tfStamp({ ...l, id: tfId(), code: tfCode("TFL"), name: o.name || l.name, description: l.description, daily: o.daily ?? l.daily, weekly: o.weekly ?? l.weekly, monthly: o.monthly ?? l.monthly, annual: o.annual ?? l.annual, min: o.min !== undefined ? o.min : l.min, max: o.max !== undefined ? o.max : l.max, isRolling: o.isRolling ?? l.isRolling, tariffOperationIds: l.tariffOperationIds.filter((id) => opMap[id]).map((id) => opMap[id]), changes: [] }, at);
     tfSnapshotLimit(nl, at);
     TF_LIMITS.push(nl);
   });
   TF_COMMISSIONS.filter((c) => !c.clientId && c.tariffOperationIds.some((id) => opMap[id])).forEach((c) => {
-    const nc = tfStamp({ ...c, id: tfId(), tariffOperationIds: c.tariffOperationIds.filter((id) => opMap[id]).map((id) => opMap[id]), factors: c.factors.map((f) => ({ ...f, id: tfId(), ...(factorOverrides[f.id] || {}) })) }, at);
+    const nc = tfStamp({ ...c, id: tfId(), code: tfCode("TFC"), tariffOperationIds: c.tariffOperationIds.filter((id) => opMap[id]).map((id) => opMap[id]), factors: c.factors.map((f) => ({ ...f, id: tfId(), ...(factorOverrides[f.id] || {}) })) }, at);
     TF_COMMISSIONS.push(nc);
   });
   if (clientId) {
@@ -317,7 +322,7 @@ const TF_HISTORY = [];
       const op = ops[s % ops.length];
       const ticker = tickerFor(op, s);
       const created = new Date(MOCK_NOW.getTime() - (j * 47 + (ci % 9) * 6 + (s % 5)) * 3600 * 1000 - (s % 55) * 60000);
-      TF_HISTORY.push(tfStamp({ id: tfId(), clientId: c.id, operationId: op.id, amount: +amountFor(ticker, s).toFixed(ticker === "BTC" ? 5 : 2), currencyTicker: ticker, status: statusPool[s % statusPool.length], trackerId: seedToPaymentUuid(70000 + n), name: null, description: null }, created, new Date(created.getTime() + 4 * 60000)));
+      TF_HISTORY.push(tfStamp({ id: tfId(), code: tfCode("TFH"), clientId: c.id, operationId: op.id, amount: +amountFor(ticker, s).toFixed(ticker === "BTC" ? 5 : 2), currencyTicker: ticker, status: statusPool[s % statusPool.length], trackerId: seedToPaymentUuid(70000 + n), name: null, description: null }, created, new Date(created.getTime() + 4 * 60000)));
     }
   });
   TF_HISTORY.sort((a, b) => b.createdDate - a.createdDate);
@@ -475,15 +480,15 @@ const TF_PARAMETERS = [
   ["risk.score", "Risk score", 1, "number", { min: 1, max: 6 }],
   ["user.level", "User level", 2, "string", null],
   ["client.country", "Client country", 3, "string", null],
-].map(([key, displayName, priority, expectedTypeOfValue, config]) => tfStamp({ id: tfId(), key, displayName, priority, expectedTypeOfValue, config }, TF_D1));
+].map(([key, displayName, priority, expectedTypeOfValue, config]) => tfStamp({ id: tfId(), code: tfCode("TFV"), key, displayName, priority, expectedTypeOfValue, config }, TF_D1));
 
 const TF_TEMPLATES = [
   ["High risk + level", "AND", [{ behaviorParameterKey: "risk.score", operator: "ge", expectedValue: 5 }, { behaviorParameterKey: "user.level", operator: "in", expectedValue: ["medium", "high"] }]],
   ["Risky country", "OR", [{ behaviorParameterKey: "client.country", operator: "in", expectedValue: ["IR", "KP"] }, { behaviorParameterKey: "risk.score", operator: "ge", expectedValue: 6 }]],
-].map(([name, logicalOperator, conditions]) => tfStamp({ id: tfId(), name, logicalOperator, conditions }, TF_D1));
+].map(([name, logicalOperator, conditions]) => tfStamp({ id: tfId(), code: tfCode("TFP"), name, logicalOperator, conditions }, TF_D1));
 
 function tfMask(spec) {
-  return tfStamp({ id: tfId(), name: spec.name, description: spec.description || null, type: spec.type, status: spec.status, riskScoreRange: spec.range || null, tariffDelay: spec.delay || 0, activeFrom: spec.from || null, activeTo: null, maskVersion: 1, tariffId: tfTariffByName(spec.tariff).id, previousVersionId: null, ruleTemplateIds: spec.templates || [] }, spec.created || TF_D1, spec.created || TF_D1);
+  return tfStamp({ id: tfId(), code: tfCode("TFM"), name: spec.name, description: spec.description || null, type: spec.type, status: spec.status, riskScoreRange: spec.range || null, tariffDelay: spec.delay || 0, activeFrom: spec.from || null, activeTo: null, maskVersion: 1, tariffId: tfTariffByName(spec.tariff).id, previousVersionId: null, ruleTemplateIds: spec.templates || [] }, spec.created || TF_D1, spec.created || TF_D1);
 }
 const TF_MASKS = [
   tfMask({ name: "Default 1-2", type: "DEFAULT", status: "ACTIVE", range: { min: 1, max: 2 }, tariff: "KYC Level 3", from: TF_D1 }),
@@ -500,7 +505,7 @@ const TF_ASSIGNMENTS = [];
 (function seedAssignments() {
   const users = TF_CLIENTS.filter((c) => c.kind === "user");
   const add = (client, mask, type, status, activeTariff, pendingTariff, at, extra) =>
-    TF_ASSIGNMENTS.push(tfStamp({ id: tfId(), maskId: mask.id, clientId: client.id, type, status, activeTariffId: activeTariff.id, pendingTariffId: pendingTariff ? pendingTariff.id : null, tariffEffectiveDate: pendingTariff ? new Date(at.getTime() + 2 * 86400000) : null, activeFrom: at, requiresApproval: false, reason: null, overridenAutomaticMaskId: null, changes: null, ...extra }, at, at));
+    TF_ASSIGNMENTS.push(tfStamp({ id: tfId(), code: tfCode("TFA"), maskId: mask.id, clientId: client.id, type, status, activeTariffId: activeTariff.id, pendingTariffId: pendingTariff ? pendingTariff.id : null, tariffEffectiveDate: pendingTariff ? new Date(at.getTime() + 2 * 86400000) : null, activeFrom: at, requiresApproval: false, reason: null, overridenAutomaticMaskId: null, changes: null, ...extra }, at, at));
   const l1 = tfTariffByName("KYC Level 1");
   const l2 = tfTariffByName("KYC Level 2");
   const l3 = tfTariffByName("KYC Level 3");

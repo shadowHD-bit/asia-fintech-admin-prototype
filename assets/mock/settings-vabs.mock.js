@@ -27,7 +27,7 @@ function vbStamp(entity, createdDate, updatedDate) {
 
 const VB_NETWORKS = ["FIAT", "BITCOIN", "ETHEREUM", "LITECOIN", "TRON"].map((name, i) =>
   vbStamp(
-    { id: seedToPaymentUuid(9100 + i), name, description: null, status: "ACTIVE", references: [], metadata: null },
+    { id: seedToPaymentUuid(9100 + i), code: entityCode("VBN", 9100 + i), name, description: null, status: "ACTIVE", references: [], metadata: null },
     i === 0 ? VB_DATE_A : VB_DATE_B,
     i === 0 ? VB_DATE_FIAT_UPDATED : VB_DATE_B
   )
@@ -52,7 +52,7 @@ const VB_CURRENCIES = [
   const created = c.network !== "FIAT" ? VB_DATE_B : isPd || i % 3 === 0 ? VB_DATE_C : VB_DATE_A;
   return vbStamp(
     {
-      id: seedToPaymentUuid(9200 + i),
+      id: seedToPaymentUuid(9200 + i), code: entityCode("VBC", 9200 + i),
       ticker: c.ticker,
       networkName: c.network,
       decimals: c.decimals,
@@ -146,8 +146,8 @@ function vbBuildConfig(p) {
 }
 
 const VB_PROVIDERS = [
-  ...ACC_PROVIDERS.map((p) => ({ id: p.id, name: p.name, type: VB_PROVIDER_TYPES[p.name] || "EXCHANGE", conditions: null })),
-  ...VB_EXTRA_PROVIDERS.map((p, i) => ({ id: seedToPaymentUuid(3050 + i), name: p.name, type: "EXCHANGE", conditions: p.conditions })),
+  ...ACC_PROVIDERS.map((p) => ({ id: p.id, code: p.code, name: p.name, type: VB_PROVIDER_TYPES[p.name] || "EXCHANGE", conditions: null })),
+  ...VB_EXTRA_PROVIDERS.map((p, i) => ({ id: seedToPaymentUuid(3050 + i), code: entityCode("VBP", 3050 + i), name: p.name, type: "EXCHANGE", conditions: p.conditions })),
 ].map((p, i) => {
   const provider = vbStamp(
     {
@@ -221,7 +221,7 @@ function vbOpposite(side) {
 function vbMakeLeg(kind, account, currency, amount, side, order, status, description, createdDate) {
   vbLegCounter += 1;
   return {
-    id: seedToPaymentUuid(20000 + vbLegCounter),
+    id: seedToPaymentUuid(20000 + vbLegCounter), code: entityCode("LEG", 20000 + vbLegCounter),
     legKind: kind,
     accountId: account.id,
     currency,
@@ -288,6 +288,7 @@ function vbAddOperation(acc, tx, seed) {
 
   const op = {
     id: tx.operation.id,
+    code: tx.operation.code,
     name: tx.operation.name,
     description: seed % 7 === 0 && /Incoming/.test(tx.operation.name) ? "SBP deposit" : null,
     externalOperationId: isPayment && seed % 3 === 0 ? `EXT-${(seed * 7919) % 900000 + 100000}` : null,

@@ -208,7 +208,7 @@ function exportAuditLogs(format) {
 
 function viewAuditLogs() {
   return `
-    <div class="list-hero">${pageHeader(t("audit.title"), t("audit.subtitle"), exportMenuHtml("au-export", t("audit.export.button"), t("audit.export.hint")))}</div>
+    <div class="list-hero">${pageHeader(t("audit.title"), t("audit.subtitle"), `${sectionHintBtn("audit-hint-btn", t("audit.info"))}${exportMenuHtml("au-export", t("audit.export.button"), t("audit.export.hint"))}`)}</div>
     ${auditLogsList.view()}
     <p class="table-cell-muted au-retention">${t("audit.retentionNote")}</p>
   `;

@@ -317,7 +317,7 @@ function viewAccounts(kind) {
     <div class="list-hero">${pageHeader(
       t(`nav.accounts-${kind}`),
       t(`navDescriptions.accounts-${kind}`),
-      `${exportMenuHtml("acc-export", t("accounts.export.button"), t("accounts.export.hint"))}<button type="button" class="btn-primary" id="acc-create-btn">${PLUS_ICON_SVG}<span>${t("accounts.create.button")}</span></button>`
+      `${sectionHintBtn("acc-hint-btn", t("accounts.info"))}${exportMenuHtml("acc-export", t("accounts.export.button"), t("accounts.export.hint"))}<button type="button" class="btn-primary" id="acc-create-btn">${PLUS_ICON_SVG}<span>${t("accounts.create.button")}</span></button>`
     )}</div>
     ${note}${ACCOUNT_LISTS[kind].view()}
   `;
@@ -408,7 +408,7 @@ function viewVabsAccounts() {
   const m = window.location.hash.match(/^#\/?settings-vabs-accounts\/(real|correspondent)$/);
   if (m) vabsAccountsTab = m[1];
   return `
-    <div class="list-hero">${pageHeader(t("nav.settings-vabs-accounts"), t("navDescriptions.settings-vabs-accounts"))}</div>
+    <div class="list-hero">${pageHeader(t("nav.settings-vabs-accounts"), t("navDescriptions.settings-vabs-accounts"), sectionHintBtn("vb-acc-hint-btn", t("accounts.vabsInfo")))}</div>
     <div class="cd-tabs-wrap" id="vb-acc-tabs">${vabsAccountsTabsBar()}</div>
     <div id="vb-acc-content">${vabsAccountsContent()}</div>
   `;
@@ -467,7 +467,7 @@ function buildAccountOperationsList(acc) {
     attachHeaderAction: () => bindExportMenu("acc-ops-export", (format) => openExportAccountOpsModal(acc, format)),
     data: dataGetter,
     searchPlaceholder: () => vt("operations.search"),
-    searchText: (op) => [op.id, op.name, op.description, op.externalOperationId].filter(Boolean).join(" "),
+    searchText: (op) => [op.code, op.name, op.description, op.externalOperationId].filter(Boolean).join(" "),
     tab: { get: (r) => r.status, values: VB_OP_STATUSES, label: (v) => accEnum("opStatus", v) },
     filters: [
       { id: "created", kind: "date", label: () => vt("filters.created"), get: (r) => r.createdDate },
@@ -619,11 +619,12 @@ function accOverviewTab(acc) {
   // (ссылка на его карточку в "Настройки vABS") и, если есть, клиент.
   const clientLink = (c) => (c.link ? `<button type="button" class="table-link" data-acc-hash="${c.link}">${pdEscape(c.name)}</button>` : pdEscape(c.name));
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, acc.id)}
+    ${copyableField(f.id, acc.code)}
     ${detailField(f.kind, accKindBadge(acc.kind))}
     ${detailField(f.status, accStatusBadge(acc.status))}
     ${detailField(f.type, accEnum("type", acc.type))}
     ${detailField(f.ledger, accEnum("ledger", acc.ledgerType))}
+    ${detailField(f.tag, acc.tag ? `<code>${pdEscape(acc.tag)}</code>` : t("accounts.noValue"))}
     ${isVirtual ? detailField(f.client, clientLink(acc.client)) : detailField(f.provider, `<button type="button" class="table-link" data-acc-hash="#/settings-vabs-providers/${acc.provider.id}">${pdEscape(acc.provider.name)}</button>`)}
     ${!isVirtual && acc.client ? detailField(f.client, clientLink(acc.client)) : ""}
     ${!isVirtual ? copyableField(f.providerExt, acc.providerExternalId) : ""}
@@ -656,7 +657,7 @@ function accBalancesTab(acc) {
   const rows = acc.balances.filter((x) => !accountBalancesNonZero || x.total > 0);
   const body = rows.length
     ? `<div class="table-scroll"><table class="data-table"><thead><tr><th>${b.id}</th><th>${b.currency}</th><th>${b.available}</th><th>${b.hold}</th><th>${b.total}</th><th>${b.status}</th>${isReal ? `<th>${b.type}</th>` : ""}${isReal ? `<th>${b.requisites}</th>` : ""}<th>${b.description}</th><th></th></tr></thead>
-        <tbody>${rows.map((x) => `<tr><td><span class="inline-copy">${pdShort(x.id)}${copyIconButton(x.id)}</span></td><td>${accCurrencyBadge(x.currency)}</td><td>${formatPaymentAmount(x.available)}</td><td>${formatPaymentAmount(x.hold)}</td><td>${formatPaymentAmount(x.total)}</td><td><span class="badge badge-success">${accEnum("status", x.status)}</span></td>${isReal ? `<td>${accEnum("balanceType", x.type)}</td>` : ""}${isReal ? `<td>${accBalanceSetsCell(acc, x)}</td>` : ""}<td>${x.description ? pdEscape(x.description) : t("accounts.noValue")}</td><td><button type="button" class="icon-btn" data-acc-balance-edit="${x.id}" title="${t("clientDetail.edit")}">${EDIT_ICON_SVG}</button></td></tr>`).join("")}</tbody></table></div>`
+        <tbody>${rows.map((x) => `<tr><td><span class="inline-copy">${x.code}${copyIconButton(x.code)}</span></td><td>${accCurrencyBadge(x.currency)}</td><td>${formatPaymentAmount(x.available)}</td><td>${formatPaymentAmount(x.hold)}</td><td>${formatPaymentAmount(x.total)}</td><td><span class="badge badge-success">${accEnum("status", x.status)}</span></td>${isReal ? `<td>${accEnum("balanceType", x.type)}</td>` : ""}${isReal ? `<td>${accBalanceSetsCell(acc, x)}</td>` : ""}<td>${x.description ? pdEscape(x.description) : t("accounts.noValue")}</td><td><button type="button" class="icon-btn" data-acc-balance-edit="${x.id}" title="${t("clientDetail.edit")}">${EDIT_ICON_SVG}</button></td></tr>`).join("")}</tbody></table></div>`
     : `<div class="table-cell-muted">${b.empty}</div>`;
   return `<div class="profile-flat-block">${flatSection(
     t("accounts.detail.tabs.balances"),
@@ -840,7 +841,7 @@ function exportAccountBalances(acc, format) {
   const isReal = acc.kind !== "virtual";
   const list = acc.balances.filter((b) => !accountBalancesNonZero || b.total > 0);
   const rows = list.map((b) => [
-    b.id, b.currency, accNetworkOf(b.currency) || "", b.available, b.hold, b.total, accEnum("status", b.status),
+    b.code, b.currency, accNetworkOf(b.currency) || "", b.available, b.hold, b.total, accEnum("status", b.status),
     ...(isReal ? [accEnum("balanceType", b.type), (acc.depositSets || []).filter((s) => s.currencies.includes(b.currency)).map((s) => paymentSystemLabel(s.rail)).join(", ")] : []),
     b.description || "",
   ]);
@@ -884,10 +885,10 @@ function exportAccountOps(acc, format) {
   const ops = ensureAccountOperationsList(acc).exportRows();
   const rows = [];
   ops.forEach((o) => {
-    const base = [o.id, o.name, o.description || "", accEnum("opStatus", o.status), o.externalOperationId || "", o.createdAt];
+    const base = [o.code, o.name, o.description || "", accEnum("opStatus", o.status), o.externalOperationId || "", o.createdAt];
     const legs = o[legsKey].filter((l) => l.accountId === acc.id);
     if (!legs.length) rows.push([...base, "", "", "", "", ""]);
-    legs.forEach((l) => rows.push([...base, l.id, l.currency, accEnum("transferType", l.transferType), l.amount, accEnum("opStatus", l.status)]));
+    legs.forEach((l) => rows.push([...base, l.code, l.currency, accEnum("transferType", l.transferType), l.amount, accEnum("opStatus", l.status)]));
   });
   exportTable(`account_operations_${acc.code}_${new Date().toISOString().slice(0, 10)}`, format, x.columns, rows);
   showToast(x.done(ops.length));
@@ -946,7 +947,7 @@ function exportAccountPdf(acc) {
   const ops = accOperationsForAccount(acc).slice().sort((a, b) => b.createdDate - a.createdDate).slice(0, 10);
   const opsHtml = ops.length
     ? `<table class="data-table"><thead><tr><th>${vt("columns.id")}</th><th>${vt("columns.name")}</th><th>${vt("columns.status")}</th><th>${vt("columns.created")}</th></tr></thead><tbody>${ops
-        .map((o) => `<tr><td>${o.id}</td><td>${pdEscape(o.name)}</td><td>${accEnum("opStatus", o.status)}</td><td>${o.createdAt}</td></tr>`)
+        .map((o) => `<tr><td>${o.code}</td><td>${pdEscape(o.name)}</td><td>${accEnum("opStatus", o.status)}</td><td>${o.createdAt}</td></tr>`)
         .join("")}</tbody></table>`
     : `<div class="pdf-note">${hm.empty}</div>`;
   const name = `${t(`accounts.kind.${acc.kind}`)} ${d.titleSuffix} ${acc.code}`;
@@ -1014,19 +1015,25 @@ function accOpenEditModal(acc) {
     title: m.editTitle,
     width: 480,
     // Редактируемые основные параметры — ровно те, что принимает
-    // VabsUpdate(Real|Virtual)AccountInput: description и ledgerType (status/
+    // VabsUpdate(Real|Virtual)AccountInput: description, ledgerType и tag (status/
     // restriction меняются действиями заморозки/закрытия, requisites — отдельно).
+    // tag в реальной схеме — просто String (не enum): значение из классификации
+    // плана счетов (см. "Бухгалтерия → План счетов") либо произвольное новое —
+    // именно так в прототипе появляется "новый тег", который потом можно привязать
+    // к счёту плана счетов (coaOpenLinkForm подхватит его автоматически).
     bodyHtml: `<label class="filters-field"><span class="filters-field-label">${m.descriptionLabel}</span><input class="address-form-input" type="text" id="acc-desc" value="${escapeAttr(acc.description || "")}" /></label>
       <label class="filters-field ac-field"><span class="filters-field-label">${m.ledgerLabel}</span>
-        <select class="address-form-input" id="acc-ledger">${["ACTIVE", "PASSIVE"].map((v) => `<option value="${v}"${acc.ledgerType === v ? " selected" : ""}>${accEnum("ledger", v)}</option>`).join("")}</select></label>`,
+        <select class="address-form-input" id="acc-ledger">${["ACTIVE", "PASSIVE"].map((v) => `<option value="${v}"${acc.ledgerType === v ? " selected" : ""}>${accEnum("ledger", v)}</option>`).join("")}</select></label>
+      <label class="filters-field"><span class="filters-field-label">${m.tagLabel}</span><input class="address-form-input" type="text" id="acc-tag" value="${escapeAttr(acc.tag || "")}" placeholder="PAYABLE_TO_CUSTOMER" /></label>`,
     footerHtml: `<button type="button" class="btn-secondary" id="acc-cancel">${m.cancel}</button><button type="button" class="btn-primary" id="acc-submit">${m.save}</button>`,
     onMount: (el) => {
       el.querySelector("#acc-cancel").addEventListener("click", closeModal);
       el.querySelector("#acc-submit").addEventListener("click", () => {
         const description = el.querySelector("#acc-desc").value.trim();
         const ledgerType = el.querySelector("#acc-ledger").value;
+        const tag = el.querySelector("#acc-tag").value.trim();
         closeModal();
-        accApply(acc, { description: description || null, ledgerType });
+        accApply(acc, { description: description || null, ledgerType, tag: tag || null });
       });
     },
   });

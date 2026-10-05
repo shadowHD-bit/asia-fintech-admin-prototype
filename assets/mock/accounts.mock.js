@@ -63,7 +63,7 @@ const ACC_PROVIDERS = [
   { name: "Pintopay", group: "CARD", rails: ["CARD_NUMBER"] },
   { name: "Walletverse", group: "CRYPTO", rails: ["CRYPTO_WALLET"] },
   { name: "Elcart", group: "CARD", rails: ["CARD_NUMBER"] },
-].map((p, i) => ({ ...p, id: seedToPaymentUuid(3000 + i), category: "PRIMARY" }));
+].map((p, i) => ({ ...p, id: seedToPaymentUuid(3000 + i), code: entityCode("VBP", 3000 + i), category: "PRIMARY" }));
 
 const ACC_SERVICE_CLIENT = { id: seedToPaymentUuid(3100), name: "Азия Финтех (служебный клиент)", legalType: "CORPORATE", link: null };
 
@@ -205,7 +205,7 @@ function accMakeBalances(currencies, seed, { zero, big, realType }) {
     const hold = !zero && seed % 3 === 0 ? +(total * 0.08).toFixed(2) : 0;
     // id и description — реальные поля VabsRealBalance/VabsVirtualBalance
     // (schema.graphql); description по умолчанию пустой
-    return { id: seedToPaymentUuid(20000 + seed * 10 + idx), description: null, currency, total, hold, available: +(total - hold).toFixed(2), status: "ACTIVE", type: realType || null };
+    return { id: seedToPaymentUuid(20000 + seed * 10 + idx), code: entityCode("BAL", 20000 + seed * 10 + idx), description: null, currency, total, hold, available: +(total - hold).toFixed(2), status: "ACTIVE", type: realType || null };
   });
 }
 
@@ -417,7 +417,7 @@ function accBuildTransactions(account, seedBase) {
       return {
         id: seedToPaymentUuid(7000 + seedBase * 100 + j),
         accountId: account.id,
-        operation: { id: seedToPaymentUuid(8000 + seedBase * 100 + j), name: op.name, status: ACC_TX_STATUS_TO_OPERATION[status] },
+        operation: { id: seedToPaymentUuid(8000 + seedBase * 100 + j), code: entityCode("VBO", 8000 + seedBase * 100 + j), name: op.name, status: ACC_TX_STATUS_TO_OPERATION[status] },
         paymentId: payment ? payment.id : null,
         order: 1 + (s % 4),
         transferType: op.dir === "in" ? increaseSide : increaseSide === "DEBIT" ? "CREDIT" : "DEBIT",

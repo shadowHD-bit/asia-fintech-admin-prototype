@@ -32,12 +32,7 @@ function vbLink(hash, text) {
   return `<button type="button" class="table-link" data-vb-hash="${hash}">${text}</button>`;
 }
 
-function vbIdCell(id) {
-  return `<button type="button" class="id-copy" data-copy-value="${id}" title="${t("clientsUsers.copy")}"><span class="id-copy-label">${pdShort(id)}</span>${COPY_ICON_SVG}</button>`;
-}
-
-// Как vbIdCell, но для сущностей с читаемым кодом (entity.code, mock/clients-users.mock.js: entityCode) —
-// код уже короткий, усечение pdShort ему только мешает (превратило бы "USR-XXXXXXXXXXXX" в "USR-XXXX…XXXX")
+// Копируемая ID-ячейка таблицы: entity.code (mock/clients-users.mock.js: entityCode) — читаемый, сырые UUID не показываем
 function vbCodeCell(code) {
   return `<button type="button" class="id-copy" data-copy-value="${code}" title="${t("clientsUsers.copy")}"><span class="id-copy-label">${code}</span>${COPY_ICON_SVG}</button>`;
 }
@@ -111,12 +106,7 @@ function vbDetailHeader({ backHash, title, badges = "", subtitle = "", actions =
     </div>`;
 }
 
-function vbIdSubtitle(id, extra) {
-  const parts = [`<span class="inline-copy">ID: ${pdShort(id)}${copyIconButton(id)}</span>`, ...extra];
-  return parts.join(`<span class="client-detail-subtitle-sep">·</span>`);
-}
-
-// Как vbIdSubtitle, но для сущностей с читаемым кодом (entity.code) — без усечения pdShort
+// Подзаголовок детальной карточки: код сущности (читаемый entity.code — сырые UUID в интерфейсе не показываем) + доп. части
 function vbCodeSubtitle(code, extra) {
   const parts = [`<span class="inline-copy">ID: ${code}${copyIconButton(code)}</span>`, ...extra];
   return parts.join(`<span class="client-detail-subtitle-sep">·</span>`);
@@ -221,7 +211,7 @@ const vbNetworksList = createAccessList({
     ];
   },
   columns: [
-    { label: () => vt("columns.name"), sort: "name", html: (n) => `<div class="identity-cell">${vbLink(`#/settings-vabs-networks/${n.id}`, pdEscape(n.name))}${vbIdCell(n.id)}</div>` },
+    { label: () => vt("columns.name"), sort: "name", html: (n) => `<div class="identity-cell">${vbLink(`#/settings-vabs-networks/${n.id}`, pdEscape(n.name))}${vbCodeCell(n.code)}</div>` },
     { label: () => vt("columns.description"), html: (n) => (n.description ? pdEscape(n.description) : "—") },
     { label: () => vt("columns.status"), html: (n) => vbStatusBadge(n.status) },
     { label: () => vt("columns.currencies"), html: (n) => vbCurrenciesOfNetwork(n.name).length },
@@ -263,7 +253,7 @@ function viewNetworkDetail(id) {
   const active = n.status === "ACTIVE";
   const actions = vbHeaderActions(`<button type="button" class="btn-primary" data-vb-action="edit">${vt("common.edit")}</button>`, [active ? vbActionItem("disable", vt("common.disable"), ICONS.lock, true) : vbActionItem("enable", vt("common.enable"), CHECK_ICON_SVG)]);
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, n.id)}${detailField(f.name, pdEscape(n.name))}${detailField(f.status, vbStatusBadge(n.status))}
+    ${copyableField(f.id, n.code)}${detailField(f.name, pdEscape(n.name))}${detailField(f.status, vbStatusBadge(n.status))}
     ${detailField(f.description, n.description ? pdEscape(n.description) : "—")}${detailField(f.created, n.createdAt)}${detailField(f.updated, n.updatedAt)}</div>`;
   const currencies = vbMiniTable(
     [f.ticker, f.description, f.decimals, f.status],
@@ -271,7 +261,7 @@ function viewNetworkDetail(id) {
     d.noCurrencies
   );
   return `<div id="vb-root">
-    ${vbDetailHeader({ backHash: "#/settings-vabs-networks", title: pdEscape(n.name), badges: vbStatusBadge(n.status), subtitle: vbIdSubtitle(n.id, [n.createdAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-vabs-networks", title: pdEscape(n.name), badges: vbStatusBadge(n.status), subtitle: vbCodeSubtitle(n.code, [n.createdAt]), actions })}
     <div class="client-detail-grid">
       <div class="client-detail-grid-main"><div class="profile-flat-block">${flatSection(vt("sections.main"), main)}${flatSection(`${d.currencies} · ${cur.length}`, currencies)}</div></div>
       <div class="client-detail-grid-side">${sectionCard(vt("sections.references"), `<div class="table-cell-muted">${vt("common.noReferences")}</div>`)}${sectionCard(vt("sections.service"), vbJson({ metadata: n.metadata }), "is-collapsed")}</div>
@@ -300,7 +290,7 @@ const vbCurrenciesList = createAccessList({
   key: "vb-cur",
   data: () => VB_CURRENCIES,
   searchPlaceholder: () => vt("currencies.search"),
-  searchText: (c) => [c.id, c.ticker, c.description, c.networkName].filter(Boolean).join(" "),
+  searchText: (c) => [c.code, c.ticker, c.description, c.networkName].filter(Boolean).join(" "),
   tab: { get: (r) => r.status, values: ["ACTIVE", "DISABLED"], label: (v) => vbEnum("entityStatus", v) },
   filters: [
     { id: "created", kind: "date", label: () => vt("filters.created"), get: (r) => r.createdDate },
@@ -318,7 +308,7 @@ const vbCurrenciesList = createAccessList({
     ];
   },
   columns: [
-    { label: () => vt("columns.ticker"), sort: "ticker", html: (c) => `<div class="identity-cell">${vbLink(`#/settings-vabs-currencies/${c.id}`, pdEscape(c.ticker))}${vbIdCell(c.id)}</div>` },
+    { label: () => vt("columns.ticker"), sort: "ticker", html: (c) => `<div class="identity-cell">${vbLink(`#/settings-vabs-currencies/${c.id}`, pdEscape(c.ticker))}${vbCodeCell(c.code)}</div>` },
     { label: () => vt("columns.description"), html: (c) => pdEscape(c.description) },
     { label: () => vt("columns.network"), html: (c) => { const n = vbNetworkByName(c.networkName); return n ? vbLink(`#/settings-vabs-networks/${n.id}`, pdEscape(n.name)) : pdEscape(c.networkName); } },
     { label: () => vt("columns.decimals"), html: (c) => c.decimals },
@@ -374,7 +364,7 @@ function viewCurrencyDetail(id) {
   const active = c.status === "ACTIVE";
   const actions = vbHeaderActions(`<button type="button" class="btn-primary" data-vb-action="edit">${vt("common.edit")}</button>`, [active ? vbActionItem("disable", vt("common.disable"), ICONS.lock, true) : vbActionItem("enable", vt("common.enable"), CHECK_ICON_SVG)]);
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, c.id)}${detailField(f.ticker, pdEscape(c.ticker))}${detailField(f.status, vbStatusBadge(c.status))}
+    ${copyableField(f.id, c.code)}${detailField(f.ticker, pdEscape(c.ticker))}${detailField(f.status, vbStatusBadge(c.status))}
     ${detailField(f.network, net ? vbLink(`#/settings-vabs-networks/${net.id}`, pdEscape(net.name)) : pdEscape(c.networkName))}
     ${detailField(f.decimals, c.decimals)}${detailField(f.description, c.description ? pdEscape(c.description) : "—")}
     ${detailField(f.created, c.createdAt)}${detailField(f.updated, c.updatedAt)}</div>`;
@@ -390,7 +380,7 @@ function viewCurrencyDetail(id) {
     d.noUsage
   );
   return `<div id="vb-root">
-    ${vbDetailHeader({ backHash: "#/settings-vabs-currencies", title: pdEscape(c.ticker), badges: vbStatusBadge(c.status), subtitle: vbIdSubtitle(c.id, [pdEscape(c.networkName), c.createdAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-vabs-currencies", title: pdEscape(c.ticker), badges: vbStatusBadge(c.status), subtitle: vbCodeSubtitle(c.code, [pdEscape(c.networkName), c.createdAt]), actions })}
     <div class="client-detail-grid">
       <div class="client-detail-grid-main"><div class="profile-flat-block">${flatSection(vt("sections.main"), main)}${flatSection(`${d.usage} · ${maps.length}`, usage)}</div></div>
       <div class="client-detail-grid-side">${sectionCard(vt("sections.references"), `<div class="table-cell-muted">${vt("common.noReferences")}</div>`)}${sectionCard(vt("sections.service"), vbJson({ metadata: c.metadata }), "is-collapsed")}</div>
@@ -463,7 +453,7 @@ function viewEnumDetail(name) {
     d.noValues
   );
   return `<div id="vb-root">
-    ${vbDetailHeader({ backHash: "#/settings-vabs-enums", title: e.name, badges: `<span class="badge badge-neutral">${vt("enumsPage.valuesLabel")(e.values.length)}</span>`, subtitle: vbIdSubtitle(e.id, [e.updatedAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-vabs-enums", title: e.name, badges: `<span class="badge badge-neutral">${vt("enumsPage.valuesLabel")(e.values.length)}</span>`, subtitle: e.updatedAt, actions })}
     <div id="vb-body"><div class="profile-flat-block">${flatSection(vt("sections.main"), info)}${flatSection(`${d.values} · ${e.values.length}`, values)}</div></div>
   </div>`;
 }

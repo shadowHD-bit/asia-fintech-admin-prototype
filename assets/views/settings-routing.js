@@ -108,7 +108,7 @@ function rgPaymentText(p) {
 }
 
 function rgInfoButton() {
-  return `<button type="button" class="client-detail-actions-btn acm-info-btn" title="${escapeAttr(rg("info"))}" aria-label="${escapeAttr(rg("title"))}">${ACM_INFO_ICON}</button>`;
+  return sectionHintBtn("rg-hint-btn", rg("info"));
 }
 
 function rgVisibleRules() {
@@ -230,7 +230,7 @@ const rgRulesList = createAccessList({
   noPager: true,
   tableClass: "rg-table",
   searchPlaceholder: () => rg("rules.search"),
-  searchText: (r) => `${r.name} ${r.description} ${r.routes.map((x) => (rgProviderById(x.providerId) || {}).name || "").join(" ")} ${r.id}`,
+  searchText: (r) => `${r.name} ${r.description} ${r.routes.map((x) => (rgProviderById(x.providerId) || {}).name || "").join(" ")} ${r.code}`,
   tab: { get: (r) => r.status, values: RG_RULE_STATUSES, label: (v) => rg(`status.${v}`) },
   filters: [
     { id: "provider", kind: "multi", label: () => rg("columns.provider"), get: (r) => r.routes.map((x) => x.providerId), options: () => RG_PROVIDERS.map((p) => ({ value: p.id, label: p.name })) },
@@ -347,6 +347,7 @@ function rgDuplicate(rule) {
     const copy = rgClone(rule);
     const now = pdNow();
     copy.id = rgUuid(600 + RG_RULES.length);
+    copy.code = entityCode("RGR", 7600 + RG_RULES.length);
     copy.name = `${rule.name} ${rg("copySuffix")}`.slice(0, 64);
     copy.status = "DRAFT";
     copy.priority = (Math.max(...rgVisibleRules().map((r) => r.priority)) || 0) + 10;
@@ -478,11 +479,18 @@ function rgLinkPayments() {
   RG_EXECUTIONS.forEach((e, i) => { if (!e.paymentLinked && list.length) { e.paymentId = list[i % list.length].id; e.paymentLinked = true; } });
 }
 
+// Код реального платежа, к которому привязано исполнение (см. rgLinkPayments) — для отображения вместо сырого UUID
+function rgPaymentCode(e) {
+  rgLinkPayments();
+  const p = OPERATIONS_PAYMENTS_MOCK.find((r) => r.id === e.paymentId);
+  return p ? p.code : pdShort(e.paymentId);
+}
+
 const rgExecList = createAccessList({
   key: "rg-exec",
   data: () => { rgLinkPayments(); return RG_EXECUTIONS; },
   searchPlaceholder: () => rg("exec.search"),
-  searchText: (e) => `${e.id} ${e.paymentId} ${e.ruleId ? (rgRuleById(e.ruleId) || {}).name : ""}`,
+  searchText: (e) => `${e.code} ${rgPaymentCode(e)} ${e.ruleId ? (rgRuleById(e.ruleId) || {}).name : ""}`,
   tab: { get: (e) => e.status, values: RG_EXEC_STATUSES, label: (v) => rg(`execStatus.${v}`) },
   filters: [
     { id: "rule", kind: "multi", label: () => rg("columns.rule"), get: (e) => e.ruleId || "default", options: () => [...RG_RULES.map((r) => ({ value: r.id, label: r.name })), { value: "default", label: rg("exec.noRule") }] },
@@ -494,7 +502,7 @@ const rgExecList = createAccessList({
   defaultSort: (a, b) => b.createdDate - a.createdDate,
   sorts: { created: (a, b) => a.createdDate - b.createdDate, attempts: (a, b) => a.attempts.length - b.attempts.length },
   columns: [
-    { label: () => rg("columns.execution"), html: (e) => `<div class="identity-cell"><button type="button" class="table-link" data-rg-exec="${e.id}">${pdShort(e.id)}</button><span class="table-cell-muted">${rg("exec.payment")}: ${pdShort(e.paymentId)}</span></div>` },
+    { label: () => rg("columns.execution"), html: (e) => `<div class="identity-cell"><button type="button" class="table-link" data-rg-exec="${e.id}">${e.code}</button><span class="table-cell-muted">${rg("exec.payment")}: ${rgPaymentCode(e)}</span></div>` },
     { label: () => rg("columns.status"), html: (e) => rgExecBadge(e.status) },
     { label: () => rg("columns.payment"), html: (e) => `<div class="identity-cell"><span>${rgPaymentText(e.payment)}</span><span class="table-cell-muted">${e.payment.senderType === "CORPORATE" ? rg("enum.type.CORPORATE") : rg("enum.type.INDIVIDUAL")}</span></div>` },
     { label: () => rg("columns.rule"), html: (e) => { const r = rgRuleById(e.ruleId); return r ? vbLink(`#/settings-routing-rules/rule/${r.id}`, pdEscape(r.name)) : `<span class="table-cell-muted">${rg("exec.noRule")}</span>`; } },
@@ -506,7 +514,7 @@ const rgExecList = createAccessList({
   headerAction: () => `<span class="filters-bar-end">${exportMenuHtml("rg-export", rg("export.button"), rg("export.hint"))}</span>`,
   attachHeaderAction: () => bindExportMenu("rg-export", (f) => {
     exportTable("routing-executions", f, [rg("columns.execution"), rg("columns.payment"), rg("columns.status"), rg("columns.rule"), rg("columns.finalRoute"), rg("columns.attempts"), rg("columns.created"), rg("columns.finished")],
-      RG_EXECUTIONS.map((e) => { const a = e.attempts[e.attempts.length - 1]; const r = rgRuleById(e.ruleId); return [e.id, `${e.payment.amount} ${e.payment.currency} ${e.payment.rail}`, rg(`execStatus.${e.status}`), r ? r.name : rg("exec.noRule"), a ? (rgProviderById(a.providerId) || {}).name : "", e.attempts.length, e.createdAt, e.finishedAt || ""]; }));
+      RG_EXECUTIONS.map((e) => { const a = e.attempts[e.attempts.length - 1]; const r = rgRuleById(e.ruleId); return [e.code, `${e.payment.amount} ${e.payment.currency} ${e.payment.rail}`, rg(`execStatus.${e.status}`), r ? r.name : rg("exec.noRule"), a ? (rgProviderById(a.providerId) || {}).name : "", e.attempts.length, e.createdAt, e.finishedAt || ""]; }));
     showToast(rg("export.done"));
   }),
   attachRows: (wrap) => {
@@ -534,14 +542,14 @@ function viewExecutionDetail(id) {
   const c = rg("columns");
   const header = vbDetailHeader({
     backHash: "#/settings-routing-executions",
-    title: `${rg("exec.title")} ${pdShort(e.id)}`,
+    title: `${rg("exec.title")} ${e.code}`,
     badges: rgExecBadge(e.status),
-    subtitle: vbIdSubtitle(e.id, [`${rg("columns.created")} ${e.createdAt}`, ...(e.finishedAt ? [`${rg("columns.finished")} ${e.finishedAt}`] : [])]),
+    subtitle: [e.createdAt, ...(e.finishedAt ? [e.finishedAt] : [])].join(" · "),
   });
   const attempts = e.attempts.length
     ? `<div class="table-scroll"><table class="data-table rg-table rg-attempts"><thead><tr><th>#</th><th>${c.source}</th><th>${c.provider}</th><th>${c.status}</th><th>${c.error}</th><th>${c.created}</th><th></th></tr></thead><tbody>${e.attempts.map((a) => `<tr><td>${a.attemptNumber}</td><td><span class="badge ${a.routeSource === "DEFAULT" ? "badge-info" : "badge-neutral"}">${rg(`source.${a.routeSource}`)}</span></td><td>${rgRouteLabel(a)}</td><td>${rgAttemptBadge(a.status)}</td><td>${a.errorCode ? `<div class="identity-cell"><span class="vb-mono">${a.errorCode}</span><span class="table-cell-muted">${pdEscape(a.errorMessage)}</span></div>` : "—"}</td><td>${dateTimeCell(a.createdAt)}</td><td class="rg-actions-cell">${a.rawResponse ? `<button type="button" class="table-link rg-raw-toggle" data-rg-raw aria-expanded="false"><span>${rg("exec.rawShow")}</span><span class="rg-raw-caret">${ICONS.chevron}</span></button>` : ""}</td></tr>${a.rawResponse ? `<tr class="rg-raw-row" hidden><td></td><td colspan="6">${vbJson(a.rawResponse)}</td></tr>` : ""}`).join("")}</tbody></table></div>`
     : `<div class="table-cell-muted">${rg("exec.noAttempts")}</div>`;
-  const payment = `<div class="rg-meta-list">${rgMetaRow(rg("exec.payment"), vbLink(`#/operations-payments/${e.paymentId}`, `<span class="vb-mono">${pdShort(e.paymentId)}</span>`))}${rgMetaRow(c.payment, rgPaymentText(p))}${rgMetaRow(rg("attr.recipientCountry"), pdEscape(RG_COUNTRIES[p.recipientCountry] || p.recipientCountry))}${rgMetaRow(rg("attr.senderType"), rgEnumLabel("senderType", p.senderType))}${rgMetaRow(rg("attr.recipientType"), rgEnumLabel("recipientType", p.recipientType))}${rgMetaRow(rg("attr.kycStatus"), rgEnumLabel("kycStatus", p.kycStatus))}</div>`;
+  const payment = `<div class="rg-meta-list">${rgMetaRow(rg("exec.payment"), vbLink(`#/operations-payments/${e.paymentId}`, `<span class="vb-mono">${rgPaymentCode(e)}</span>`))}${rgMetaRow(c.payment, rgPaymentText(p))}${rgMetaRow(rg("attr.recipientCountry"), pdEscape(RG_COUNTRIES[p.recipientCountry] || p.recipientCountry))}${rgMetaRow(rg("attr.senderType"), rgEnumLabel("senderType", p.senderType))}${rgMetaRow(rg("attr.recipientType"), rgEnumLabel("recipientType", p.recipientType))}${rgMetaRow(rg("attr.kycStatus"), rgEnumLabel("kycStatus", p.kycStatus))}</div>`;
   const rule = `<div class="rg-meta-list">${rgMetaRow(c.rule, r ? vbLink(`#/settings-routing-rules/rule/${r.id}`, pdEscape(r.name)) : `<span class="table-cell-muted">${rg("exec.noRule")}</span>`)}${rgMetaRow(c.status, rgExecBadge(e.status))}${rgMetaRow(c.attempts, e.attempts.length)}${rgMetaRow(c.created, e.createdAt)}${rgMetaRow(c.finished, e.finishedAt || "—")}</div>`;
   return `<div id="vb-root">${header}<div class="client-detail-grid">
     <div class="client-detail-grid-main"><div class="profile-flat-block">${flatSection(`${rg("exec.attempts")} · ${e.attempts.length}`, attempts)}</div></div>
@@ -579,7 +587,7 @@ function rgAnalyticsHero(s, days) {
   const pct = (n) => (s.total ? Math.round((n / s.total) * 100) : 0);
   return `<div class="hm-hero">
     <div class="hm-hero-main">
-      <h1 class="hm-hello">${t("nav.analytics-routing")}</h1>
+      <div class="hm-hello-row"><h1 class="hm-hello">${t("nav.analytics-routing")}</h1>${sectionHintBtn("an-routing-hint-btn", rg("hero.info"))}</div>
       <div class="hm-date">${anCurrentDateText()}</div>
       <p class="hm-lead">${rg("hero.lead")}</p>
       <div class="hm-pills">
@@ -811,7 +819,7 @@ function rgRuleHeader() {
   const rule = st.id ? rgRuleById(st.id) : null;
   const title = st.id ? pdEscape(rule.name) : rg("rule.newTitle");
   const badges = st.id ? `${rgStatusBadge(rule.status)}<span class="badge badge-neutral">${rg("columns.priority")} ${rule.priority}</span>` : rgStatusBadge("DRAFT");
-  const sub = st.id ? vbIdSubtitle(rule.id, [`${rg("rule.created")} ${rule.createdAt}`, `${rg("rule.updated")} ${rule.updatedAt}`]) : rg("rule.newSubtitle");
+  const sub = st.id ? vbCodeSubtitle(rule.code, [`${rg("rule.created")} ${rule.createdAt}`, `${rg("rule.updated")} ${rule.updatedAt}`]) : rg("rule.newSubtitle");
   let actions = "";
   if (st.id) {
     const items = [{ label: rg("simulate.button"), icon: ICONS.exchange, attrs: `data-rg-head="simulate"` }];
@@ -1138,7 +1146,8 @@ function rgApplyCreate(status, pos, target) {
   const d = st.draft;
   const now = pdNow();
   const id = rgUuid(700 + RG_RULES.length);
-  const rule = Object.assign(rgClone(d), { id, name: d.name.trim(), description: d.description.trim(), status: status === "ACTIVE" && d.dateStart && d.dateStart > MOCK_NOW ? "SCHEDULED" : status, priority: 0, createdDate: now, createdAt: formatDateTime(now), updatedDate: now, updatedAt: formatDateTime(now), createdBy: CURRENT_ADMIN.email });
+  const code = entityCode("RGR", 7700 + RG_RULES.length);
+  const rule = Object.assign(rgClone(d), { id, code, name: d.name.trim(), description: d.description.trim(), status: status === "ACTIVE" && d.dateStart && d.dateStart > MOCK_NOW ? "SCHEDULED" : status, priority: 0, createdDate: now, createdAt: formatDateTime(now), updatedDate: now, updatedAt: formatDateTime(now), createdBy: CURRENT_ADMIN.email });
   RG_RULES.push(rule);
   const order = rgVisibleRules().map((r) => r.id).filter((x) => x !== id);
   const idx = pos === "START" ? 0 : pos === "END" ? order.length : order.indexOf(target) + (pos === "AFTER" ? 1 : 0);

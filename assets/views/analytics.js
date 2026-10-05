@@ -225,7 +225,7 @@ function anUsersHero(d) {
   const verifiedPct = totalAll ? Math.round(((verifiedUsers + verifiedCompanies) / totalAll) * 100) : 0;
   return `<div class="hm-hero">
     <div class="hm-hero-main">
-      <h1 class="hm-hello">${t("nav.analytics-users")}</h1>
+      <div class="hm-hello-row"><h1 class="hm-hello">${t("nav.analytics-users")}</h1>${sectionHintBtn("an-users-hint-btn", cd.info)}</div>
       <div class="hm-date">${anCurrentDateText()}</div>
       <p class="hm-lead">${cd.hero.lead}</p>
       <div class="hm-pills">
@@ -1018,7 +1018,7 @@ function anOperationsHero() {
   const successPct = totalAll ? Math.round((totalOk / totalAll) * 100) : 0;
   return `<div class="hm-hero">
     <div class="hm-hero-main">
-      <h1 class="hm-hello">${t("nav.analytics-operations")}</h1>
+      <div class="hm-hello-row"><h1 class="hm-hello">${t("nav.analytics-operations")}</h1>${sectionHintBtn("an-ops-hint-btn", cd.info)}</div>
       <div class="hm-date">${anCurrentDateText()}</div>
       <p class="hm-lead">${cd.hero.lead}</p>
       <div class="hm-pills">
@@ -1237,7 +1237,7 @@ function anAccountsHero(d) {
   const kindSegments = Object.keys(d.byKind).map((k, i) => ({ label: t(`accounts.kind.${k}`), value: d.byKind[k], color: ["var(--color-brand)", "var(--color-info)", "var(--color-warning)"][i] }));
   return `<div class="hm-hero">
     <div class="hm-hero-main">
-      <h1 class="hm-hello">${t("nav.analytics-accounts")}</h1>
+      <div class="hm-hello-row"><h1 class="hm-hello">${t("nav.analytics-accounts")}</h1>${sectionHintBtn("an-acc-hint-btn", cd.info)}</div>
       <div class="hm-date">${anCurrentDateText()}</div>
       <p class="hm-lead">${cd.hero.lead}</p>
       <div class="hm-pills">
@@ -1415,7 +1415,7 @@ function anEodHero(d, c) {
   const statusSegments = Object.keys(d.byDayStatus).map((k) => ({ value: d.byDayStatus[k], label: eodEnum("status", k), color: AN_EOD_STATUS_COLORS[k] || "var(--color-text-tertiary)" }));
   return `<div class="hm-hero">
     <div class="hm-hero-main">
-      <h1 class="hm-hello">${t("nav.analytics-eod")}</h1>
+      <div class="hm-hello-row"><h1 class="hm-hello">${t("nav.analytics-eod")}</h1>${sectionHintBtn("an-eod-hint-btn", c.info)}</div>
       <div class="hm-date">${anCurrentDateText()}</div>
       <p class="hm-lead">${c.hero.lead}</p>
       <div class="hm-pills">
@@ -1539,7 +1539,7 @@ function anEventsHero(d, c) {
   const severitySegments = Object.keys(d.bySeverity).map((k) => ({ value: d.bySeverity[k], label: auEnum("severity", k), color: AN_SEVERITY_COLORS[k] || "var(--color-brand)" }));
   return `<div class="hm-hero">
     <div class="hm-hero-main">
-      <h1 class="hm-hello">${t("nav.analytics-events")}</h1>
+      <div class="hm-hello-row"><h1 class="hm-hello">${t("nav.analytics-events")}</h1>${sectionHintBtn("an-events-hint-btn", c.info)}</div>
       <div class="hm-date">${anCurrentDateText()}</div>
       <p class="hm-lead">${c.hero.lead}</p>
       <div class="hm-pills">

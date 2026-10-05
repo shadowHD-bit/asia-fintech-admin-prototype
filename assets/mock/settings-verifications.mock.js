@@ -65,7 +65,7 @@ const VF_STEP_NAMES = { BB_MANUAL_PII: "Базовая анкета", BB_CHECKS:
 const VF_KYC_CONFIGS = VF_KYC_SPECS.map(([key, name, service, level, version, isActive, created, steps, , button, features, actions], i) =>
   vfStamp(
     {
-      id: seedToPaymentUuid(13000 + i),
+      id: seedToPaymentUuid(13000 + i), code: entityCode("KYC", 13000 + i),
       key, name, service, level, configVersion: version, isActive,
       description: null,
       startButtonText: button,
@@ -114,7 +114,7 @@ const VF_KYB_D0 = new Date(2026, 6, 28, 13, 35);
 const VF_KYB_CONFIGS = [1, 2, 3].map((level, i) =>
   vfStamp(
     {
-      id: seedToPaymentUuid(13900 + i),
+      id: seedToPaymentUuid(13900 + i), code: entityCode("KYB", 13900 + i),
       key: `kyb${level}`, name: KYB_CONFIG_NAMES[level - 1], service: "ASIA_FINTECH", level,
       configVersion: 1, isActive: true, description: null,
       steps: KYB_STEPS_BY_LEVEL[level].map((st, idx) => ({
@@ -171,7 +171,7 @@ const VF_DOC_SPECS = [
 ];
 const VF_DOC_CONFIGS = VF_DOC_SPECS.map(([name, description, code, docType, version, isActive, countries, fields, created], i) => {
   const rec = vfStamp(
-    { id: seedToPaymentUuid(14000 + i), name, description, code, docType, configVersion: version || 1, isActive, availableCountryIds: [...countries], references: [] },
+    { id: seedToPaymentUuid(14000 + i), recordCode: entityCode("VDC", 14000 + i), name, description, code, docType, configVersion: version || 1, isActive, availableCountryIds: [...countries], references: [] },
     created,
     new Date(created.getTime() + (i % 4) * 60 * 1000)
   );
@@ -202,7 +202,7 @@ const VF_ADDRESS_SPECS = [
   ["residential", null, 2414, new Date(2022, 11, 22, 16, 56), null],
 ];
 const VF_ADDRESS_CATEGORIES = VF_ADDRESS_SPECS.map(([name, description, addressesCount, created, deleted], i) => {
-  const rec = vfStamp({ id: seedToPaymentUuid(15000 + i), name, description, addressesCount, deletedDate: deleted, deletedAt: deleted ? formatDateTime(deleted) : null }, created, created);
+  const rec = vfStamp({ id: seedToPaymentUuid(15000 + i), code: entityCode("VCT", 15000 + i), name, description, addressesCount, deletedDate: deleted, deletedAt: deleted ? formatDateTime(deleted) : null }, created, created);
   return rec;
 });
 // Названия категорий, которые ищет код KYC (identity: шаги BB_MANUAL_PII и BB_MANUAL)

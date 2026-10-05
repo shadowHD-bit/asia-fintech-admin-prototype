@@ -70,7 +70,7 @@ const tfClientsList = createAccessList({
     ];
   },
   columns: [
-    { label: () => tf("columns.client"), sort: "name", html: (c) => `<div class="identity-cell">${vbLink(`#/settings-tariffs-clients/${c.id}`, pdEscape(c.name))}${vbIdCell(c.id)}</div>` },
+    { label: () => tf("columns.client"), sort: "name", html: (c) => `<div class="identity-cell">${vbLink(`#/settings-tariffs-clients/${c.id}`, pdEscape(c.name))}${vbCodeCell(c.code)}</div>` },
     { label: () => tf("columns.category"), html: (c) => tfCatBadge(c.category) },
     { label: () => tf("columns.tariff"), html: (c) => { const x = tfTariffById(c.tariffId); return `<div class="identity-cell">${tfTariffLink(x)}${x.ownerClientId ? tfBadge("badge-warning tf-mini", tf("common.personal")) : ""}</div>`; } },
     { label: () => tf("columns.billing"), sort: "billing", html: (c) => tfDate(c.billingPeriod) },
@@ -95,7 +95,7 @@ function tfClientDetailBodyHtml(c, { withHeader = true } = {}) {
   const now = tfNow();
   const ends = tfPeriodEnds(now);
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, c.id)}${detailField(f.client, `${pdEscape(c.name)} ${vbLink(c.link, d.openCard)}`)}${detailField(f.category, tfCatBadge(c.category))}
+    ${copyableField(f.id, c.code)}${detailField(f.client, `${pdEscape(c.name)} ${vbLink(c.link, d.openCard)}`)}${detailField(f.category, tfCatBadge(c.category))}
     ${detailField(f.tariff, `${tfTariffLink(tariff)} ${tfTariffKind(tariff)}`)}${detailField(f.billing, tfDate(c.billingPeriod))}${detailField(f.updated, c.updatedAt)}
   </div>`;
   // доступные лимиты по всем операциям тарифа; пул из нескольких операций показывается одной строкой
@@ -123,7 +123,7 @@ function tfClientDetailBodyHtml(c, { withHeader = true } = {}) {
   const personal = !!tariff.ownerClientId;
   const actions = `<button type="button" class="btn-primary" data-tf-act="change">${tf("clients.changeShort")}</button><button type="button" class="btn-secondary" data-tf-act="calc">${d.calc}</button>${personal ? `<button type="button" class="btn-danger" data-tf-act="revoke">${tf("tariffs.revoke.title")}</button>` : `<button type="button" class="btn-secondary" data-tf-act="personal">${d.makePersonal}</button>`}`;
   const headerHtml = withHeader
-    ? vbDetailHeader({ backHash: "#/settings-tariffs-clients", title: pdEscape(c.name), badges: `${tfCatBadge(c.category)}${tfTariffKind(tariff)}`, subtitle: vbIdSubtitle(c.id, [tariff.name]), actions })
+    ? vbDetailHeader({ backHash: "#/settings-tariffs-clients", title: pdEscape(c.name), badges: `${tfCatBadge(c.category)}${tfTariffKind(tariff)}`, subtitle: vbCodeSubtitle(c.code, [tariff.name]), actions })
     : `<div class="tf-embedded-actions">${actions}</div>`;
   return `<div id="tf-root">
     ${headerHtml}
@@ -195,7 +195,7 @@ function tfOpenHistoryForm(h) {
     onSave: (v) => {
       const now = pdNow();
       if (isEdit) { h.status = v.status; acTouch(h); return; }
-      TF_HISTORY.unshift(tfStamp({ id: tfId(), clientId: v.client, operationId: v.operation, amount: v.amount, currencyTicker: v.ticker, status: v.status, trackerId: v.trackerId, name: null, description: null }, now));
+      TF_HISTORY.unshift(tfStamp({ id: tfId(), code: tfCode("TFH"), clientId: v.client, operationId: v.operation, amount: v.amount, currencyTicker: v.ticker, status: v.status, trackerId: v.trackerId, name: null, description: null }, now));
     },
   });
 }
@@ -204,7 +204,7 @@ const tfHistoryList = createAccessList({
   key: "tf-history",
   data: () => TF_HISTORY,
   searchPlaceholder: () => tf("history.search"),
-  searchText: (h) => [h.id, h.trackerId, h.clientId, (tfClientById(h.clientId) || {}).name].filter(Boolean).join(" "),
+  searchText: (h) => [h.code, h.trackerId, h.clientId, (tfClientById(h.clientId) || {}).name].filter(Boolean).join(" "),
   tab: { get: (h) => h.status, values: TF_HISTORY_STATUSES, label: (v) => tfEnum("historyStatus", v) },
   filters: [
     { id: "created", kind: "date", label: () => tf("filters.created"), get: (h) => h.createdDate },
@@ -262,7 +262,7 @@ const tfMasksList = createAccessList({
     return [{ value: list.filter((x) => x.type === "DEFAULT").length, label: m.defaults }, { value: list.filter((x) => x.type === "RULE_BASED").length, label: m.rules }, { value: list.reduce((n, x) => n + TF_ASSIGNMENTS.filter((a) => a.maskId === x.id && a.status === "ACTIVE").length, 0), label: m.clients }];
   },
   columns: [
-    { label: () => tf("columns.name"), sort: "name", html: (m) => `<div class="identity-cell">${vbLink(`#/settings-masks-list/${m.id}`, pdEscape(m.name))}${vbIdCell(m.id)}</div>` },
+    { label: () => tf("columns.name"), sort: "name", html: (m) => `<div class="identity-cell">${vbLink(`#/settings-masks-list/${m.id}`, pdEscape(m.name))}${vbCodeCell(m.code)}</div>` },
     { label: () => tf("columns.type"), html: (m) => tfEnum("maskType", m.type) },
     { label: () => tf("columns.status"), html: (m) => tfMaskBadge(m.status) },
     { label: () => tf("columns.tariff"), html: (m) => tfTariffLink(tfTariffById(m.tariffId)) },
@@ -314,7 +314,7 @@ function tfOpenMaskForm(mask) {
       const type = isEdit ? mask.type : v.type;
       const vals = { name: v.name, description: v.description || null, tariffId: v.tariff, tariffDelay: v.delay || 0, riskScoreRange: type === "DEFAULT" ? { min: v.riskMin, max: v.riskMax } : null, ruleTemplateIds: type === "RULE_BASED" ? v.templates : [] };
       if (isEdit) { Object.assign(mask, vals); acTouch(mask); return; }
-      const created = tfStamp({ id: tfId(), type, status: "DRAFT", activeFrom: null, activeTo: null, maskVersion: 1, previousVersionId: null, ...vals }, pdNow());
+      const created = tfStamp({ id: tfId(), code: tfCode("TFM"), type, status: "DRAFT", activeFrom: null, activeTo: null, maskVersion: 1, previousVersionId: null, ...vals }, pdNow());
       TF_MASKS.unshift(created);
       window.location.hash = `#/settings-masks-list/${created.id}`;
     },
@@ -359,7 +359,7 @@ function viewMaskDetail(id) {
   const tariff = tfTariffById(m.tariffId);
   const assignments = TF_ASSIGNMENTS.filter((a) => a.maskId === m.id);
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, m.id)}${detailField(f.type, tfEnum("maskType", m.type))}${detailField(f.status, tfMaskBadge(m.status))}
+    ${copyableField(f.id, m.code)}${detailField(f.type, tfEnum("maskType", m.type))}${detailField(f.status, tfMaskBadge(m.status))}
     ${detailField(f.tariff, tfTariffLink(tariff))}${detailField(f.description, m.description ? pdEscape(m.description) : "—")}${detailField(f.delay, m.tariffDelay ? tf("masks.days")(m.tariffDelay) : "—")}
     ${detailField(f.risk, m.riskScoreRange ? `${m.riskScoreRange.min}–${m.riskScoreRange.max}` : "—")}${detailField(f.version, m.maskVersion)}${detailField(f.activeFrom, tfDate(m.activeFrom))}${detailField(f.activeTo, tfDate(m.activeTo))}
     ${detailField(f.created, m.createdAt)}${detailField(f.updated, m.updatedAt)}
@@ -373,7 +373,7 @@ function viewMaskDetail(id) {
   const canDelete = m.status !== "ACTIVE";
   const actions = `<button type="button" class="btn-secondary" data-tf-act="edit"${canEdit ? "" : ` disabled title="${d.editDisabled}"`}>${vt("common.edit")}</button>${canPublish ? `<button type="button" class="btn-primary" data-tf-act="publish">${d.publish}</button>` : ""}${canArchive ? `<button type="button" class="btn-secondary" data-tf-act="archive">${d.archive}</button>` : ""}<button type="button" class="btn-danger" data-tf-act="delete"${canDelete ? "" : ` disabled title="${d.deleteDisabled}"`}>${vt("common.delete")}</button>`;
   return `<div id="tf-root">
-    ${vbDetailHeader({ backHash: "#/settings-masks-list", title: pdEscape(m.name), badges: `${tfMaskBadge(m.status)}<span class="badge badge-neutral">${tfEnum("maskType", m.type)}</span>`, subtitle: vbIdSubtitle(m.id, [`v${m.maskVersion}`, m.createdAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-masks-list", title: pdEscape(m.name), badges: `${tfMaskBadge(m.status)}<span class="badge badge-neutral">${tfEnum("maskType", m.type)}</span>`, subtitle: vbCodeSubtitle(m.code, [`v${m.maskVersion}`, m.createdAt]), actions })}
     ${sectionCard(d.general, main)}
     ${sectionCard(`${d.templates} · ${templates.length}`, tplBlock)}
     ${sectionCard(`${d.assignments} · ${assignments.length}`, asBlock)}
@@ -418,7 +418,7 @@ const tfTemplatesList = createAccessList({
   key: "tf-tpl",
   data: () => TF_TEMPLATES,
   searchPlaceholder: () => tf("templates.search"),
-  searchText: (x) => [x.id, x.name, ...x.conditions.map((c) => c.behaviorParameterKey)].join(" "),
+  searchText: (x) => [x.code, x.name, ...x.conditions.map((c) => c.behaviorParameterKey)].join(" "),
   filters: [{ id: "logical", kind: "multi", label: () => tf("filters.logical"), get: (x) => x.logicalOperator, options: () => ["AND", "OR"].map((v) => ({ value: v, label: tfEnum("logical", v) })) }, { id: "created", kind: "date", label: () => tf("filters.created"), get: (x) => x.createdDate }],
   defaultSort: (a, b) => b.createdDate - a.createdDate,
   sorts: { name: (a, b) => a.name.localeCompare(b.name) },
@@ -427,7 +427,7 @@ const tfTemplatesList = createAccessList({
     return [{ value: list.length, label: m.total }, { value: list.reduce((n, x) => n + x.conditions.length, 0), label: m.conditions }, { value: list.filter((x) => !TF_MASKS.some((mk) => mk.ruleTemplateIds.includes(x.id))).length, label: m.unused }];
   },
   columns: [
-    { label: () => tf("columns.name"), sort: "name", html: (x) => `<div class="identity-cell"><span>${pdEscape(x.name)}</span>${vbIdCell(x.id)}</div>` },
+    { label: () => tf("columns.name"), sort: "name", html: (x) => `<div class="identity-cell"><span>${pdEscape(x.name)}</span>${vbCodeCell(x.code)}</div>` },
     { label: () => tf("columns.logical"), html: (x) => tfEnum("logical", x.logicalOperator) },
     { label: () => tf("columns.conditions"), html: (x) => `<div class="identity-cell">${x.conditions.map((c) => `<span class="vb-mono">${pdEscape(tfConditionText(c))}</span>`).join("")}</div>` },
     { label: () => tf("columns.masks"), html: (x) => TF_MASKS.filter((mk) => mk.ruleTemplateIds.includes(x.id) && mk.status !== "DELETED").length },
@@ -462,7 +462,7 @@ function tfOpenTemplateForm(x) {
     confirm: x ? () => f.confirmEdit(TF_MASKS.filter((mk) => mk.ruleTemplateIds.includes(x.id) && mk.status !== "DELETED").length) : null,
     onSave: (v) => {
       if (x) { Object.assign(x, { name: v.name, logicalOperator: v.logical, conditions: v.conditions }); acTouch(x); return; }
-      TF_TEMPLATES.unshift(tfStamp({ id: tfId(), name: v.name, logicalOperator: v.logical, conditions: v.conditions }, pdNow()));
+      TF_TEMPLATES.unshift(tfStamp({ id: tfId(), code: tfCode("TFP"), name: v.name, logicalOperator: v.logical, conditions: v.conditions }, pdNow()));
     },
   });
 }
@@ -472,7 +472,7 @@ const tfParametersList = createAccessList({
   key: "tf-param",
   data: () => TF_PARAMETERS,
   searchPlaceholder: () => tf("parameters.search"),
-  searchText: (p) => [p.id, p.key, p.displayName].join(" "),
+  searchText: (p) => [p.code, p.key, p.displayName].join(" "),
   filters: [{ id: "type", kind: "multi", label: () => tf("filters.valueType"), get: (p) => p.expectedTypeOfValue, options: () => TF_VALUE_TYPES.map((v) => ({ value: v, label: tfEnum("valueType", v) })) }],
   defaultSort: (a, b) => a.priority - b.priority,
   sorts: { key: (a, b) => a.key.localeCompare(b.key), priority: (a, b) => a.priority - b.priority },
@@ -533,7 +533,7 @@ function tfOpenParameterForm(p) {
         acTouch(p);
         return;
       }
-      TF_PARAMETERS.push(tfStamp({ id: tfId(), ...vals }, pdNow()));
+      TF_PARAMETERS.push(tfStamp({ id: tfId(), code: tfCode("TFV"), ...vals }, pdNow()));
     },
   });
 }
@@ -543,7 +543,7 @@ const tfAssignmentsList = createAccessList({
   key: "tf-assign",
   data: () => TF_ASSIGNMENTS,
   searchPlaceholder: () => tf("assignments.search"),
-  searchText: (a) => [a.id, a.clientId, (tfClientById(a.clientId) || {}).name, (tfMaskById(a.maskId) || {}).name, a.reason].filter(Boolean).join(" "),
+  searchText: (a) => [a.code, a.clientId, (tfClientById(a.clientId) || {}).name, (tfMaskById(a.maskId) || {}).name, a.reason].filter(Boolean).join(" "),
   tab: { get: (a) => a.status, values: TF_ASSIGNMENT_STATUSES, label: (v) => tfEnum("assignmentStatus", v) },
   filters: [
     { id: "type", kind: "multi", label: () => tf("filters.assignmentType"), get: (a) => a.type, options: () => TF_ASSIGNMENT_TYPES.map((v) => ({ value: v, label: tfEnum("assignmentType", v) })) },
@@ -589,7 +589,7 @@ function tfApplyAssignment(client, mask, type, status, extra) {
   const prevTariff = tfTariffById(client.tariffId);
   TF_ASSIGNMENTS.filter((a) => a.clientId === client.id && a.type === type && (a.status === "ACTIVE" || a.status === "SCHEDULED")).forEach((a) => { a.status = "SUPERSEDED"; acTouch(a); });
   const pending = status === "SCHEDULED" ? mask.tariffId : null;
-  const created = tfStamp({ id: tfId(), maskId: mask.id, clientId: client.id, type, status, activeTariffId: status === "SCHEDULED" ? prevTariff.id : mask.tariffId, pendingTariffId: pending, tariffEffectiveDate: pending ? new Date(now.getTime() + mask.tariffDelay * 86400000) : null, activeFrom: now, requiresApproval: false, reason: null, overridenAutomaticMaskId: null, changes: null, ...extra }, now);
+  const created = tfStamp({ id: tfId(), code: tfCode("TFA"), maskId: mask.id, clientId: client.id, type, status, activeTariffId: status === "SCHEDULED" ? prevTariff.id : mask.tariffId, pendingTariffId: pending, tariffEffectiveDate: pending ? new Date(now.getTime() + mask.tariffDelay * 86400000) : null, activeFrom: now, requiresApproval: false, reason: null, overridenAutomaticMaskId: null, changes: null, ...extra }, now);
   TF_ASSIGNMENTS.unshift(created);
   if (status === "ACTIVE" && !prevTariff.ownerClientId) {
     client.tariffId = mask.tariffId;
@@ -672,37 +672,37 @@ function tfOpenEvaluate() {
 
 // ==== Обёртки для роутера ==================================================================================================================
 function viewTariffsClients() {
-  return `${pageHeader(tf("titles.clients"), t("navDescriptions.settings-tariffs-clients"))}${tfClientsList.view()}`;
+  return `${pageHeader(tf("titles.clients"), t("navDescriptions.settings-tariffs-clients"), sectionHintBtn("tf-clients-hint-btn", tf("info.clients")))}${tfClientsList.view()}`;
 }
 function initTariffsClients() {
   tfClientsList.init();
 }
 function viewTariffsHistory() {
-  return `${pageHeader(tf("titles.history"), t("navDescriptions.settings-tariffs-history"))}${tfHistoryList.view()}`;
+  return `${pageHeader(tf("titles.history"), t("navDescriptions.settings-tariffs-history"), sectionHintBtn("tf-history-hint-btn", tf("info.history")))}${tfHistoryList.view()}`;
 }
 function initTariffsHistory() {
   tfHistoryList.init();
 }
 function viewMasksList() {
-  return `${pageHeader(tf("titles.masks"), t("navDescriptions.settings-masks-list"))}${tfMasksList.view()}`;
+  return `${pageHeader(tf("titles.masks"), t("navDescriptions.settings-masks-list"), sectionHintBtn("tf-masks-hint-btn", tf("info.masks")))}${tfMasksList.view()}`;
 }
 function initMasksList() {
   tfMasksList.init();
 }
 function viewMasksTemplates() {
-  return `${pageHeader(tf("titles.templates"), t("navDescriptions.settings-masks-templates"))}${tfTemplatesList.view()}`;
+  return `${pageHeader(tf("titles.templates"), t("navDescriptions.settings-masks-templates"), sectionHintBtn("tf-templates-hint-btn", tf("info.templates")))}${tfTemplatesList.view()}`;
 }
 function initMasksTemplates() {
   tfTemplatesList.init();
 }
 function viewMasksParameters() {
-  return `${pageHeader(tf("titles.parameters"), t("navDescriptions.settings-masks-parameters"))}${tfParametersList.view()}`;
+  return `${pageHeader(tf("titles.parameters"), t("navDescriptions.settings-masks-parameters"), sectionHintBtn("tf-parameters-hint-btn", tf("info.parameters")))}${tfParametersList.view()}`;
 }
 function initMasksParameters() {
   tfParametersList.init();
 }
 function viewMasksAssignments() {
-  return `${pageHeader(tf("titles.assignments"), t("navDescriptions.settings-masks-assignments"))}${tfAssignmentsList.view()}`;
+  return `${pageHeader(tf("titles.assignments"), t("navDescriptions.settings-masks-assignments"), sectionHintBtn("tf-assignments-hint-btn", tf("info.assignments")))}${tfAssignmentsList.view()}`;
 }
 function initMasksAssignments() {
   tfAssignmentsList.init();

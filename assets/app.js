@@ -27,6 +27,7 @@ const ICONS = {
   accounts: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="15" height="11" rx="1.6"/><path d="M2.5 8h15"/><path d="M13 12.5h2.5"/></svg>`,
   chevron: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 8 4 4 4-4"/></svg>`,
   calendar: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="14" height="12" rx="1.5"/><path d="M3 8h14M7 3v3M13 3v3"/></svg>`,
+  globe: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2.2 2 2.2 12 0 14M10 3c-2.2 2-2.2 12 0 14"/></svg>`,
 };
 
 // ---- Флаги языков (inline SVG) ---------------------------------------------
@@ -92,7 +93,19 @@ const NAV_TREE = [
       { id: "eod-history", icon: "box" },
     ],
   },
-  { id: "financial-reports", icon: "box" },
+  {
+    // Бухгалтерия: «Финансовые отчёты» — реальный раздел (см. docs/financial-reports-spec.md).
+    // «План счетов»/«Главная книга» — допущение прототипа: раздела нет в реальном бэкенде,
+    // построены по FRD (research-gl-coa.md, general-ledger-i-chart-of-accounts.md).
+    id: "accounting",
+    icon: "box",
+    children: [
+      { id: "financial-reports", icon: "box" },
+      { id: "accounting-coa", icon: "box" },
+      { id: "accounting-gl", icon: "box" },
+      { id: "accounting-rules", icon: "box" },
+    ],
+  },
   {
     id: "security",
     section: "platform",
@@ -111,6 +124,16 @@ const NAV_TREE = [
     icon: "settings",
     children: [
       { id: "settings-access", icon: "security" },
+      {
+        // Maker-Checker — допущение прототипа: раздела нет в реальном бэкенде, построен по
+        // отдельной спеке заказчика (maker-checker.md, RM-87441). См. mock/maker-checker.mock.js.
+        id: "settings-maker-checker",
+        icon: "lock",
+        children: [
+          { id: "settings-maker-checker-rules", icon: "box" },
+          { id: "settings-maker-checker-requests", icon: "operations" },
+        ],
+      },
       { id: "settings-rates", icon: "exchange" },
       { id: "settings-vabs-accounts", icon: "accounts" },
       {
@@ -153,6 +176,7 @@ const NAV_TREE = [
         children: [
           { id: "settings-sanctions-individuals", icon: "user" },
           { id: "settings-sanctions-companies", icon: "building" },
+          { id: "settings-sanctions-countries", icon: "globe" },
         ],
       },
       {
@@ -290,7 +314,10 @@ function activeNavId(routeId = currentRouteId()) {
   }
   if (routeId === "operations-otc-detail") return "operations-otc";
   if (routeId === "clients-partners-detail") return "clients-partners";
-  if (routeId === "clients-partner-users-detail") return "clients-partners";
+  if (routeId === "accounting-coa-detail") return "accounting-coa";
+  if (routeId === "accounting-gl-detail") return "accounting-gl";
+  if (routeId === "accounting-rules-detail") return "accounting-rules";
+  if (routeId === "settings-maker-checker-request-detail") return "settings-maker-checker-requests";
   if (routeId === "settings-routing-rule") return "settings-routing-rules";
   if (routeId === "settings-routing-execution") return "settings-routing-executions";
   return routeId;
@@ -574,14 +601,34 @@ function renderBreadcrumbs(routeId, navItem) {
       { label: navLabel(NAV_INDEX["clients-partners"]), route: "clients-partners" },
       { label: svc ? svc.name : t("vabs.common.notFoundTitle") },
     ];
-  } else if (routeId === "clients-partner-users-detail") {
-    const pu = pnClientById(currentPartnerUserId());
-    const svc = pu ? pnById(pu.serviceId) : null;
+  } else if (routeId === "accounting-coa-detail") {
+    const acc = coaById(coaRef());
     parts = [
-      { label: navLabel(NAV_INDEX["clients"]) },
-      { label: navLabel(NAV_INDEX["clients-partners"]), route: "clients-partners" },
-      { label: svc ? svc.name : t("vabs.common.notFoundTitle"), route: svc ? `clients-partners/${svc.id}` : undefined },
-      { label: pu ? pu.name : t("vabs.common.notFoundTitle") },
+      { label: navLabel(NAV_INDEX["accounting"]) },
+      { label: navLabel(NAV_INDEX["accounting-coa"]), route: "accounting-coa" },
+      { label: acc ? `${acc.code} · ${acc.name}` : t("vabs.common.notFoundTitle") },
+    ];
+  } else if (routeId === "accounting-gl-detail") {
+    const e = glById(glRef());
+    parts = [
+      { label: navLabel(NAV_INDEX["accounting"]) },
+      { label: navLabel(NAV_INDEX["accounting-gl"]), route: "accounting-gl" },
+      { label: e ? e.entryId : t("vabs.common.notFoundTitle") },
+    ];
+  } else if (routeId === "accounting-rules-detail") {
+    const r = arById(arRef());
+    parts = [
+      { label: navLabel(NAV_INDEX["accounting"]) },
+      { label: navLabel(NAV_INDEX["accounting-rules"]), route: "accounting-rules" },
+      { label: r ? `${r.code} · ${r.name}` : t("vabs.common.notFoundTitle") },
+    ];
+  } else if (routeId === "settings-maker-checker-request-detail") {
+    const r = mcById(mcRef());
+    parts = [
+      { label: navLabel(NAV_INDEX["settings-operational"]) },
+      { label: navLabel(NAV_INDEX["settings-maker-checker"]) },
+      { label: navLabel(NAV_INDEX["settings-maker-checker-requests"]), route: "settings-maker-checker-requests" },
+      { label: r ? r.code : t("vabs.common.notFoundTitle") },
     ];
   } else if (routeId === "tariffs-detail") {
     const ref = tfRef();
@@ -736,13 +783,15 @@ function viewProfile() {
         <div class="pf-hero-meta"><div class="profile-card-name">${pdEscape(CURRENT_ADMIN.name)}</div><div class="profile-card-role">${pdEscape(roleLabel)}</div></div>
       </div>
     </div>
-    <div class="cd-tabs-wrap pf-tabs"><div class="cd-subtabs">${["profile", "security"]
+    <div class="cd-tabs-wrap pf-tabs"><div class="cd-subtabs">${["profile", "security", "approvals"]
       .map((k) => `<button type="button" class="cd-subtab${profileTab === k ? " is-active" : ""}" data-pf-tab="${k}"><span>${p.tabs[k]}</span></button>`)
       .join("")}</div></div>
-    <div class="profile-flat-block pf-page">
+    <div class="${profileTab === "approvals" ? "" : "profile-flat-block pf-page"}">
       ${
         profileTab === "security"
           ? profileSecurityHtml()
+          : profileTab === "approvals"
+          ? profileApprovalsHtml()
           : `${flatSection(p.sections.main, `<div class="profile-fields profile-fields-grid">${rows.map(([label, value]) => detailField(label, value)).join("")}</div>`)}
       ${flatSection(p.sections.contacts, `<div class="pf-contacts">${contacts}</div>`, null, p.contactsHint)}`
       }
@@ -762,28 +811,55 @@ function profileSecurityHtml() {
       <div class="pf-2fa-actions">${actions}</div>
     </div>`;
   const btn = (act, label, cls = "btn-secondary") => `<button type="button" class="${cls}" data-a2f-act="${act}">${label}</button>`;
+  const otpActions = `${m.OTP.enabled ? btn("rebind", s.rebindBtn) : ""}${m.OTP.enabled ? btn("otp-off", s.disconnect) : btn("otp-on", s.connect, "btn-primary")}`;
   const body = `<div class="pf-2fa">
-    ${row(t("twofa.methods.OTP"), s.otpDesc, m.OTP.enabled, m.OTP.enabled ? btn("otp-off", s.disconnect) : btn("otp-on", s.connect, "btn-primary"))}
+    ${row(t("twofa.methods.OTP"), s.otpDesc, m.OTP.enabled, otpActions)}
     ${row(t("twofa.methods.EMAIL"), s.emailDesc, true, `<span title="${s.emailRequired}"><button type="button" class="btn-secondary" disabled>${s.disable}</button></span>`)}
   </div>`;
-  return flatSection(s.title, body, null, s.desc) + profileRecoveryCodeHtml() + profilePasswordHtml();
+  return flatSection(s.title, body, null, s.desc) + profileRecoveryCodeHtml() + profileWindowsHtml() + profilePasswordHtml();
 }
 
-// ---- Профиль → "Безопасность": резервный код (getRecoveryCode/disableAll2FA в auth-backend) -----------------------------
-// Один код на экстренный случай, не альтернативный способ подтверждения: получается один раз, использование разом
-// отключает все отключаемые способы подтверждения (кроме e-mail — он базовый) и стирает код, новый — только после этого.
+// ---- Профиль → "Безопасность": коды восстановления -----------------------------------------------------------------------
+// Набор из 10 одноразовых кодов — равноправная альтернатива коду способа подтверждения везде, где он принимается
+// (вход, подтверждение действия, отключение способа), а не отдельный инструмент "сбросить всё".
 function profileRecoveryCodeHtml() {
   const s = t("twofa.profile");
-  const has = !!admin2fa.recoveryCode;
-  const status = has ? s.recoveryStatusGot(formatDateTime(new Date(admin2fa.recoveryCodeObtainedAt))) : s.recoveryStatusNone;
-  const action = has
-    ? `<button type="button" class="btn-secondary" data-a2f-act="recovery-use">${s.recoveryUse}</button>`
-    : `<button type="button" class="btn-primary" data-a2f-act="recovery-get">${s.recoveryGet}</button>`;
+  // Коды восстановления выпускаются вместе с подключением Google Authenticator (как admin2FASetupConfirm в
+  // справочнике) — без него им не из чего быть: карточка показывает причину вместо кнопки.
+  if (!admin2fa.methods.OTP.enabled) {
+    const body = `<div class="pf-2fa"><div class="pf-2fa-row"><div class="pf-2fa-main"><div class="pf-2fa-title">${s.recoveryTitle}</div><div class="table-cell-muted">${s.recoveryNeedsOtp}</div></div></div></div>`;
+    return flatSection(s.recoveryTitle, body, null, s.recoveryDesc);
+  }
+  const left = admin2faRecoveryCodesLeft();
+  const low = admin2faRecoveryLow();
+  const status = low ? s.recoveryStatusLow(left) : s.recoveryStatusLeft(left);
+  const action = `<button type="button" class="btn-secondary" data-a2f-act="recovery-regenerate">${s.recoveryRegenerate}</button>`;
   const body = `<div class="pf-2fa"><div class="pf-2fa-row">
-      <div class="pf-2fa-main"><div class="pf-2fa-title">${s.recoveryTitle}</div><div class="table-cell-muted">${status}</div></div>
+      <div class="pf-2fa-main"><div class="pf-2fa-title">${s.recoveryTitle}</div><div class="table-cell-muted${low ? " pf-2fa-warn" : ""}">${status}</div></div>
       <div class="pf-2fa-actions">${action}</div>
     </div></div>`;
   return flatSection(s.recoveryTitle, body, null, s.recoveryDesc);
+}
+
+// ---- Профиль → "Безопасность": открытые доверенные окна (stepUpWindows) ---------------------------------------------------
+// Одно окно на модуль (ближайший в прототипе аналог "области" из справочника 2FA) — открывается подтверждением
+// любого действия модуля и скользяще продлевается, пока активны действия. Здесь — просмотр и ручное закрытие.
+function profileWindowsHtml() {
+  const s = t("twofa.profile");
+  const modNames = t("twofa.actions.modules");
+  const windows = admin2faOpenWindowsList();
+  const row = (w) => {
+    const mins = Math.max(0, Math.ceil((w.expiresAt - Date.now()) / 60000));
+    return `<div class="pf-2fa-row">
+      <div class="pf-2fa-main"><div class="pf-2fa-title">${pdEscape(modNames[w.module] || w.module)}</div><div class="table-cell-muted">${s.windowExpires(mins)} · ${tf2(`methods.${w.method === "RECOVERY_CODE" ? "BACKUP" : w.method}`)}</div></div>
+      <div class="pf-2fa-actions"><button type="button" class="btn-secondary" data-a2f-win-close="${w.module}">${s.windowClose}</button></div>
+    </div>`;
+  };
+  const body = windows.length
+    ? `<div class="pf-2fa">${windows.map(row).join("")}</div>`
+    : `<div class="table-cell-muted">${s.windowsEmpty}</div>`;
+  const head = windows.length > 1 ? `<button type="button" class="btn-secondary" data-a2f-act="windows-close-all">${s.windowCloseAll}</button>` : null;
+  return flatSection(s.windowsTitle, body, null, s.windowsDesc, head);
 }
 
 // ---- Профиль → "Безопасность": пароль. Смена — старый + новый + повтор; восстановление — ссылка на почту ----------------
@@ -824,7 +900,7 @@ function openPasswordChangeModal() {
         if (!el.querySelector("#login-captcha-box").classList.contains("is-done")) return fail(t("login.recovery.errCaptcha"));
         // как в бэкенде (confirmChangePassword): новый пароль применяется после кода подтверждения
         closeModal();
-        openAdmin2faModal({ title: p.changeTitle, intro: p.codeIntro, remember: false, onSuccess: () => showToast(p.changedToast) });
+        openAdmin2faModal({ title: p.changeTitle, intro: p.codeIntro, onSuccess: () => showToast(p.changedToast) });
       });
     },
   });
@@ -843,7 +919,7 @@ function openPasswordResetLinkModal() {
       el.querySelector("#pw-send").addEventListener("click", () => {
         closeModal();
         showToast(p.resetSentToast(CURRENT_ADMIN.email));
-        openAdmin2faModal({ title: p.resetTitle, intro: p.resetCodeIntro(CURRENT_ADMIN.email), remember: false, onSuccess: openPasswordNewModal });
+        openAdmin2faModal({ title: p.resetTitle, intro: p.resetCodeIntro(CURRENT_ADMIN.email), onSuccess: openPasswordNewModal });
       });
     },
   });
@@ -878,13 +954,18 @@ function profileToggleMethod(method, on) {
   const s = t("twofa.profile");
   const others = ADMIN_2FA_METHODS.filter((x) => x !== method && admin2fa.methods[x].enabled).length;
   if (!on && others === 0) { showToast(s.lastMethod); return; }
-  // включение и отключение способа подтверждается кодом; окно "запомнить" не используется
+  // включение и отключение способа подтверждается кодом (TOTP или код восстановления — оба равноправны здесь)
   openAdmin2faModal({
     title: `${t(`twofa.methods.${method}`)}: ${on ? s.enable : s.disable}`,
     intro: s.confirmIntro,
-    remember: false,
     onSuccess: () => {
       admin2fa.methods[method].enabled = on;
+      // Отключение способа — как adminDisable2FAConfirm: закрываются все доверенные окна, коды восстановления отзываются
+      if (!on) {
+        admin2faCloseAllWindows();
+        admin2fa.recoveryCodes = [];
+        admin2fa.recoveryCodesGeneratedAt = null;
+      }
       render();
       showToast(on ? s.connectedToast : s.disconnectedToast);
     },
@@ -893,14 +974,19 @@ function profileToggleMethod(method, on) {
 
 function initProfile() {
   document.querySelectorAll("[data-pf-tab]").forEach((b) => b.addEventListener("click", () => { profileTab = b.dataset.pfTab; render(); }));
+  if (profileTab === "approvals") initProfileApprovalsTab();
   document.querySelectorAll("[data-a2f-act]").forEach((b) =>
     b.addEventListener("click", () => {
       const act = b.dataset.a2fAct;
       if (act === "otp-on") openGaSetupModal(() => render());
       else if (act === "otp-off") profileToggleMethod("OTP", false);
-      else if (act === "recovery-get") openRecoveryGetModal(() => render());
-      else if (act === "recovery-use") openRecoveryUseModal(() => render());
+      else if (act === "rebind") openRebindModal(() => render());
+      else if (act === "recovery-regenerate") openRecoveryRegenerateModal(() => render());
+      else if (act === "windows-close-all") { admin2faCloseAllWindows(); render(); showToast(t("twofa.profile.windowsClosedToast")); }
     })
+  );
+  document.querySelectorAll("[data-a2f-win-close]").forEach((b) =>
+    b.addEventListener("click", () => { admin2faCloseWindow(b.dataset.a2fWinClose); render(); showToast(t("twofa.profile.windowClosedToast")); })
   );
   document.querySelectorAll("[data-profile-logout]").forEach((b) => b.addEventListener("click", () => { window.location.hash = "#/login"; }));
   document.querySelectorAll("[data-pw-act]").forEach((b) => b.addEventListener("click", () => (b.dataset.pwAct === "change" ? openPasswordChangeModal() : openPasswordResetLinkModal())));
@@ -923,7 +1009,10 @@ function currentRouteId() {
   const hash = window.location.hash.replace(/^#\/?/, "");
   if (/^clients-users\/.+/.test(hash)) return "clients-users-detail";
   if (/^clients-companies\/.+/.test(hash)) return "clients-companies-detail";
-  if (/^clients-partner-users\/.+/.test(hash)) return "clients-partner-users-detail";
+  if (/^accounting-coa\/.+/.test(hash)) return "accounting-coa-detail";
+  if (/^accounting-gl\/.+/.test(hash)) return "accounting-gl-detail";
+  if (/^accounting-rules\/.+/.test(hash)) return "accounting-rules-detail";
+  if (/^settings-maker-checker-requests\/.+/.test(hash)) return "settings-maker-checker-request-detail";
   if (/^operations-otc\/.+/.test(hash)) return "operations-otc-detail";
   if (/^operations-(payments|exchanges)\/.+/.test(hash)) return "operations-payment-detail";
   if (/^settings-access\/(role|admin)\/.+/.test(hash)) return "settings-access-detail";
@@ -1009,6 +1098,37 @@ function render() {
   } else if (routeId === "financial-reports") {
     content.innerHTML = viewFinancialReports();
     initFinancialReports();
+  } else if (routeId === "accounting-coa") {
+    content.innerHTML = viewAccountingCoa();
+    initAccountingCoa();
+  } else if (routeId === "accounting-coa-detail") {
+    const id = coaRef();
+    content.innerHTML = viewAccountingCoaDetail(id);
+    initAccountingCoaDetail(id);
+  } else if (routeId === "accounting-gl") {
+    content.innerHTML = viewAccountingGl();
+    initAccountingGl();
+  } else if (routeId === "accounting-gl-detail") {
+    const id = glRef();
+    content.innerHTML = viewAccountingGlDetail(id);
+    initAccountingGlDetail(id);
+  } else if (routeId === "accounting-rules") {
+    content.innerHTML = viewAccountingRules();
+    initAccountingRules();
+  } else if (routeId === "accounting-rules-detail") {
+    const id = arRef();
+    content.innerHTML = viewAccountingRuleDetail(id);
+    initAccountingRuleDetail(id);
+  } else if (routeId === "settings-maker-checker-rules") {
+    content.innerHTML = viewMakerCheckerRules();
+    initMakerCheckerRules();
+  } else if (routeId === "settings-maker-checker-requests") {
+    content.innerHTML = viewMakerCheckerRequests();
+    initMakerCheckerRequests();
+  } else if (routeId === "settings-maker-checker-request-detail") {
+    const id = mcRef();
+    content.innerHTML = viewMakerCheckerRequestDetail(id);
+    initMakerCheckerRequestDetail(id);
   } else if (routeId === "operations-exchanges") {
     content.innerHTML = viewOperationsExchanges();
     initOperationsExchangesView();
@@ -1041,10 +1161,6 @@ function render() {
   } else if (routeId === "settings-rates") {
     content.innerHTML = viewSettingsRates();
     initSettingsRates();
-  } else if (routeId === "clients-partner-users-detail") {
-    const id = currentPartnerUserId();
-    content.innerHTML = viewPartnerUserDetail(id);
-    initPartnerUserDetail(id);
   } else if (routeId === "clients-partners") {
     content.innerHTML = viewPartners();
     initPartners();
@@ -1117,7 +1233,7 @@ function render() {
     const ref = vfRef();
     content.innerHTML = viewVerifDetail(ref);
     initVerifDetail(ref);
-  } else if (routeId === "settings-sanctions-individuals" || routeId === "settings-sanctions-companies") {
+  } else if (routeId === "settings-sanctions-individuals" || routeId === "settings-sanctions-companies" || routeId === "settings-sanctions-countries") {
     const kind = routeId.replace("settings-sanctions-", "");
     content.innerHTML = viewSanctions(kind);
     initSanctions(kind);

@@ -162,7 +162,7 @@ function rgRoute(providerName, nostroIndex) {
 function rgRule(n, d) {
   const created = rgDate(-(60 - n * 3), 11, n * 7);
   const updated = rgDate(-(20 - n), 15, n * 5);
-  return Object.assign({ id: rgUuid(n), description: "", dateStart: null, dateEnd: null, createdDate: created, createdAt: formatDateTime(created), updatedDate: updated, updatedAt: formatDateTime(updated), createdBy: "a.kim@aziafintech.kz" }, d);
+  return Object.assign({ id: rgUuid(n), code: entityCode("RGR", 7000 + n), description: "", dateStart: null, dateEnd: null, createdDate: created, createdAt: formatDateTime(created), updatedDate: updated, updatedAt: formatDateTime(updated), createdBy: "a.kim@aziafintech.kz" }, d);
 }
 
 const RG_RULES = [
@@ -316,7 +316,7 @@ const RG_EXECUTIONS = [];
     }
     const finished = ["SUCCESS", "USE_DEFAULT", "FAILED"].includes(status) ? new Date(created.getTime() + (attempts.length * 4 + 2) * 1000) : null;
     RG_EXECUTIONS.push({
-      id: rgUuid(100 + i), paymentId: seedToPaymentUuid(8000 + i), status, ruleId: rule ? rule.id : null, payment, attempts,
+      id: rgUuid(100 + i), code: entityCode("RGE", 8100 + i), paymentId: seedToPaymentUuid(8000 + i), status, ruleId: rule ? rule.id : null, payment, attempts,
       createdDate: created, createdAt: formatDateTime(created), finishedAt: finished ? formatDateTime(finished) : null,
     });
   }

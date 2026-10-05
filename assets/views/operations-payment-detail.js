@@ -10,7 +10,6 @@
    ========================================================================== */
 
 const PD_ARROW_ICON = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h13M12 5.5 16.5 10 12 14.5"/></svg>`;
-const PD_STAR_ICON = `<svg viewBox="0 0 20 20" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="m10 2.8 2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5-3.6-3.5 5-.7L10 2.8Z"/></svg>`;
 const PD_EXTERNAL_LINK_ICON = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4.5H4.5v11h11V12M12 3.5h4.5V8M16 4 9 11"/></svg>`;
 const PD_DOWNLOAD_ICON = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9M6.5 8.5 10 12l3.5-3.5"/><path d="M4 14v1.5A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5V14"/></svg>`;
 
@@ -160,7 +159,6 @@ function renderPaymentDetailHeader(row, ref, extras) {
           <span class="badge ${paymentStatusBadgeClass(row.status)}">${paymentStatusLabel(row.status)}</span>
           <span class="badge ${isIncoming ? "badge-success" : "badge-neutral"}">${isCrypto ? paymentFlowOneLabel(paymentFlow(row), row) : paymentDirectionLabel(row.direction)}</span>
           <span class="badge badge-neutral">${isCrypto && row.cryptoWallet ? `${row.cryptoWallet.networkName} · ${row.cryptoWallet.currencyTicker}` : paymentSystemLabel(row.paymentSystem)}</span>
-          ${row.isFavorite ? `<span class="pd-star" title="${cd.favorite}">${PD_STAR_ICON}</span>` : ""}
         </div>
         <div class="client-detail-subtitle">
           <span class="inline-copy">ID: ${row.code}${copyIconButton(row.code)}</span>
@@ -302,7 +300,7 @@ function renderPaymentPartyBox(label, row, side, accountPairs, identityPairs) {
   // У внутренней стороны (есть clientId) — её счёт в нашей системе, ссылка ведёт в раздел "Счета"; у внешней — реквизиты рельса (accountPairs)
   const internalAcc = clientId ? paymentInternalAccount(row, side) : null;
   const ourAccount = internalAcc
-    ? detailField(t("paymentDetail.fields.accountNumber"), `<span class="profile-field-value-wrap"><button type="button" class="table-link" data-party-hash="${internalAcc.href}">${internalAcc.id}</button>${copyIconButton(internalAcc.id)}</span>`)
+    ? detailField(t("paymentDetail.fields.accountNumber"), `<span class="profile-field-value-wrap"><button type="button" class="table-link" data-party-hash="${internalAcc.href}">${internalAcc.code}</button>${copyIconButton(internalAcc.code)}</span>`)
     : "";
   const extra = [paymentPartyExtraPairs(clientId, clientType), identityPairs || "", internalAcc ? ourAccount : accountPairs || ""].filter(Boolean).join("");
   return `
@@ -1010,7 +1008,7 @@ function pdServiceAccount(index) {
 
 function pdLeg(row, order, description, side, amount, currency, acc) {
   const seed = Math.abs(paymentStableHash(`${row.id}:${order}`));
-  return { id: seedToPaymentUuid(80000 + (seed % 20000)), order, description, side, amount, currency, acc: acc || null, status: pdLegStatus(row), createdAt: row.createdAt };
+  return { id: seedToPaymentUuid(80000 + (seed % 20000)), code: entityCode("LEG", 80000 + (seed % 20000)), order, description, side, amount, currency, acc: acc || null, status: pdLegStatus(row), createdAt: row.createdAt };
 }
 
 // Реальные проводки (через ностро/провайдера) — только там, где деньги реально уходят за пределы наших книг:
@@ -1070,7 +1068,7 @@ function renderLedgerTable(legs, { title, intro, emptyTitle, emptyText, exportKe
       (x) => `<tr>
         <td><div class="identity-cell">
           <div class="identity-cell-primary">${x.acc ? `<button type="button" class="table-link" ${hashAttr}="${accHref(x.acc)}">${pdEscape(x.description)}</button>` : `<span>${pdEscape(x.description)}</span>`}</div>
-          <div class="identity-cell-sub"><span class="identity-cell-tag">${t("clientsUsers.idTag")}</span><button type="button" class="id-copy" data-copy-value="${x.id}" title="${t("clientsUsers.copy")}"><span class="id-copy-label">${pdShort(x.id)}</span>${COPY_ICON_SVG}</button></div>
+          <div class="identity-cell-sub"><span class="identity-cell-tag">${t("clientsUsers.idTag")}</span><button type="button" class="id-copy" data-copy-value="${x.code}" title="${t("clientsUsers.copy")}"><span class="id-copy-label">${x.code}</span>${COPY_ICON_SVG}</button></div>
         </div></td>
         <td><span class="badge ${x.side === "DEBIT" ? "badge-neutral" : "badge-info"}">${accEnum("transferType", x.side)}</span></td>
         <td>${formatPaymentAmount(x.amount)}</td>
@@ -1118,7 +1116,7 @@ function pdLedgerExportRows(row) {
   const l = t("paymentDetail.ledger");
   const legs = pdLedgerActiveLegs(row);
   const headers = [l.colDescription, l.colId, l.colSide, l.colAmount, l.colCurrency, l.colAccount, l.colStatus, l.colDate];
-  const rows = legs.map((x) => [x.description, x.id, accEnum("transferType", x.side), x.amount, x.currency, x.acc ? x.acc.id : l.noAccount, accEnum("opStatus", x.status), row.createdAt]);
+  const rows = legs.map((x) => [x.description, x.code, accEnum("transferType", x.side), x.amount, x.currency, x.acc ? x.acc.code : l.noAccount, accEnum("opStatus", x.status), row.createdAt]);
   return { headers, rows };
 }
 
@@ -1194,7 +1192,7 @@ function openApproveModal(row, ref) {
   const c = t("paymentDetail.common");
   openConfirmModal({
     title: m.approveTitle,
-    text: m.approveText(formatPaymentAmount(row.sourceAmount), row.sourceCurrency, row.recipientClientId ? pdShort(row.recipientClientId) : ""),
+    text: m.approveText(formatPaymentAmount(row.sourceAmount), row.sourceCurrency, row.recipientClientName || ""),
     confirmLabel: t("paymentDetail.actions.approve"),
     cancelLabel: c.cancel,
     danger: false,
@@ -1315,9 +1313,11 @@ function openCancelDealModal(extras, ref) {
     submitLabel: t("paymentDetail.actions.cancelDeal"),
     danger: true,
     onSubmit: (reason) => {
-      extras.rail.status = "CANCELED";
-      addPaymentComment(extras, m.cancelDealComment + reason);
-      rerenderPaymentDetail(ref);
+      requireAdmin2fa("otc_force_cancel", () => {
+        extras.rail.status = "CANCELED";
+        addPaymentComment(extras, m.cancelDealComment + reason);
+        rerenderPaymentDetail(ref);
+      });
     },
   });
 }

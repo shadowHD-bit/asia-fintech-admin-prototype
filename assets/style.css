@@ -3921,6 +3921,28 @@ body.filters-drawer-open {
   gap: 6px;
 }
 
+/* ---- Дерево плана счетов ("Бухгалтерия → План счетов") — направляющие линии по глубине + сворачивание групп ---
+   Линии — background-image прямо на настоящей <td> (через tdStyle в createAccessList), не на вложенном блоке:
+   фон табличной ячейки — это именно её отрисованная площадь, без допущений о высоте через проценты/stretch/
+   position:absolute на дочернем элементе (все три варианта пробовались, на стыке строк оставался разрыв в 1-2px).
+   background-origin: content-box — чтобы 0,0 фона был в начале КОНТЕНТА ячейки (после её паддинга), в тех же
+   координатах, что и .coa-tree-content ниже (обычный поток, после паддинга td) — иначе линии и текст/шеврон
+   были бы сдвинуты друг относительно друга на величину паддинга. */
+.coa-table td { border-bottom: none; }
+tbody .coa-name-td { padding-top: 0 !important; padding-bottom: 0 !important; background-origin: content-box; background-clip: content-box; }
+.coa-tree-content { display: flex; align-items: center; gap: 6px; padding: var(--space-3) 0; min-width: 0; }
+.coa-tree-system-badge { flex-shrink: 0; }
+.coa-tree-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; flex: none; border: none; background: none; padding: 0;
+  color: var(--color-text-tertiary); cursor: pointer; transition: transform var(--transition-fast);
+}
+.coa-tree-toggle svg { width: 14px; height: 14px; }
+.coa-tree-toggle.is-collapsed { transform: rotate(-90deg); }
+.coa-tree-toggle.is-spacer { cursor: default; }
+.coa-bool-icon { display: inline-flex; width: 16px; height: 16px; color: var(--color-success); flex-shrink: 0; }
+.coa-bool-icon svg { width: 100%; height: 100%; }
+
 /* ---- Ячейка "Направление + платёжная система" — бейдж направления сверху,
    платёжная система мелким серым текстом под ним, одной колонкой вместо двух. */
 .payment-direction-cell {
@@ -4598,16 +4620,6 @@ body.modal-open {
   flex: 1;
 }
 
-.client-detail-title-row {
-  flex-wrap: wrap;
-}
-
-.pd-star {
-  display: flex;
-  width: 18px;
-  height: 18px;
-  color: var(--color-warning);
-}
 
 .pd-hero {
   display: flex;
@@ -5692,6 +5704,9 @@ textarea.vb-mono { line-height: 1.45; }
   mask-image: linear-gradient(180deg, #000 0%, #000 60%, transparent 100%);
 }.hm-hero-main { display: flex; flex-direction: column; justify-content: center; gap: var(--space-3); min-width: 0; padding-left: var(--space-4); }
 .hm-brand { display: inline-flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+/* Хинт-иконка рядом с заголовком дашборда (.hm-hello) — та же section-hint-btn, что и в шапках списков,
+   просто у hm-hero нет отдельной зоны действий справа, поэтому ставим инлайн рядом с h1. */
+.hm-hello-row { display: flex; align-items: center; gap: var(--space-2); }
 .hm-hello { margin: 0; font-size: 32px; line-height: 1.15; font-weight: var(--font-weight-bold); color: var(--color-text); letter-spacing: -0.02em; }
 .hm-date { font-size: var(--font-size-md); color: var(--color-brand); font-weight: var(--font-weight-medium); text-transform: capitalize; }
 .hm-lead { margin: 0; max-width: 360px; color: var(--color-text-tertiary); font-size: var(--font-size-sm); line-height: var(--line-height-base); }
@@ -6430,7 +6445,6 @@ textarea.vb-mono { line-height: 1.45; }
 .pf-2fa-title { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-weight: var(--font-weight-medium); margin-bottom: 2px; }
 .pf-2fa-actions { flex-shrink: 0; }
 .pf-2fa-note { margin-top: var(--space-3); }
-.a2f-methods { margin-bottom: var(--space-3); }
 .a2f-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 22px; letter-spacing: 0.35em; text-align: center; padding: 12px 10px; }
 .a2f-hint { margin-top: var(--space-2); }
 .a2f-send { margin-top: var(--space-2); display: inline-block; }
@@ -6443,6 +6457,8 @@ textarea.vb-mono { line-height: 1.45; }
 .a2f-secret code, .a2f-codes code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--color-bg); padding: 4px 8px; border-radius: 6px; }
 .a2f-codes { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); margin-top: var(--space-3); }
 .a2f-codes code { text-align: center; font-size: var(--font-size-md); letter-spacing: 0.05em; }
+.a2f-recovery-toggle { display: inline-block; margin-top: var(--space-3); }
+.pf-2fa-warn { color: var(--color-warning, #b45309); }
 .tf-domain-row td { background: var(--color-bg); font-weight: var(--font-weight-semibold); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
 .tf-table td .filter-seg { display: inline-flex; }
 .tf-actions-table { margin-top: var(--space-4); }
@@ -6961,6 +6977,7 @@ button.acg-agg:hover { border-color: var(--color-brand); }
 .rt-markup.is-neg { color: #1f9d55; }
 .rt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .rt-grid .vb-field + .vb-field { margin-top: 0; }
+.rt-grid.rt-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
 .rt-preview { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 12px 0; padding: 10px 12px; border-radius: var(--radius-md, 8px); background: var(--color-brand-soft); font-size: var(--font-size-sm); }
 .rt-preview-arrow { color: var(--color-text-tertiary); }
 .rt-clients { display: flex; flex-direction: column; gap: 2px; max-height: 176px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md, 8px); padding: 6px; }

@@ -61,7 +61,7 @@ const KYT_CONFIG_SPECS = [
 const KYT_CONFIGS = KYT_CONFIG_SPECS.map(([key, name, type, description, version, isActive, created, schema, stepDesc, format], i) =>
   ktStamp(
     {
-      id: seedToPaymentUuid(16000 + i), key, name, type, description, configVersion: version, isActive,
+      id: seedToPaymentUuid(16000 + i), code: entityCode("KTC", 16000 + i), key, name, type, description, configVersion: version, isActive,
       schema: JSON.parse(JSON.stringify(schema)), notify: KYT_NOTIFY(),
       steps: [{ id: seedToPaymentUuid(16100 + i), order: 1, name: null, step: "coinkyt", description: stepDesc, format: JSON.parse(JSON.stringify(format)), providerData: { provider: "coinkyt", mode: "sync" } }],
     },
@@ -135,7 +135,7 @@ function ktBuildTransaction(seed, override) {
   }
   const u = seed % 7 === 0 ? CLIENTS_USERS_MOCK[seed % CLIENTS_USERS_MOCK.length] : null;
   const rec = {
-    id: seedToPaymentUuid(17000 + seed), configId: config.id, status, trackerId: seed % 4 === 0 ? seedToPaymentUuid(17200 + seed) : pick(KYT_TRACKERS, seed),
+    id: seedToPaymentUuid(17000 + seed), code: entityCode("KTX", 17000 + seed), configId: config.id, status, trackerId: seed % 4 === 0 ? seedToPaymentUuid(17200 + seed) : pick(KYT_TRACKERS, seed),
     data, errorMessage, totalScore: score, client: u ? { id: u.id, name: u.fullName, link: `#/clients-users/${u.id}` } : null, steps: [step],
     scoringResult: score === null ? { totalScore: 0 } : { totalScore: score, coinkyt: { stepStatus, totalScore: score, riskClass } },
   };
@@ -236,7 +236,7 @@ const KYT_EXCEPTIONS = KYT_EXCEPTION_SPECS.map(([seed, statusIdx, direction, cha
   const consumed = status === "CONSUMED" ? new Date(created.getTime() + 60 * 60 * 1000) : null;
   return ktStamp(
     {
-      id: seedToPaymentUuid(18000 + seed),
+      id: seedToPaymentUuid(18000 + seed), code: entityCode("KTE", 18000 + seed),
       client: { id: client.id, name: client.fullName || client.email, link: `#/clients-users/${client.id}` },
       address: chain[2], currency: chain[0], network: chain[1].toUpperCase(), direction, status,
       expiresDate: expires, expiresAt: formatDateTime(expires),

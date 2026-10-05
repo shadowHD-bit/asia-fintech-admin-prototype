@@ -183,6 +183,7 @@ const ACM_PAGES = [
   ...["catalog", "operations", "limits", "restrictions", "commissions", "clients", "history"].map((id) => acmPageDef(`settings-tariffs-${id}`, "settings", "tariffs")),
   acmPageDef("settings-sanctions-individuals", "settings", "sanctions"),
   acmPageDef("settings-sanctions-companies", "settings", "sanctions"),
+  acmPageDef("settings-sanctions-countries", "settings", "sanctions"),
   acmPageDef("settings-kyt-configs", "settings", "kyt_settings"),
   acmPageDef("settings-verif-kyc", "settings", "verifications"),
   acmPageDef("settings-verif-documents", "settings", "verifications"),

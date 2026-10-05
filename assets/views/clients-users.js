@@ -829,7 +829,7 @@ function openMfPopup(btn) {
     searchEl = document.createElement("input");
     searchEl.type = "text";
     searchEl.className = "address-form-input mf-popup-search";
-    searchEl.placeholder = "Поиск...";
+    searchEl.placeholder = t("mfSelect.search");
     popup.appendChild(searchEl);
   }
 
@@ -839,7 +839,7 @@ function openMfPopup(btn) {
     const fl = q ? options.filter((o) => o.l.toLowerCase().includes(q.toLowerCase())) : options;
     body.innerHTML = fl.length
       ? fl.map((o) => `<button type="button" class="mf-select-opt${o.v === selectedValue ? " is-sel" : ""}" data-mf-v="${escapeAttr(o.v)}">${o.l}</button>`).join("")
-      : `<div class="mf-popup-empty">Ничего не найдено</div>`;
+      : `<div class="mf-popup-empty">${t("mfSelect.empty")}</div>`;
   };
   renderOpts("");
   if (searchEl) searchEl.addEventListener("input", () => renderOpts(searchEl.value));
@@ -1709,6 +1709,16 @@ function renderClientDetailMainTab(user) {
 // ---- Степпер по уровням KYC (1 → 2 → 3), с адресами внизу той же вкладки --------
 const KYC_STEPPER_ICON_PIN = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17.5S16 12.5 16 8a6 6 0 1 0-12 0c0 4.5 6 9.5 6 9.5Z"/><circle cx="10" cy="8" r="2"/></svg>`;
 
+// Активный уровень степпера → ссылка на реальную конфигурацию KYC ("Настройки → Верификации → KYC",
+// VF_KYC_CONFIGS). У пользователя хранится только kycConfigName — ищем активную конфигурацию с таким
+// именем (запасной вариант — любую, если активной нет, например для устаревшей версии конфига).
+function kycConfigStepperLink(user) {
+  const label = kycLevelLabel(user.kycConfigName);
+  const cfg = VF_KYC_CONFIGS.find((c) => c.name === user.kycConfigName && c.isActive) || VF_KYC_CONFIGS.find((c) => c.name === user.kycConfigName);
+  if (!cfg) return `<span class="table-link">${label}</span>`;
+  return `<button type="button" class="table-link" data-kyc-config-hash="#/settings-verif-kyc/${cfg.id}">${label}</button>`;
+}
+
 function renderKycLevelStepper(user) {
   if (user.kycLevel == null) return "";
 
@@ -1728,7 +1738,7 @@ function renderKycLevelStepper(user) {
           <div class="kyc-stepper-circle ${nodeClass}">${isDone ? CHECK_ICON_SVG : `<span>${lvl}</span>`}</div>
           ${idx < 2 ? `<div class="kyc-stepper-line${isDone ? " is-done" : ""}"></div>` : ""}
           <div class="kyc-stepper-label">
-            <div class="kyc-stepper-title">${isCurrent ? `<span class="table-link">${kycLevelLabel(user.kycConfigName)}</span>` : `Level ${lvl}`}</div>
+            <div class="kyc-stepper-title">${isCurrent ? kycConfigStepperLink(user) : `Level ${lvl}`}</div>
             ${entry ? `<span class="badge ${statusBadgeClass(entry.status)}">${kycStatusLabel(entry.status)}</span>` : `<span class="table-cell-muted">—</span>`}
           </div>
         </div>
@@ -2568,15 +2578,15 @@ function buildClientAccountsList(kind, user) {
     attachRows: (wrap) => {
       wrap.querySelectorAll("[data-acc-hash]").forEach((b) => b.addEventListener("click", () => { window.location.hash = b.dataset.accHash; }));
       attachCustomTooltips(wrap);
+      // То же действие (подтверждение + предупреждение об остатке + код 2FA на закрытие), что и на основной
+      // странице "Счета" (accHandleAction, views/accounts.js) — раньше тут статус менялся напрямую, без
+      // подтверждения и без 2FA, что расходилось с тем же действием там.
       wrap.querySelectorAll("[data-acc-action]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const [action, accId] = btn.dataset.accAction.split(":");
           const acc = dataGetter().find((a) => a.id === accId);
           if (!acc) return;
-          if (action === "freeze") acc.status = "FROZEN";
-          else if (action === "close") acc.status = "CLOSED";
-          else if (action === "activate") acc.status = "ACTIVE";
-          list.refresh();
+          accHandleAction(action, acc);
         });
       });
     },
@@ -2660,12 +2670,12 @@ function getClientOperations(entity) {
 function csOpSummary(row, entity) {
   const cd = t("clientDetail.opsTabs");
   if (row.referenceNumber !== undefined) {
-    return { id: row.id, kind: cd.otc, amount: `${row.amount} ${row.baseCurrencyTicker} → ${row.cost} ${row.quoteCurrencyTicker}`, status: otcEnum("status", row.status), createdAt: row.createdAt, createdDate: row.createdDate };
+    return { id: row.id, code: row.referenceNumber, kind: cd.otc, amount: `${row.amount} ${row.baseCurrencyTicker} → ${row.cost} ${row.quoteCurrencyTicker}`, status: otcEnum("status", row.status), createdAt: row.createdAt, createdDate: row.createdDate };
   }
   if (row.exchangeRate !== undefined) {
-    return { id: row.id, kind: cd.exchanges, amount: `${row.sourceAmount} ${row.sourceCurrency} → ${row.targetAmount} ${row.targetCurrency}`, status: paymentStatusLabel(row.status), createdAt: row.createdAt, createdDate: row.createdDate };
+    return { id: row.id, code: row.code, kind: cd.exchanges, amount: `${row.sourceAmount} ${row.sourceCurrency} → ${row.targetAmount} ${row.targetCurrency}`, status: paymentStatusLabel(row.status), createdAt: row.createdAt, createdDate: row.createdDate };
   }
-  return { id: row.id, kind: cd[isCryptoPayment(row) ? "crypto" : "fiat"], amount: `${row.sourceAmount} ${row.sourceCurrency}`, status: paymentStatusLabel(row.status), createdAt: row.createdAt, createdDate: row.createdDate };
+  return { id: row.id, code: row.code, kind: cd[isCryptoPayment(row) ? "crypto" : "fiat"], amount: `${row.sourceAmount} ${row.sourceCurrency}`, status: paymentStatusLabel(row.status), createdAt: row.createdAt, createdDate: row.createdDate };
 }
 
 const CS_OPS_KINDS = ["fiat", "crypto", "exchanges", "otc"];
@@ -3038,7 +3048,7 @@ function buildClientKytList(user) {
     defaultSort: (a, b) => b.createdDate - a.createdDate,
     sorts: { created: (a, b) => a.createdDate - b.createdDate, updated: (a, b) => a.updatedDate - b.updatedDate },
     columns: [
-      { label: () => kt("columns.id"), html: (x) => `<div class="identity-cell-primary">${vbLink(`#/security-aml-checks/${x.id}`, pdShort(x.id))}${copyIconButton(x.id)}</div>` },
+      { label: () => kt("columns.id"), html: (x) => `<div class="identity-cell-primary">${vbLink(`#/security-aml-checks/${x.id}`, x.code)}${copyIconButton(x.code)}</div>` },
       { label: () => kt("columns.config"), html: (x) => { const c = ktConfigById(x.configId); return c ? vbLink(`#/settings-kyt-configs/${c.id}`, pdEscape(c.name)) : "—"; } },
       { label: () => kt("columns.created"), sort: "created", html: (x) => dateTimeCell(x.createdAt) },
       { label: () => kt("columns.updated"), sort: "updated", html: (x) => dateTimeCell(x.updatedAt) },
@@ -3710,7 +3720,7 @@ function clientCardPdfBody(entity, kind) {
   const ops = getClientOperations(entity).map((o) => csOpSummary(o, entity)).sort((a, b) => b.createdDate - a.createdDate).slice(0, 10);
   const opsHtml = ops.length
     ? `<table class="data-table"><thead><tr><th>ID</th><th>${t("clientDetail.opsColumns.kind")}</th><th>${t("operationsPayments.columns").amount}</th><th>${t("operationsPayments.columns").status}</th><th>${t("operationsPayments.columns").createdAt}</th></tr></thead><tbody>${ops
-        .map((o) => `<tr><td>${pdShort(o.id)}</td><td>${o.kind}</td><td>${o.amount}</td><td>${o.status}</td><td>${o.createdAt}</td></tr>`)
+        .map((o) => `<tr><td>${o.code}</td><td>${o.kind}</td><td>${o.amount}</td><td>${o.status}</td><td>${o.createdAt}</td></tr>`)
         .join("")}</tbody></table>`
     : empty;
 
@@ -3981,6 +3991,10 @@ function attachClientDetailContentHandlers(user) {
       const check = (user.verificationChecks || []).find((c) => c.id === btn.dataset.checkInfo);
       if (check) openCheckDetailsModal(check);
     });
+  });
+
+  content.querySelectorAll("[data-kyc-config-hash]").forEach((btn) => {
+    btn.addEventListener("click", () => { window.location.hash = btn.dataset.kycConfigHash; });
   });
 
   content.querySelectorAll("[data-doc-edit]").forEach((btn) => {

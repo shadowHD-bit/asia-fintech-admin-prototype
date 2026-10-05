@@ -158,7 +158,7 @@ function hmHero() {
   return `<section class="hm-hero">
     <div class="hm-hero-main">
       <div class="hm-brand"><img class="sidebar-brand-mark" src="assets/images/logo-icon.svg" alt="Asia Fintech" /><div class="sidebar-brand-text"><span class="sidebar-brand-title"><span class="brand-word">Asia</span> <span class="brand-word-accent">Fintech</span></span><span class="sidebar-brand-subtitle">${t("home.brandTag")}</span></div></div>
-      <h1 class="hm-hello">${greeting}, ${pdEscape(CURRENT_ADMIN.name)}!</h1>
+      <div class="hm-hello-row"><h1 class="hm-hello">${greeting}, ${pdEscape(CURRENT_ADMIN.name)}!</h1>${sectionHintBtn("hm-hint-btn", t("home.info"))}</div>
       <div class="hm-date">${date}</div>
       <div class="hm-pills">
         <button type="button" class="hm-pill" data-dash-hash="#/clients-users"><strong>${clients.toLocaleString("ru-RU")}</strong> ${t("home.pillClients")}</button>

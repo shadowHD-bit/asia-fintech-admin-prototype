@@ -51,7 +51,7 @@ const vfKycList = createAccessList({
   key: "vf-kyc",
   data: () => VF_KYC_CONFIGS,
   searchPlaceholder: () => vf("kyc.search"),
-  searchText: (c) => [c.id, c.name, c.description, c.service].filter(Boolean).join(" "),
+  searchText: (c) => [c.code, c.name, c.description, c.service].filter(Boolean).join(" "),
   tab: { get: (c) => (c.isActive ? "active" : "inactive"), values: ["active", "inactive"], label: (v) => vf(`status.${v}`) },
   filters: [
     { id: "created", kind: "date", label: () => vf("filters.created"), get: (c) => c.createdDate },
@@ -63,7 +63,7 @@ const vfKycList = createAccessList({
   defaultSort: (a, b) => b.configVersion - a.configVersion || b.createdDate - a.createdDate,
   sorts: {},
   columns: [
-    { label: () => vf("columns.id"), html: (c) => `<div class="identity-cell-primary">${vbLink(`#/settings-verif-kyc/${c.id}`, pdShort(c.id))}${copyIconButton(c.id)}</div>` },
+    { label: () => vf("columns.id"), html: (c) => `<div class="identity-cell-primary">${vbLink(`#/settings-verif-kyc/${c.id}`, c.code)}${copyIconButton(c.code)}</div>` },
     { label: () => vf("columns.name"), html: (c) => pdEscape(c.name || "—") },
     { label: () => vf("columns.service"), html: (c) => pdEscape(c.service) },
     { label: () => vf("columns.level"), html: (c) => c.level },
@@ -88,7 +88,7 @@ const vfKybList = createAccessList({
   key: "vf-kyb",
   data: () => VF_KYB_CONFIGS,
   searchPlaceholder: () => vf("kyb.search"),
-  searchText: (c) => [c.id, c.name, c.description].filter(Boolean).join(" "),
+  searchText: (c) => [c.code, c.name, c.description].filter(Boolean).join(" "),
   tab: { get: (c) => (c.isActive ? "active" : "inactive"), values: ["active", "inactive"], label: (v) => vf(`status.${v}`) },
   filters: [
     { id: "created", kind: "date", label: () => vf("filters.created"), get: (c) => c.createdDate },
@@ -99,7 +99,7 @@ const vfKybList = createAccessList({
   defaultSort: (a, b) => a.level - b.level || b.configVersion - a.configVersion,
   sorts: {},
   columns: [
-    { label: () => vf("columns.id"), html: (c) => `<div class="identity-cell-primary">${vbLink(`#/settings-verif-kyb/${c.id}`, pdShort(c.id))}${copyIconButton(c.id)}</div>` },
+    { label: () => vf("columns.id"), html: (c) => `<div class="identity-cell-primary">${vbLink(`#/settings-verif-kyb/${c.id}`, c.code)}${copyIconButton(c.code)}</div>` },
     { label: () => vf("columns.name"), html: (c) => pdEscape(c.name || "—") },
     { label: () => vf("columns.level"), html: (c) => c.level },
     { label: () => vf("columns.version"), html: (c) => c.configVersion },
@@ -459,7 +459,7 @@ function viewKycDetail(id) {
   const users = vfUsersOfKyc(c);
   const actions = `<button type="button" class="btn-secondary" data-vf-action="edit">${vt("common.edit")}</button>`;
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, c.id)}${detailField(f.name, c.name ? pdEscape(c.name) : "—")}${detailField(f.service, pdEscape(c.service))}${detailField(f.level, c.level)}
+    ${copyableField(f.id, c.code)}${detailField(f.name, c.name ? pdEscape(c.name) : "—")}${detailField(f.service, pdEscape(c.service))}${detailField(f.level, c.level)}
     ${detailField(f.version, c.configVersion)}${detailField(f.state, vfStateBadge(c.isActive))}${detailField(f.startButton, c.startButtonText ? pdEscape(c.startButtonText) : "—")}
     ${detailField(f.description, c.description ? pdEscape(c.description) : "—")}${detailField(f.created, c.createdAt)}${detailField(f.updated, c.updatedAt)}</div>`;
   const list = (arr) => (arr.length ? `<ul class="vf-list">${arr.map((x) => `<li>${pdEscape(x)}</li>`).join("")}</ul>` : `<div class="table-cell-muted">—</div>`);
@@ -485,7 +485,7 @@ function viewKycDetail(id) {
     c.isActive && VF_KYC_CONFIGS.some((x) => x.name === c.name && x.configVersion < c.configVersion) ? d.usersOnOlder : d.noUsers
   );
   return `<div id="vf-root">
-    ${vbDetailHeader({ backHash: "#/settings-verif-kyc", title: `${d.title} #${pdShort(c.id)}`, badges: `${vfStateBadge(c.isActive)}<span class="badge badge-neutral">v${c.configVersion}</span>`, subtitle: vbIdSubtitle(c.id, [pdEscape(c.service), `${f.level} ${c.level}`, c.createdAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-verif-kyc", title: `${d.title} ${c.code}`, badges: `${vfStateBadge(c.isActive)}<span class="badge badge-neutral">v${c.configVersion}</span>`, subtitle: vbCodeSubtitle(c.code, [pdEscape(c.service), `${f.level} ${c.level}`, c.createdAt]), actions })}
     <div class="vf-banner"><span>${d.stepsBanner}</span><button type="button" class="btn-secondary" data-vf-action="newVersion">${d.newVersion}</button></div>
     <div class="pd-grid">
       <div class="pd-col"><div class="profile-flat-block">${flatSection(vt("sections.main"), main)}${steps}${flatSection(`${d.users} · ${users.length}`, usersTable)}</div></div>
@@ -512,7 +512,7 @@ function viewKybDetail(id) {
   const d = vf("kyb.detail");
   const companies = vfCompaniesOfKyb(c);
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, c.id)}${detailField(f.name, c.name ? pdEscape(c.name) : "—")}${detailField(f.level, c.level)}
+    ${copyableField(f.id, c.code)}${detailField(f.name, c.name ? pdEscape(c.name) : "—")}${detailField(f.level, c.level)}
     ${detailField(f.version, c.configVersion)}${detailField(f.state, vfStateBadge(c.isActive))}
     ${detailField(f.description, c.description ? pdEscape(c.description) : "—")}${detailField(f.created, c.createdAt)}${detailField(f.updated, c.updatedAt)}</div>`;
   const steps = c.steps
@@ -527,11 +527,11 @@ function viewKybDetail(id) {
     .join("");
   const companiesTable = vbMiniTable(
     [vf("columns.id"), f.name, "KYB", vf("columns.created")],
-    companies.slice(0, 15).map((cm) => [vbLink(`#/clients-companies/${cm.id}`, pdShort(cm.id)), pdEscape(cm.name), cm.currentKYBLevelStatusV2 ? `<span class="badge ${statusBadgeClass(cm.currentKYBLevelStatusV2.status)}">${kybStatusLabel(cm.currentKYBLevelStatusV2.status)}</span>` : "—", cm.createdAt]),
+    companies.slice(0, 15).map((cm) => [vbLink(`#/clients-companies/${cm.id}`, cm.code), pdEscape(cm.name), cm.currentKYBLevelStatusV2 ? `<span class="badge ${statusBadgeClass(cm.currentKYBLevelStatusV2.status)}">${kybStatusLabel(cm.currentKYBLevelStatusV2.status)}</span>` : "—", cm.createdAt]),
     d.noCompanies
   );
   return `<div id="vf-root">
-    ${vbDetailHeader({ backHash: "#/settings-verif-kyb", title: `${d.title} #${pdShort(c.id)}`, badges: `${vfStateBadge(c.isActive)}<span class="badge badge-neutral">v${c.configVersion}</span>`, subtitle: vbIdSubtitle(c.id, [`${f.level} ${c.level}`, c.createdAt]) })}
+    ${vbDetailHeader({ backHash: "#/settings-verif-kyb", title: `${d.title} ${c.code}`, badges: `${vfStateBadge(c.isActive)}<span class="badge badge-neutral">v${c.configVersion}</span>`, subtitle: vbCodeSubtitle(c.code, [`${f.level} ${c.level}`, c.createdAt]) })}
     <div class="vf-banner"><span>${d.stepsBanner}</span><button type="button" class="btn-secondary" data-vf-kyb-action="newVersion">${d.newVersion}</button></div>
     ${flatSection(vt("sections.main"), main)}
     ${steps}
@@ -607,7 +607,7 @@ const vfDocList = createAccessList({
   key: "vf-doc",
   data: () => VF_DOC_CONFIGS,
   searchPlaceholder: () => vf("docs.search"),
-  searchText: (d) => [d.id, d.name, d.description, d.code, d.docType].filter(Boolean).join(" "),
+  searchText: (d) => [d.recordCode, d.name, d.description, d.code, d.docType].filter(Boolean).join(" "),
   tab: { get: (d) => (d.isActive ? "active" : "inactive"), values: ["active", "inactive"], label: (v) => vf(`status.${v}`) },
   filters: [
     { id: "created", kind: "date", label: () => vf("filters.created"), get: (d) => d.createdDate },
@@ -626,7 +626,7 @@ const vfDocList = createAccessList({
     ];
   },
   columns: [
-    { label: () => vf("columns.id"), html: (d) => `<div class="identity-cell-primary">${vbLink(`#/settings-verif-documents/${d.id}`, pdShort(d.id))}${copyIconButton(d.id)}</div>` },
+    { label: () => vf("columns.id"), html: (d) => `<div class="identity-cell-primary">${vbLink(`#/settings-verif-documents/${d.id}`, d.recordCode)}${copyIconButton(d.recordCode)}</div>` },
     { label: () => vf("columns.name"), sort: "name", html: (d) => pdEscape(d.name) },
     { label: () => vf("columns.description"), html: (d) => slTrunc(d.description, true) },
     { label: () => vf("columns.code"), html: (d) => (d.code ? `<span class="vb-mono">${d.code}</span>` : "—") },
@@ -711,12 +711,12 @@ function viewDocDetail(id) {
   const d = vf("docs.detail");
   const actions = `<button type="button" class="btn-secondary" data-vf-action="edit">${vt("common.edit")}</button><button type="button" class="btn-danger" data-vf-action="delete">${vt("common.delete")}</button>`;
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, doc.id)}${detailField(f.name, pdEscape(doc.name))}${detailField(f.code, doc.code ? `<span class="vb-mono">${doc.code}</span>` : "—")}${detailField(f.docType, pdEscape(doc.docType))}
+    ${copyableField(f.id, doc.recordCode)}${detailField(f.name, pdEscape(doc.name))}${detailField(f.code, doc.code ? `<span class="vb-mono">${doc.code}</span>` : "—")}${detailField(f.docType, pdEscape(doc.docType))}
     ${detailField(f.version, doc.configVersion)}${detailField(f.state, vfStateBadge(doc.isActive))}${detailField(f.description, doc.description ? pdEscape(doc.description) : "—")}
     ${detailField(f.created, doc.createdAt)}${detailField(f.updated, doc.updatedAt)}</div>`;
   const countries = doc.availableCountryIds.length ? `<div class="ac-badges">${doc.availableCountryIds.map((c) => `<span class="badge badge-neutral">${pdEscape(vfCountryName(c))}</span>`).join("")}</div>` : `<div class="table-cell-muted">${d.noCountries}</div>`;
   return `<div id="vf-root">
-    ${vbDetailHeader({ backHash: "#/settings-verif-documents", title: pdEscape(doc.name), badges: `${vfStateBadge(doc.isActive)}<span class="badge badge-neutral">v${doc.configVersion}</span>`, subtitle: vbIdSubtitle(doc.id, [pdEscape(doc.docType), doc.createdAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-verif-documents", title: pdEscape(doc.name), badges: `${vfStateBadge(doc.isActive)}<span class="badge badge-neutral">v${doc.configVersion}</span>`, subtitle: vbCodeSubtitle(doc.recordCode, [pdEscape(doc.docType), doc.createdAt]), actions })}
     <div class="pd-grid">
       <div class="pd-col">${sectionCard(vt("sections.main"), main)}</div>
       <div class="pd-col">${sectionCard(f.countries, countries)}${sectionCard(vt("sections.service"), vbJson({ references: doc.references }), "is-collapsed")}</div>
@@ -807,7 +807,7 @@ const vfAddressList = createAccessList({
   key: "vf-addr",
   data: () => VF_ADDRESS_CATEGORIES,
   searchPlaceholder: () => vf("addresses.search"),
-  searchText: (c) => [c.id, c.name, c.description].filter(Boolean).join(" "),
+  searchText: (c) => [c.code, c.name, c.description].filter(Boolean).join(" "),
   tab: { get: (c) => (c.deletedDate ? "deleted" : "active"), values: ["active", "deleted"], label: (v) => vf(`addresses.tabs.${v}`) },
   filters: [
     { id: "created", kind: "date", label: () => vf("filters.created"), get: (c) => c.createdDate },
@@ -824,7 +824,7 @@ const vfAddressList = createAccessList({
     ];
   },
   columns: [
-    { label: () => vf("columns.id"), html: (c) => `<div class="identity-cell-primary"><button type="button" class="id-copy" data-copy-value="${c.id}" title="${t("clientsUsers.copy")}"><span class="id-copy-label">${pdShort(c.id)}</span>${COPY_ICON_SVG}</button></div>` },
+    { label: () => vf("columns.id"), html: (c) => `<div class="identity-cell-primary"><button type="button" class="id-copy" data-copy-value="${c.code}" title="${t("clientsUsers.copy")}"><span class="id-copy-label">${c.code}</span>${COPY_ICON_SVG}</button></div>` },
     { label: () => vf("columns.name"), html: (c) => `<div class="identity-cell"><span>${pdEscape(c.name)}</span>${vfCategoryUsed(c) ? `<span class="badge badge-info vf-used">${vf("addresses.usedInKycBadge")}</span>` : ""}</div>` },
     { label: () => vf("columns.addresses"), html: (c) => c.addressesCount },
     { label: () => vf("columns.description"), html: (c) => (c.description ? pdEscape(c.description) : "—") },
@@ -889,7 +889,7 @@ const VF_LIST_HERO_ACTION = {
 function viewVerifList(kind) {
   const list = VF_LISTS[kind];
   const a = VF_LIST_HERO_ACTION[kind];
-  return `<div class="list-hero">${pageHeader(vf(`titles.${kind}`), t(`navDescriptions.settings-verif-${kind}`), `<button type="button" class="btn-primary" id="${a.id}">+ ${a.label()}</button>`)}</div>
+  return `<div class="list-hero">${pageHeader(vf(`titles.${kind}`), t(`navDescriptions.settings-verif-${kind}`), `${sectionHintBtn(`vf-${kind}-hint-btn`, vf(`info.${kind}`))}<button type="button" class="btn-primary" id="${a.id}">+ ${a.label()}</button>`)}</div>
     ${kind === "addresses" ? `<p class="table-cell-muted sl-info">${vf("addresses.note")}</p>` : ""}${list.view()}`;
 }
 

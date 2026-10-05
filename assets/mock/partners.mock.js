@@ -67,7 +67,7 @@ const PN_CHANNELS = ["INNER", "SWIFT", "RU_WIRE", "SBP", "QR"];
 
 function pnService(n, d) {
   const created = pnDate(d.createdAgo, 11, (n * 13) % 60);
-  return Object.assign({ id: pnUuid(n), logoUrl: `https://cdn.example.com/${d.slug}/logo.svg`, createdDate: created, createdAt: formatDateTime(created), updatedAt: formatDateTime(pnDate(Math.max(0, d.createdAgo - 5), 14, 5)) }, d);
+  return Object.assign({ id: pnUuid(n), code: entityCode("PNS", n), logoUrl: `https://cdn.example.com/${d.slug}/logo.svg`, createdDate: created, createdAt: formatDateTime(created), updatedAt: formatDateTime(pnDate(Math.max(0, d.createdAgo - 5), 14, 5)) }, d);
 }
 
 const PN_SERVICES = [
@@ -207,10 +207,11 @@ const PN_SESSIONS = [];
   PN_CLIENTS.forEach((c, i) => {
     const created = pnDate(i % 9, 9 + (i % 10), (i * 7) % 60);
     const svc = PN_SERVICES.find((s) => s.id === c.serviceId);
-    PN_SESSIONS.push({ id: pnUuid(900 + n++), serviceId: c.serviceId, kind: "TOKEN", clientId: c.id, status: i % 4 === 3 ? "INACTIVE" : "ACTIVE", scopes: svc.scopes, createdAt: formatDateTime(created), createdDate: created, expiresAt: formatDateTime(new Date(created.getTime() + 365 * 24 * 3600 * 1000)) });
+    { const sid = 900 + n++; PN_SESSIONS.push({ id: pnUuid(sid), code: entityCode("PNT", sid), serviceId: c.serviceId, kind: "TOKEN", clientId: c.id, status: i % 4 === 3 ? "INACTIVE" : "ACTIVE", scopes: svc.scopes, createdAt: formatDateTime(created), createdDate: created, expiresAt: formatDateTime(new Date(created.getTime() + 365 * 24 * 3600 * 1000)) }); }
     if (i % 3 === 0) {
       const exp = new Date(created.getTime() + 60 * 1000);
-      PN_SESSIONS.push({ id: pnUuid(900 + n++), serviceId: c.serviceId, kind: "CODE", clientId: c.id, status: i % 6 === 0 ? "USED" : "EXPIRED", scopes: svc.scopes, createdAt: formatDateTime(created), createdDate: created, expiresAt: formatDateTime(exp) });
+      const sid = 900 + n++;
+      PN_SESSIONS.push({ id: pnUuid(sid), code: entityCode("PNT", sid), serviceId: c.serviceId, kind: "CODE", clientId: c.id, status: i % 6 === 0 ? "USED" : "EXPIRED", scopes: svc.scopes, createdAt: formatDateTime(created), createdDate: created, expiresAt: formatDateTime(exp) });
     }
   });
 })();
@@ -288,12 +289,6 @@ function pnWebhooksOf(serviceId) {
 function pnClientById(id) {
   return PN_CLIENTS.find((c) => c.id === id);
 }
-function pnDepositsOfClient(clientId) {
-  return PN_SBP_DEPOSITS.filter((d) => d.clientId === clientId);
-}
-function pnPaymentsOfClient(clientId) {
-  return PN_SBP_PAYMENTS.filter((p) => p.clientId === clientId);
-}
 function pnDepositsOfService(serviceId) {
   return PN_SBP_DEPOSITS.filter((d) => d.serviceId === serviceId);
 }
@@ -304,15 +299,15 @@ function pnPaymentsOfService(serviceId) {
 function pnInternalLink(c) {
   return c.internalKind === "company" ? `#/clients-companies/${c.internalId}` : `#/clients-users/${c.internalId}`;
 }
+// Код реальной записи платформы (клиент/компания), к которой привязан партнёрский клиент — для отображения вместо сырого UUID
+function pnInternalCode(c) {
+  const rec = c.internalKind === "company" ? CLIENTS_COMPANIES_MOCK.find((x) => x.id === c.internalId) : CLIENTS_USERS_MOCK.find((x) => x.id === c.internalId);
+  return rec ? rec.code : c.internalId;
+}
 // Обратный поиск: привязан ли этот пользователь/компания платформы к партнёрскому сервису через open banking
 // (ExternalServiceClientEntity: userId ↔ externalServiceId, см. apps/open-banking) — используется в таблице
 // «Физлица», строка под ID: если есть связка, вместо белого лейбла (user.service — ASIA_FINTECH/BITBANKER/...,
 // ортогональное понятие) показываем реального партнёра. Связь по internalId, не по совпадению email.
 function pnClientByInternal(kind, id) {
   return PN_CLIENTS.find((c) => c.internalKind === kind && c.internalId === id);
-}
-// Счета партнёрского клиента — это счета той же реальной записи платформы (ACCOUNTS_VIRTUAL_MOCK, assets/mock/accounts.mock.js:
-// accClientRef линкует счета и на пользователей, и на компании), не отдельная сущность
-function pnAccountsOfClient(c) {
-  return ACCOUNTS_VIRTUAL_MOCK.filter((a) => a.client && a.client.id === c.internalId);
 }

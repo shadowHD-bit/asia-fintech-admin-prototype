@@ -194,7 +194,7 @@ const tfTariffsList = createAccessList({
     ];
   },
   columns: [
-    { label: () => tf("columns.name"), sort: "name", html: (x) => `<div class="identity-cell">${vbLink(`#/settings-tariffs-catalog/${x.id}`, pdEscape(x.name))}${vbIdCell(x.id)}</div>` },
+    { label: () => tf("columns.name"), sort: "name", html: (x) => `<div class="identity-cell">${vbLink(`#/settings-tariffs-catalog/${x.id}`, pdEscape(x.name))}${vbCodeCell(x.code)}</div>` },
     { label: () => tf("columns.category"), html: (x) => tfCatBadge(x.clientCategory) },
     { label: () => tf("columns.kind"), html: (x) => (x.ownerClientId ? `<div class="identity-cell">${tfTariffKind(x)}${tfClientLink(tfClientById(x.ownerClientId))}</div>` : tfTariffKind(x)) },
     { label: () => tf("columns.operations"), html: (x) => tfTariffCounts(x).operations },
@@ -239,24 +239,51 @@ function tfOpenTariffForm(tariff) {
     },
     confirm: isEdit ? (v) => f.confirmEdit(tfTariffCounts(tariff).clients) : null,
     onSave: (v) => {
-      const now = pdNow();
-      let target = tariff;
-      if (!isEdit) {
-        target = tfStamp({ id: tfId(), name: v.name, description: v.description || null, clientCategory: v.category, conditions: JSON.stringify(v.conditions), permissions: v.permissions, ownerClientId: null, sourceTariffId: null, deleted: false }, now);
-        TF_TARIFFS.unshift(target);
-      } else {
-        Object.assign(target, { name: v.name, description: v.description || null, clientCategory: v.category, conditions: JSON.stringify(v.conditions), permissions: v.permissions });
-        acTouch(target);
+      // Maker-Checker: если на создание/изменение тарифа есть активное правило — вместо немедленного
+      // применения создаётся запрос на подтверждение (см. mcTryGate, mock/maker-checker.mock.js).
+      const apply = () => {
+        const now = pdNow();
+        let target = tariff;
+        if (!isEdit) {
+          target = tfStamp({ id: tfId(), code: tfCode("TFT"), name: v.name, description: v.description || null, clientCategory: v.category, conditions: JSON.stringify(v.conditions), permissions: v.permissions, ownerClientId: null, sourceTariffId: null, deleted: false }, now);
+          TF_TARIFFS.unshift(target);
+        } else {
+          Object.assign(target, { name: v.name, description: v.description || null, clientCategory: v.category, conditions: JSON.stringify(v.conditions), permissions: v.permissions });
+          acTouch(target);
+        }
+        // связь тариф ↔ операции: недостающие добавляются, снятые удаляются вместе с привязками лимитов и комиссий
+        const have = tfTariffOpsOf(target.id);
+        v.operations.forEach((opId) => { if (!have.some((x) => x.operationId === opId)) TF_TARIFF_OPS.push({ id: tfId(), tariffId: target.id, operationId: opId }); });
+        have.filter((x) => !v.operations.includes(x.operationId)).forEach((x) => {
+          TF_LIMITS.forEach((l) => { l.tariffOperationIds = l.tariffOperationIds.filter((id) => id !== x.id); });
+          TF_COMMISSIONS.forEach((c) => { c.tariffOperationIds = c.tariffOperationIds.filter((id) => id !== x.id); });
+          TF_TARIFF_OPS.splice(TF_TARIFF_OPS.indexOf(x), 1);
+        });
+        if (!isEdit) window.location.hash = `#/settings-tariffs-catalog/${target.id}`;
+      };
+      const fl = tf("fields");
+      const changes = [];
+      if (isEdit) {
+        if (v.name !== tariff.name) changes.push({ attribute: fl.name, currentValue: tariff.name, targetValue: v.name });
+        if ((v.description || "") !== (tariff.description || "")) changes.push({ attribute: fl.description, currentValue: tariff.description || "—", targetValue: v.description || "—" });
+        if (v.category !== tariff.clientCategory) changes.push({ attribute: fl.category, currentValue: tfEnum("category", tariff.clientCategory), targetValue: tfEnum("category", v.category) });
       }
-      // связь тариф ↔ операции: недостающие добавляются, снятые удаляются вместе с привязками лимитов и комиссий
-      const have = tfTariffOpsOf(target.id);
-      v.operations.forEach((opId) => { if (!have.some((x) => x.operationId === opId)) TF_TARIFF_OPS.push({ id: tfId(), tariffId: target.id, operationId: opId }); });
-      have.filter((x) => !v.operations.includes(x.operationId)).forEach((x) => {
-        TF_LIMITS.forEach((l) => { l.tariffOperationIds = l.tariffOperationIds.filter((id) => id !== x.id); });
-        TF_COMMISSIONS.forEach((c) => { c.tariffOperationIds = c.tariffOperationIds.filter((id) => id !== x.id); });
-        TF_TARIFF_OPS.splice(TF_TARIFF_OPS.indexOf(x), 1);
+      const gate = mcTryGate({
+        actionType: isEdit ? "UPDATE" : "CREATE",
+        entity: "Tariff",
+        targetType: "TARIFF",
+        targetId: isEdit ? tariff.id : null,
+        targetLabel: v.name,
+        summary: isEdit
+          ? mcUpdateSummary(changes)
+          : mcCreateSummary([
+              { label: fl.name, value: v.name },
+              { label: fl.category, value: tfEnum("category", v.category) },
+              { label: tf("columns.operations"), value: v.operations.length },
+            ]),
+        apply,
       });
-      if (!isEdit) window.location.hash = `#/settings-tariffs-catalog/${target.id}`;
+      if (gate.gated) showToast(mc("gate.createdToast"));
     },
   });
 }
@@ -349,7 +376,7 @@ function viewTariffDetail(id) {
   const owner = x.ownerClientId ? tfClientById(x.ownerClientId) : null;
   const source = x.sourceTariffId ? tfTariffById(x.sourceTariffId) : null;
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, x.id)}${detailField(f.category, tfCatBadge(x.clientCategory))}${detailField(f.kind, tfTariffKind(x))}
+    ${copyableField(f.id, x.code)}${detailField(f.category, tfCatBadge(x.clientCategory))}${detailField(f.kind, tfTariffKind(x))}
     ${detailField(f.description, x.description ? pdEscape(x.description) : "—")}${detailField(f.owner, owner ? tfClientLink(owner) : "—")}${detailField(f.source, source ? tfTariffLink(source) : "—")}
     ${detailField(f.created, x.createdAt)}${detailField(f.updated, x.updatedAt)}
   </div>`;
@@ -370,7 +397,7 @@ function viewTariffDetail(id) {
     <button type="button" class="btn-secondary" data-tf-act="calc">${d.calc}</button>
     ${owner ? `<button type="button" class="btn-danger" data-tf-act="revoke">${tf("tariffs.revoke.title")}</button>` : `<button type="button" class="btn-danger" data-tf-act="delete">${vt("common.delete")}</button>`}`;
   return `<div id="tf-root">
-    ${vbDetailHeader({ backHash: "#/settings-tariffs-catalog", title: pdEscape(x.name), badges: `${tfCatBadge(x.clientCategory)}${tfTariffKind(x)}`, subtitle: vbIdSubtitle(x.id, [x.createdAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-tariffs-catalog", title: pdEscape(x.name), badges: `${tfCatBadge(x.clientCategory)}${tfTariffKind(x)}`, subtitle: vbCodeSubtitle(x.code, [x.createdAt]), actions })}
     <div class="pd-grid">
       <div class="pd-col"><div class="profile-flat-block">${flatSection(d.general, main)}${flatSection(`${d.operations} · ${counts.operations}`, ops)}${flatSection(`${d.clients} · ${clients.length}`, clientsBlock)}</div></div>
       <div class="pd-col">${sectionCard(d.conditions, vbJson(JSON.parse(x.conditions)), "is-collapsed")}${sectionCard(d.permissions, x.permissions ? vbJson(x.permissions) : `<div class="table-cell-muted">—</div>`, "is-collapsed")}${TF_MASKS_ENABLED ? sectionCard(`${d.masks} · ${masks.length}`, masksBlock, "is-collapsed") : ""}</div>
@@ -408,7 +435,7 @@ const tfOperationsList = createAccessList({
   key: "tf-ops",
   data: () => TF_OPERATIONS,
   searchPlaceholder: () => tf("operations.search"),
-  searchText: (o) => [o.id, o.name, o.description].filter(Boolean).join(" "),
+  searchText: (o) => [o.code, o.name, o.description].filter(Boolean).join(" "),
   tab: { get: (o) => o.domain, values: ["CRYPTO", "FIAT"], label: (v) => tfEnum("opDomain", v) },
   filters: [
     { id: "direction", kind: "multi", label: () => tf("filters.direction"), get: (o) => o.direction, options: () => ["OUTGOING", "DEPOSIT", "TRANSFER", "INTERNAL_PAYMENT"].map((v) => ({ value: v, label: tfEnum("opDirection", v) })) },
@@ -462,7 +489,7 @@ function tfOpenOperationForm(op) {
     confirm: op ? () => f.confirmEdit : null,
     onSave: (v) => {
       if (op) { Object.assign(op, { name: v.name, description: v.description || null, domain: v.domain, direction: v.direction }); acTouch(op); return; }
-      TF_OPERATIONS.push(tfStamp({ id: tfId(), name: v.name, description: v.description || null, domain: v.domain, direction: v.direction, start: "OUR", integration: "NO" }, pdNow()));
+      TF_OPERATIONS.push(tfStamp({ id: tfId(), code: tfCode("TFO"), name: v.name, description: v.description || null, domain: v.domain, direction: v.direction, start: "OUR", integration: "NO" }, pdNow()));
     },
   });
 }
@@ -530,7 +557,7 @@ function tfOpenCalc({ tariff, client }) {
 
 // ==== Обёртки для роутера ===============================================================================================================
 function viewTariffsCatalog() {
-  return `<div class="list-hero">${pageHeader(tf("titles.catalog"), t("navDescriptions.settings-tariffs-catalog"), `<button type="button" class="btn-primary" id="tf-tariff-create">+ ${tf("tariffs.create")}</button>`)}</div>${tfTariffsList.view()}`;
+  return `<div class="list-hero">${pageHeader(tf("titles.catalog"), t("navDescriptions.settings-tariffs-catalog"), `${sectionHintBtn("tf-catalog-hint-btn", tf("info.catalog"))}<button type="button" class="btn-primary" id="tf-tariff-create">+ ${tf("tariffs.create")}</button>`)}</div>${tfTariffsList.view()}`;
 }
 function initTariffsCatalog() {
   tfTariffsList.init();
@@ -538,7 +565,7 @@ function initTariffsCatalog() {
   if (b) b.addEventListener("click", () => tfOpenTariffForm(null));
 }
 function viewTariffsOperations() {
-  return `<div class="list-hero">${pageHeader(tf("titles.operations"), t("navDescriptions.settings-tariffs-operations"), `<button type="button" class="btn-primary" id="tf-op-create">+ ${tf("operations.create")}</button>`)}</div>${tfOperationsList.view()}`;
+  return `<div class="list-hero">${pageHeader(tf("titles.operations"), t("navDescriptions.settings-tariffs-operations"), `${sectionHintBtn("tf-op-hint-btn", tf("info.operations"))}<button type="button" class="btn-primary" id="tf-op-create">+ ${tf("operations.create")}</button>`)}</div>${tfOperationsList.view()}`;
 }
 function initTariffsOperations() {
   tfOperationsList.init();

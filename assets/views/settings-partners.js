@@ -1,7 +1,9 @@
 /* ==========================================================================
    "Клиенты → Партнёрские сервисы" (партнёры, подключённые по API через open banking). Страница сервиса: обзор,
-   авторизация, платежи, клиенты, вебхуки, 2FA. Клиенты, пришедшие через партнёра, отдельного раздела в навигации не
-   имеют — открываются только из вкладки «Клиенты» на карточке сервиса. Данные и источники — в mock/partners.mock.js.
+   авторизация, платежи, клиенты, вебхуки, 2FA. Партнёрский клиент — это реальный пользователь/компания платформы
+   (документ: лёгкий режим — клиент банка, прошедший регистрацию и KYC на фронте банка), просто с привязкой к
+   сервису — отдельной карточки у него нет, вкладка «Клиенты» ведёт прямо на его настоящую запись
+   (clients-users/clients-companies, см. pnInternalLink). Данные и источники — в mock/partners.mock.js.
    Списки — на createAccessList, формы — на vbOpenForm; все изменения — через код 2FA.
    ========================================================================== */
 
@@ -44,12 +46,14 @@ function pnPaymentStatusBadge(status) {
 }
 
 function pnNameCell(s) {
-  return `<div class="identity-cell">${vbLink(`#/clients-partners/${s.id}`, pdEscape(s.name))}${vbIdCell(s.id)}</div>`;
+  return `<div class="identity-cell">${vbLink(`#/clients-partners/${s.id}`, pdEscape(s.name))}${vbCodeCell(s.code)}</div>`;
 }
 
-// Ссылка на карточку партнёрского клиента (открывается из вкладки «Клиенты» на карточке сервиса)
+// Партнёрский клиент — это реальный пользователь/компания платформы (документ: лёгкий режим — клиент банка,
+// прошедший регистрацию и KYC на фронте банка), просто с привязкой к сервису. Отдельной карточки "партнёрского
+// клиента" нет — ссылка ведёт сразу на настоящую запись (clients-users/clients-companies).
 function pnClientCell(c) {
-  return `<div class="identity-cell">${vbLink(`#/clients-partner-users/${c.id}`, pdEscape(c.name))}${vbIdCell(c.id)}</div>`;
+  return `<div class="identity-cell">${vbLink(pnInternalLink(c), pdEscape(c.name))}${vbCodeCell(pnInternalCode(c))}</div>`;
 }
 
 // Привязанный аккаунт — не «что клиент подключил партнёру» (это была отдельная концепция старого плана с полным
@@ -204,12 +208,6 @@ function pnRef() {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-// ---- Страница партнёрского клиента ------------------------------------------------------------------------------
-function currentPartnerUserId() {
-  const m = window.location.hash.replace(/^#\/?/, "").match(/^clients-partner-users\/(.+)$/);
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
 function pnDraftFor(s) {
   if (!pnDraft || pnDraft.id !== s.id) pnDraft = { id: s.id, authMode: s.authMode, clientOwnership: s.clientOwnership || "ANY", twofa: s.twofa.enabled, channels: { ...s.channels } };
   return pnDraft;
@@ -236,7 +234,7 @@ function viewPartnerDetail(id) {
   const s = pnById(id);
   if (!s) return vbNotFound();
   return `<div id="vb-root">
-    ${vbDetailHeader({ backHash: "#/clients-partners", title: pdEscape(s.name), badges: `${pnStatusBadge(s.status)}${pnModeBadge(s.authMode)}`, subtitle: vbIdSubtitle(s.id, [pdEscape(s.email), s.createdAt]), actions: pnHeaderActions(s), avatar: cdAvatar(s.name) })}
+    ${vbDetailHeader({ backHash: "#/clients-partners", title: pdEscape(s.name), badges: `${pnStatusBadge(s.status)}${pnModeBadge(s.authMode)}`, subtitle: vbCodeSubtitle(s.code, [pdEscape(s.email), s.createdAt]), actions: pnHeaderActions(s), avatar: cdAvatar(s.name) })}
     <div class="cd-tabs-wrap" id="pn-tabs">${pnTabsBar(s)}</div>
     <div id="pn-content"><div id="vb-body">${pnTabContent(s)}</div></div>
   </div>`;
@@ -327,7 +325,7 @@ function pnValueList(items, delAttr, emptyText) {
 function pnOverview(s) {
   const f = pn("fields");
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, s.id)}${detailField(f.name, pdEscape(s.name))}${detailField(f.status, pnStatusBadge(s.status))}
+    ${copyableField(f.id, s.code)}${detailField(f.name, pdEscape(s.name))}${detailField(f.status, pnStatusBadge(s.status))}
     ${copyableField(f.email, s.email)}${detailField(f.description, s.description ? pdEscape(s.description) : "—")}${copyableField(f.logoUrl, s.logoUrl, `<span class="vb-mono">${pdEscape(s.logoUrl)}</span>`)}
     ${detailField(f.created, s.createdAt)}${detailField(f.updated, s.updatedAt)}</div>`;
   const uris = `<div class="pn-block-head"><span class="pn-block-title">${pn("access.redirectUris")}</span><button type="button" class="btn-secondary pn-add-btn" data-pn-add="uri">${PLUS_ICON_SVG}<span>${pn("access.add")}</span></button></div>${pnValueList(s.redirectUris, "data-pn-del-uri", pn("access.noUris"))}<p class="table-cell-muted pn-hint">${pn("access.urisHint")}</p>`;
@@ -359,7 +357,7 @@ function pnAuth(s) {
   const c = pn("columns");
   const sessions = vbMiniTable(
     [c.session, c.kind, c.status, c.scopes, c.created, c.expires],
-    rows.map((x) => [vbIdCell(x.id), pn(`sessionKind.${x.kind}`), `<span class="badge ${x.status === "ACTIVE" ? "badge-success" : x.status === "USED" ? "badge-info" : "badge-neutral"}">${pn(`sessionStatus.${x.status}`)}</span>`, x.scopes.length, x.createdAt, x.expiresAt || "—"]),
+    rows.map((x) => [vbCodeCell(x.code), pn(`sessionKind.${x.kind}`), `<span class="badge ${x.status === "ACTIVE" ? "badge-success" : x.status === "USED" ? "badge-info" : "badge-neutral"}">${pn(`sessionStatus.${x.status}`)}</span>`, x.scopes.length, x.createdAt, x.expiresAt || "—"]),
     pn("sessions.empty")
   );
   return `<div class="profile-flat-block">
@@ -606,78 +604,3 @@ function pnOpenEditScopes(s) {
   });
 }
 
-
-// ---- Карточка партнёрского клиента: его данные, KYC, привязанный аккаунт, счета, операции и сессии ----------------
-function pnKycBlock(c) {
-  const f = pn("fields");
-  const cls = PN_KYC_STATUS_BADGE_CLS[c.kycStatus] || "badge-neutral";
-  return `<div class="profile-fields profile-fields-grid">
-    ${detailField(f.kycLevel, c.kycLevel ? pn("kycLevel")(c.kycLevel) : "—")}
-    ${detailField(f.kycStatus, `<span class="badge ${cls}">${pn(`kyc.status.${c.kycStatus}`)}</span>`)}
-  </div><p class="table-cell-muted pn-hint">${pn("kyc.hint")}</p>`;
-}
-
-// Счета партнёрского клиента — те же счета, что и у привязанной реальной записи платформы (см. вкладку "Счета" в
-// карточке обычного клиента, views/clients-users.js): id, баланс, валюты, статус, клик по ID ведёт на страницу счёта
-function pnAccountsBlock(c) {
-  const accounts = pnAccountsOfClient(c);
-  const col = pn("columns");
-  return vbMiniTable(
-    [col.accId, col.accBalance, col.accCurrencies, col.status],
-    accounts.map((a) => [vbLink(accHref(a), a.code), vabsAccountBalanceCell(a.balances), vabsAccountCurrenciesCell(a.balances), accStatusBadge(a.status)]),
-    pn("accounts.empty")
-  );
-}
-
-function viewPartnerUserDetail(id) {
-  const c = pnClientById(id);
-  if (!c) return vbNotFound();
-  const f = pn("fields");
-  const svc = pnById(c.serviceId);
-  const deposits = pnDepositsOfClient(c.id).sort((a, b) => b.createdDate - a.createdDate);
-  const payments = pnPaymentsOfClient(c.id).sort((a, b) => b.createdDate - a.createdDate);
-  const sessions = pnSessionsOf(c.serviceId).filter((s) => s.clientId === c.id).sort((a, b) => b.createdDate - a.createdDate);
-  const col = pn("columns");
-  const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, c.id)}${detailField(f.email, pdEscape(c.email))}
-    ${detailField(f.service, svc ? vbLink(`#/clients-partners/${svc.id}`, pdEscape(svc.name)) : "—")}
-    ${detailField(f.status, `<span class="badge ${c.status === "ACTIVE" ? "badge-success" : "badge-danger"}">${pn(`clientStatus.${c.status}`)}</span>`)}
-    ${detailField(f.registered, c.registeredAt)}${detailField(f.lastLogin, c.lastLoginAt)}
-  </div>`;
-  const depTable = vbMiniTable(
-    [col.depCost, col.depAmount, col.depFee, col.status, col.created],
-    deposits.map((d) => [tfNum(d.cost, "RUB"), `${d.amount} RUB`, `${d.totalFee} RUB`, pnDepositStatusBadge(d.status), d.createdAt]),
-    pn("operations.noDeposits")
-  );
-  const payTable = vbMiniTable(
-    [col.paySource, col.payTotal, col.payBank, col.status, col.created],
-    payments.map((p) => [`${p.sourceAmount} RUB`, `${p.totalAmount} RUB`, pdEscape(p.bankName), pnPaymentStatusBadge(p.status), p.createdAt]),
-    pn("operations.noPayments")
-  );
-  const opsBlock = `<div class="profile-flat-section-desc">${pn("operations.depositsIntro")}</div>${depTable}
-    <div class="profile-flat-section-desc">${pn("operations.paymentsIntro")}</div>${payTable}`;
-  const sessTable = vbMiniTable(
-    [col.session, col.kind, col.status, col.scopes, col.created, col.expires],
-    sessions.map((x) => [vbIdCell(x.id), pn(`sessionKind.${x.kind}`), `<span class="badge ${x.status === "ACTIVE" ? "badge-success" : x.status === "USED" ? "badge-info" : "badge-neutral"}">${pn(`sessionStatus.${x.status}`)}</span>`, x.scopes.length, x.createdAt, x.expiresAt || "—"]),
-    pn("sessions.empty")
-  );
-  const accounts = pnAccountsOfClient(c);
-  return `<div id="pn-user-root">
-    ${vbDetailHeader({ backHash: svc ? `#/clients-partners/${svc.id}` : "#/clients-partners", title: pdEscape(c.name), badges: `<span class="badge ${c.status === "ACTIVE" ? "badge-success" : "badge-danger"}">${pn(`clientStatus.${c.status}`)}</span>`, subtitle: vbIdSubtitle(c.id, [pdEscape(c.email), c.registeredAt]) })}
-    <div class="client-detail-grid">
-      <div class="client-detail-grid-main"><div class="profile-flat-block">
-        ${flatSection(pn("users.detail.general"), main)}
-        ${flatSection(`${pn("accounts.title")} · ${accounts.length}`, pnAccountsBlock(c))}
-        ${svc && svc.channels.SBP ? flatSection(`${pn("operations.title")} · ${deposits.length + payments.length}`, opsBlock) : ""}
-      </div></div>
-      <div class="client-detail-grid-side">${sectionCard(pn("kyc.title"), pnKycBlock(c))}${sectionCard(`${pn("sessions.title")} · ${sessions.length}`, sessTable, "is-collapsed")}</div>
-    </div>
-  </div>`;
-}
-
-function initPartnerUserDetail(id) {
-  const c = pnClientById(id);
-  const root = document.getElementById("pn-user-root");
-  if (!c || !root) return;
-  vbAttachCommon(root);
-}

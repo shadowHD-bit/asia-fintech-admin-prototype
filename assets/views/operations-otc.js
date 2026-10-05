@@ -254,7 +254,7 @@ function exportOtcDeals(format) {
 
 // ---- Страница списка ----------------------------------------------------------------------------
 function viewOperationsOtc() {
-  return `<div class="list-hero">${pageHeader(t("nav.operations-otc"), t("navDescriptions.operations-otc"), exportMenuHtml("otc-export", ot("export.button"), ot("export.hint")))}</div>${otcList.view()}`;
+  return `<div class="list-hero">${pageHeader(t("nav.operations-otc"), t("navDescriptions.operations-otc"), `${sectionHintBtn("otc-hint-btn", ot("info"))}${exportMenuHtml("otc-export", ot("export.button"), ot("export.hint"))}`)}</div>${otcList.view()}`;
 }
 
 function initOperationsOtcView() {
@@ -411,7 +411,6 @@ function otcServiceSection(d) {
   return flatSection(
     ot("detail.sections.service"),
     `<div class="profile-fields profile-fields-grid profile-fields-grid-3">
-      ${copyableField(f.dealId, d.id)}
       ${copyableField(f.reference, d.referenceNumber)}
       ${copyableField(f.whiteLabel, d.whiteLabelId)}
     </div>
@@ -575,7 +574,7 @@ function otcBindCommentsCard(d) {
 // сделки — до этого проводок в учёте ещё нет, есть только блокировка средств продавца (см. "Итог сделки").
 function otcLeg(d, order, description, side, amount, currency, acc) {
   const seed = Math.abs(paymentStableHash(`${d.id}:${order}`));
-  return { id: seedToPaymentUuid(85000 + (seed % 20000)), order, description, side, amount, currency, acc: acc || null, status: "COMPLETED", createdAt: d.completedAt || d.createdAt };
+  return { id: seedToPaymentUuid(85000 + (seed % 20000)), code: entityCode("LEG", 85000 + (seed % 20000)), order, description, side, amount, currency, acc: acc || null, status: "COMPLETED", createdAt: d.completedAt || d.createdAt };
 }
 
 function otcLedgerLegsFor(d) {
@@ -598,7 +597,7 @@ function otcLedgerExportRows(d) {
   const l = t("paymentDetail.ledger");
   const legs = otcLedgerLegsFor(d);
   const headers = [l.colDescription, l.colId, l.colSide, l.colAmount, l.colCurrency, l.colAccount, l.colStatus, l.colDate];
-  const rows = legs.map((x) => [x.description, x.id, accEnum("transferType", x.side), x.amount, x.currency, x.acc ? x.acc.id : l.noAccount, accEnum("opStatus", x.status), x.createdAt]);
+  const rows = legs.map((x) => [x.description, x.code, accEnum("transferType", x.side), x.amount, x.currency, x.acc ? x.acc.code : l.noAccount, accEnum("opStatus", x.status), x.createdAt]);
   return { headers, rows };
 }
 

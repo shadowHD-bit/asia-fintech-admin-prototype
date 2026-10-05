@@ -107,7 +107,7 @@ function secFreezesSection() {
 
 function viewSecuritySystemAccess() {
   return `
-    <div class="list-hero">${pageHeader(t("nav.security-system-access"), t("navDescriptions.security-system-access"))}</div>
+    <div class="list-hero">${pageHeader(t("nav.security-system-access"), t("navDescriptions.security-system-access"), sectionHintBtn("sa-hint-btn", sa("info")))}</div>
     <div class="profile-flat-block cs-page sa-page">
       ${secSessionsSection()}
       ${secMaintenanceSection()}

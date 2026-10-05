@@ -35,10 +35,13 @@ function slTrunc(value, wide) {
 }
 
 function slRowActions(kind, r) {
-  return `<div class="sl-actions">${rowKebabMenu(`sl-row-${r.id}`, [
-    { label: sl("actions.edit"), icon: EDIT_ICON_SVG, attrs: `data-sl-edit="${r.id}"` },
-    { label: sl("actions.delete"), icon: TRASH_ICON_SVG, danger: true, attrs: `data-sl-del="${r.id}"` },
-  ])}</div>`;
+  const items = kind === "countries"
+    ? [{ label: sl("actions.delete"), icon: TRASH_ICON_SVG, danger: true, attrs: `data-sl-del="${r.id}"` }]
+    : [
+        { label: sl("actions.edit"), icon: EDIT_ICON_SVG, attrs: `data-sl-edit="${r.id}"` },
+        { label: sl("actions.delete"), icon: TRASH_ICON_SVG, danger: true, attrs: `data-sl-del="${r.id}"` },
+      ];
+  return `<div class="sl-actions">${rowKebabMenu(`sl-row-${r.id}`, items)}</div>`;
 }
 
 // Каждое значение в таблице копируется: значок копирования рядом со значением (пустое значение — прочерк)
@@ -49,18 +52,20 @@ function slCopy(value, html) {
 
 // Главная колонка: значение и под ним ID записи (тоже копируется)
 function slNameCell(value, r, html) {
-  return `<div class="identity-cell">${slCopy(value, html)}<div class="identity-cell-sub"><span class="identity-cell-tag">ID</span><span class="sl-copy" data-sl-copy="${r.id}">${pdShort(r.id)}<span class="sl-copy-check">${CHECK_ICON_SVG}</span></span></div></div>`;
+  return `<div class="identity-cell">${slCopy(value, html)}<div class="identity-cell-sub"><span class="identity-cell-tag">ID</span><span class="sl-copy" data-sl-copy="${r.code}">${r.code}<span class="sl-copy-check">${CHECK_ICON_SVG}</span></span></div></div>`;
 }
 function slRecords(kind) {
-  return kind === "individuals" ? SANCTION_INDIVIDUALS : SANCTION_COMPANIES;
+  return kind === "individuals" ? SANCTION_INDIVIDUALS : kind === "companies" ? SANCTION_COMPANIES : SANCTION_COUNTRIES;
 }
 
 function slTitleOf(kind, r) {
-  return kind === "individuals" ? [r.lastName, r.firstName, r.middleName].filter(Boolean).join(" ") : r.name;
+  if (kind === "individuals") return [r.lastName, r.firstName, r.middleName].filter(Boolean).join(" ");
+  if (kind === "companies") return r.name;
+  return r.countryId ? findCountry(r.countryId).name : "—";
 }
 
 function slIdCell(r) {
-  return `<div class="identity-cell-primary"><button type="button" class="id-copy" data-copy-value="${r.id}" title="${t("clientsUsers.copy")}"><span class="id-copy-label">${pdShort(r.id)}</span>${COPY_ICON_SVG}</button></div>`;
+  return `<div class="identity-cell-primary"><button type="button" class="id-copy" data-copy-value="${r.code}" title="${t("clientsUsers.copy")}"><span class="id-copy-label">${r.code}</span>${COPY_ICON_SVG}</button></div>`;
 }
 
 function slAttachRows(kind) {
@@ -74,11 +79,12 @@ function slAttachRows(kind) {
 
 // Действия списка в шапке экрана: «Экспорт» (CSV / XLSX) и меню «⋯» — добавить, импорт, перепроверка
 function slBarActions(kind) {
-  return () => `<button type="button" class="client-detail-actions-btn acm-info-btn" title="${escapeAttr(sl(`info.${kind}`))}" aria-label="${escapeAttr(sl(`titles.${kind}`))}">${ACM_INFO_ICON}</button>${exportMenuHtml("sl-export", sl("export.button"), sl("export.hint"))}${rowKebabMenu(`sl-more-${kind}`, [
+  const items = [
     { label: sl("actions.add"), icon: PLUS_ICON_SVG, attrs: `data-sl-more="add"` },
     { label: sl("actions.import"), icon: UPLOAD_ICON_SL, attrs: `data-sl-more="import"` },
-    { label: sl("actions.rerun"), icon: ICONS.lock, attrs: `data-sl-more="rerun"` },
-  ])}`;
+  ];
+  if (kind !== "countries") items.push({ label: sl("actions.rerun"), icon: ICONS.lock, attrs: `data-sl-more="rerun"` });
+  return () => `${sectionHintBtn(`sl-hint-btn-${kind}`, sl(`info.${kind}`))}${exportMenuHtml("sl-export", sl("export.button"), sl("export.hint"))}${rowKebabMenu(`sl-more-${kind}`, items)}`;
 }
 
 const UPLOAD_ICON_SL = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12V3m0 0L6.5 6.5M10 3l3.5 3.5M4 14v2h12v-2"/></svg>`;
@@ -101,7 +107,7 @@ const slIndividualsList = createAccessList({
   key: "sl-ind",
   data: () => SANCTION_INDIVIDUALS,
   searchPlaceholder: () => sl("search.individuals"),
-  searchText: (r) => [r.lastName, r.firstName, r.middleName, r.lastNameEn, r.firstNameEn, r.middleNameEn, r.externalId, r.id].filter(Boolean).join(" "),
+  searchText: (r) => [r.lastName, r.firstName, r.middleName, r.lastNameEn, r.firstNameEn, r.middleNameEn, r.externalId, r.code].filter(Boolean).join(" "),
   tab: null,
   filters: [
     { id: "created", kind: "date", label: () => sl("filters.created"), get: (r) => r.createdDate },
@@ -130,7 +136,7 @@ const slCompaniesList = createAccessList({
   key: "sl-com",
   data: () => SANCTION_COMPANIES,
   searchPlaceholder: () => sl("search.companies"),
-  searchText: (r) => [r.name, r.nameEn, r.tin, r.okpo, r.registrationNumber, r.founderFullName, r.externalId, r.id].filter(Boolean).join(" "),
+  searchText: (r) => [r.name, r.nameEn, r.tin, r.okpo, r.registrationNumber, r.founderFullName, r.externalId, r.code].filter(Boolean).join(" "),
   tab: null,
   filters: [
     { id: "created", kind: "date", label: () => sl("filters.created"), get: (r) => r.createdDate },
@@ -155,8 +161,26 @@ const slCompaniesList = createAccessList({
   ],  attachRows: slAttachRows("companies"),
 });
 
+const slCountriesList = createAccessList({
+  key: "sl-cty",
+  data: () => SANCTION_COUNTRIES,
+  searchPlaceholder: () => sl("search.countries"),
+  searchText: (r) => [r.countryId ? findCountry(r.countryId).name : "", r.countryId ? SL_ALPHA3[r.countryId] : "", r.code].filter(Boolean).join(" "),
+  tab: null,
+  filters: [
+    { id: "created", kind: "date", label: () => sl("filters.created"), get: (r) => r.createdDate },
+  ],
+  defaultSort: (a, b) => b.createdDate - a.createdDate,
+  sorts: {},
+  columns: [
+    { label: () => sl("columns.country"), html: (r) => slNameCell(r.countryId ? SL_ALPHA3[r.countryId] : "", r, slCountryCell(r.countryId)) },
+    { label: () => sl("columns.created"), html: (r) => slCopy(r.createdAt, dateTimeCell(r.createdAt)) },
+    { label: () => "", html: (r) => slRowActions("countries", r) },
+  ],  attachRows: slAttachRows("countries"),
+});
+
 function slListOf(kind) {
-  return kind === "individuals" ? slIndividualsList : slCompaniesList;
+  return kind === "individuals" ? slIndividualsList : kind === "companies" ? slCompaniesList : slCountriesList;
 }
 
 // ---- Экран (каждый список — отдельный пункт сайдбара) ---------------------------------------------------
@@ -238,7 +262,39 @@ function slReadCompany(el) {
   };
 }
 
+function slCountryFields() {
+  const f = sl("countryForm");
+  return `<div class="sl-grid">${vbSelect("sl-cty-country", f.country, slCountryOptions(), "")}</div>`;
+}
+
+function slReadCountryForm(el) {
+  const f = sl("countryForm");
+  const countryId = el.querySelector("#sl-cty-country").value.trim() || null;
+  if (!countryId) return { error: f.errCountry };
+  if (SANCTION_COUNTRIES.some((r) => r.countryId === countryId)) return { error: f.errDuplicate };
+  return { rec: { countryId } };
+}
+
 function slOpenForm(kind, r) {
+  if (kind === "countries") {
+    vbOpenForm({
+      title: sl("countryForm.addTitle"),
+      width: 420,
+      fieldsHtml: slCountryFields(),
+      submitLabel: vt("common.create"),
+      onSubmit: (el) => {
+        const res = slReadCountryForm(el);
+        if (res.error) return res.error;
+        closeModal();
+        const now = pdNow();
+        const newId = Date.now() % 100000 + 70000;
+        SANCTION_COUNTRIES.unshift(slStamp(Object.assign({ id: seedToPaymentUuid(newId), code: entityCode("SLN", newId) }, res.rec), now));
+        render();
+        return null;
+      },
+    });
+    return;
+  }
   const isInd = kind === "individuals";
   const title = isInd ? (r ? sl("form.editIndividual") : sl("form.addIndividual")) : r ? sl("form.editCompany") : sl("form.addCompany");
   vbOpenForm({
@@ -258,7 +314,8 @@ function slOpenForm(kind, r) {
         r.updatedDate = now;
         r.updatedAt = formatDateTime(now);
       } else {
-        const rec = slStamp(Object.assign({ id: seedToPaymentUuid(Date.now() % 100000 + 70000), externalId: null }, res.rec), now);
+        const newId = Date.now() % 100000 + 70000;
+        const rec = slStamp(Object.assign({ id: seedToPaymentUuid(newId), code: entityCode(isInd ? "SLI" : "SLC", newId), externalId: null }, res.rec), now);
         if (!isInd) slRecomputeCompany(rec);
         slRecords(kind).unshift(rec);
       }
@@ -295,10 +352,22 @@ function slCsvNorm(value) {
 // обязательные поля; поле короче 2 символов считается пустым; дата дд.мм.гггг; страна Alpha-3
 function slParseCsv(kind, filename, text) {
   const m = sl("import");
-  const expected = kind === "individuals" ? 10 : 8;
   if (!/\.csv$/i.test(filename)) return { error: m.errExt };
   const lines = text.replace(/^﻿/, "").split("\n").filter((l) => l.trim().length > 0);
   if (lines.length < 2) return { error: m.errRows };
+  if (kind === "countries") {
+    const now = pdNow();
+    const records = [];
+    for (let i = 1; i < lines.length; i += 1) {
+      const alpha3 = slCsvNorm(lines[i]);
+      const countryId = alpha3 ? slCountryByAlpha3(alpha3) : null;
+      if (!countryId) return { error: m.errRow(i + 1, "country") };
+      const newId = Date.now() % 100000 + 80000 + i;
+      records.push(slStamp({ id: seedToPaymentUuid(newId), code: entityCode("SLN", newId), countryId }, now));
+    }
+    return { records };
+  }
+  const expected = kind === "individuals" ? 10 : 8;
   if (!lines[1].includes(";")) return { error: m.errDelimiter };
   const got = lines[1].split(";").length;
   if (got !== expected) return { error: m.errColumns(expected, got) };
@@ -307,7 +376,8 @@ function slParseCsv(kind, filename, text) {
   for (let i = 1; i < lines.length; i += 1) {
     const c = lines[i].split(";");
     const rowNo = i + 1;
-    const base = { id: seedToPaymentUuid(Date.now() % 100000 + 80000 + i), externalId: String(rowNo) };
+    const rowId = Date.now() % 100000 + 80000 + i;
+    const base = { id: seedToPaymentUuid(rowId), code: entityCode(kind === "individuals" ? "SLI" : "SLC", rowId), externalId: String(rowNo) };
     if (kind === "individuals") {
       const [firstName, lastName, , firstNameEn, lastNameEn] = [0, 1, 2, 3, 4].map((k) => slCsvNorm(c[k]));
       const missing = [!firstName && "firstName", !lastName && "lastName", !firstNameEn && "firstNameEn", !lastNameEn && "lastNameEn"].filter(Boolean);
@@ -365,8 +435,10 @@ function slExportTable(kind, format) {
   const country = (r) => (r.countryId ? SL_ALPHA3[r.countryId] : "");
   const rows = list.map((r) =>
     kind === "individuals"
-      ? [r.id, r.lastName, r.firstName, r.middleName || "", slFioEn(r), slDob(r) === "—" ? "" : slDob(r), country(r), r.state || "", r.city || "", r.createdAt, r.updatedAt]
-      : [r.id, r.name, r.nameEn || "", r.tin || "", r.okpo || "", r.registrationNumber || "", country(r), r.founderFullName || "", r.activityCode || "", r.address || "", r.createdAt, r.updatedAt]
+      ? [r.code, r.lastName, r.firstName, r.middleName || "", slFioEn(r), slDob(r) === "—" ? "" : slDob(r), country(r), r.state || "", r.city || "", r.createdAt, r.updatedAt]
+      : kind === "companies"
+      ? [r.code, r.name, r.nameEn || "", r.tin || "", r.okpo || "", r.registrationNumber || "", country(r), r.founderFullName || "", r.activityCode || "", r.address || "", r.createdAt, r.updatedAt]
+      : [r.code, r.countryId ? findCountry(r.countryId).name : "", r.createdAt]
   );
   exportTable(`sanctions_${kind}_${new Date().toISOString().slice(0, 10)}`, format, x.columns[kind], rows);
   showToast(x.done(list.length));
@@ -392,7 +464,8 @@ function slExportCsv(kind) {
       const dob = r.dobYear ? `${String(r.dobDay || 0).padStart(2, "0")}.${String(r.dobMonth || 0).padStart(2, "0")}.${r.dobYear}` : "";
       return [r.firstName, r.lastName, r.middleName, r.firstNameEn, r.lastNameEn, r.middleNameEn, dob, r.countryId ? SL_ALPHA3[r.countryId] : "", r.state, r.city];
     }
-    return [r.name, r.registrationNumber, r.tin, r.okpo, r.countryId ? SL_ALPHA3[r.countryId] : "", r.founderFullName, r.activityCode, r.address];
+    if (kind === "companies") return [r.name, r.registrationNumber, r.tin, r.okpo, r.countryId ? SL_ALPHA3[r.countryId] : "", r.founderFullName, r.activityCode, r.address];
+    return [r.countryId ? SL_ALPHA3[r.countryId] : ""];
   });
   slDownload(`sanctioned-${kind}.csv`, [slCsvHeader(kind), ...rows.map((c) => c.map((x) => (x == null ? "" : String(x).replace(/;/g, ","))).join(";"))].join("\n"));
 }
@@ -403,7 +476,7 @@ function slOpenImport(kind) {
   openModal({
     title: m.title[kind],
     width: 600,
-    bodyHtml: `<p class="modal-confirm-text pd-modal-intro">${m.intro}</p>
+    bodyHtml: `<p class="modal-confirm-text pd-modal-intro">${kind === "countries" ? m.introCountries : m.intro}</p>
       <div class="sl-format"><div class="sl-format-title">${m.formatTitle}</div><code class="vb-mono">${pdEscape(slCsvHeader(kind))}</code><div class="table-cell-muted">${m.format[kind]}</div></div>
       <div class="sl-import-tools"><button type="button" class="btn-secondary" id="sl-template">${m.template}</button><button type="button" class="btn-secondary" id="sl-export">${m.exportCurrent}</button></div>
       <label class="filters-field vb-field"><span class="filters-field-label">${m.file}</span><input type="file" id="sl-file" accept=".csv" /></label>
@@ -440,14 +513,14 @@ function slOpenImport(kind) {
         const records = parsed;
         vbConfirm({
           title: m.confirmTitle,
-          text: m.confirmText(records.length, slRecords(kind).length),
+          text: (kind === "countries" ? m.confirmTextCountries : m.confirmText)(records.length, slRecords(kind).length),
           confirmLabel: m.doImport,
           danger: true,
           onConfirm: () => {
             const list = slRecords(kind);
             list.splice(0, list.length, ...records.sort((a, b) => b.createdDate - a.createdDate));
             render();
-            slRunRerun(kind, true);
+            if (kind !== "countries") slRunRerun(kind, true);
           },
         });
       });

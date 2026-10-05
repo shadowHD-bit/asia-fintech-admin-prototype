@@ -271,7 +271,7 @@ function eodWeekChartHtml(day) {
 function viewEodDashboard() {
   const day = eodActiveDay();
   if (!day) {
-    const head = `<div class="list-hero">${pageHeader(ed("titles.dashboard"), t("navDescriptions.eod-dashboard"))}</div>`;
+    const head = `<div class="list-hero">${pageHeader(ed("titles.dashboard"), t("navDescriptions.eod-dashboard"), sectionHintBtn("ed-dash-hint-btn", ed("info.dashboard")))}</div>`;
     return `${head}<div class="empty-state empty-state-centered"><div class="empty-state-text-group"><div class="empty-state-title">${ed("dash.emptyTitle")}</div><div class="empty-state-text">${ed("dash.emptyText")}</div></div><button type="button" class="btn-primary" id="ed-create-first">${ed("dash.createFirst")}</button></div>`;
   }
   const next = eodDayById(day.nextEodId);
@@ -290,7 +290,7 @@ function viewEodDashboard() {
   // никогда не бывает CLOSED, карточку любого дня можно открыть из списка "Дни работы". Кнопка закрытия дня — в шапке.
   const hero = `<div class="hm-hero ed-hero">
     <div class="hm-hero-main">
-      <div class="ed-hero-title"><h1 class="hm-hello">${ed("titles.dashboard")}</h1>${eodStatusBadge(day.status)}</div>
+      <div class="ed-hero-title"><div class="hm-hello-row"><h1 class="hm-hello">${ed("titles.dashboard")}</h1>${sectionHintBtn("ed-dash-hint-btn", ed("info.dashboard"))}</div>${eodStatusBadge(day.status)}</div>
       <div class="hm-date">${eodDtText(day.startDatetime)} → ${eodDtText(day.endDatetimePlan)}</div>
       <p class="hm-lead">${t("navDescriptions.eod-dashboard")}</p>
       <div class="hm-pills">
@@ -355,12 +355,12 @@ function eodOpenApprove(day, stageType) {
     text: stageType === "RECONCILIATION" && open ? ed("dash.approveReconText")(eodStageName(stageType), open) : ed("dash.approveText")(eodStageName(stageType)),
     confirmLabel: ed("dash.approve"),
     danger: false,
-    onConfirm: () => {
+    onConfirm: () => requireAdmin2fa("eod_stage_approve", () => {
       const r = eodApproveStage(day, stageType);
       // сверка с нерешённым расхождением: этап остаётся на подтверждении
       if (r.blocked) eodResultModal(ed("dash.approveBlockedTitle"), ed("dash.approveBlockedText")(eodOpenCount(day.id)), ed("dash.allDisc"), "#/eod-discrepancies");
       else { render(); showToast(t("toast.stageApproved")); }
-    },
+    }),
   });
 }
 
@@ -525,7 +525,7 @@ function exportEodHistory(format) {
 }
 
 function viewEodHistory() {
-  return `<div class="list-hero">${pageHeader(ed("titles.history"), t("navDescriptions.eod-history"))}</div>
+  return `<div class="list-hero">${pageHeader(ed("titles.history"), t("navDescriptions.eod-history"), sectionHintBtn("ed-history-hint-btn", ed("info.history")))}</div>
     <div class="cd-tabs-wrap" id="eod-history-tabs">${eodHistoryTabsBarHtml()}</div>
     <div id="eod-history-content">${eodHistoryTabContentHtml()}</div>`;
 }
@@ -754,7 +754,7 @@ const eodDiscList = createAccessList({
 
 // Страница "Расхождения": голубая шапка с экспортом, сверху статистика расхождений активного дня к предыдущему, затем список
 function viewEodDiscrepancies() {
-  return `<div class="list-hero">${pageHeader(ed("titles.discrepancies"), t("navDescriptions.eod-discrepancies"), exportMenuHtml("ed-disc-export", ed("discExport.button"), ed("discExport.hint")))}</div>${eodDiscList.view()}`;
+  return `<div class="list-hero">${pageHeader(ed("titles.discrepancies"), t("navDescriptions.eod-discrepancies"), `${sectionHintBtn("ed-disc-hint-btn", ed("info.discrepancies"))}${exportMenuHtml("ed-disc-export", ed("discExport.button"), ed("discExport.hint"))}`)}</div>${eodDiscList.view()}`;
 }
 
 // ---- Экспорт списка расхождений (CSV / XLSX): то, что показывает таблица — поиск, таб, фильтры и сортировка, без учёта страницы ----
@@ -893,7 +893,7 @@ function edAdjLegRowHtml(kind, leg) {
   const head = (collapsed) => `<div class="acw-set-head adj-leg-head" data-adj-toggle="${kind}:${leg._row}">
       <span class="adj-leg-chevron${collapsed ? "" : " is-open"}">${FILTER_GROUP_CHEVRON}</span>
       <span class="acw-set-group-title">${title}</span>
-      ${collapsed ? `<span class="adj-leg-summary table-cell-muted">${leg.currency || "—"} · ${leg.accountId ? pdShort(leg.accountId) : "—"} · ${accEnum("transferType", leg.transferType)} ${leg.amount || "—"}</span>` : ""}
+      ${collapsed ? `<span class="adj-leg-summary table-cell-muted">${leg.currency || "—"} · ${leg.accountId ? ((accFind("all", leg.accountId) || {}).code || pdShort(leg.accountId)) : "—"} · ${accEnum("transferType", leg.transferType)} ${leg.amount || "—"}</span>` : ""}
       <button type="button" class="icon-btn adj-leg-remove" data-adj-remove="${kind}:${leg._row}" title="${vt("common.delete")}">${TRASH_ICON_SVG}</button>
     </div>`;
   if (leg._collapsed) return `<div class="pc-section acw-set adj-leg-collapsed">${head(true)}</div>`;
@@ -1660,7 +1660,7 @@ function viewEodSettingsDay() {
   const stages = `${vbMiniTable([ed("fields.order"), ed("fields.stage"), ed("settings.stageName"), ed("fields.requiresApproval")], stageRows, "")}
   <p class="table-cell-muted vb-note">${ed("settings.stagesNote")}</p>`;
   // "Изменить" — стандартная кнопка в заголовке плоской секции
-  return `<div id="ed-root"><div class="list-hero">${pageHeader(ed("titles.settingsDay"), t("navDescriptions.settings-eod-day"))}</div>
+  return `<div id="ed-root"><div class="list-hero">${pageHeader(ed("titles.settingsDay"), t("navDescriptions.settings-eod-day"), sectionHintBtn("ed-set-day-hint-btn", ed("info.settingsDay")))}</div>
     <div class="profile-flat-block">
       ${flatSection(ed("settings.schedule"), schedule, "data-ed-cfg-edit")}
       ${flatSection(ed("settings.stages"), stages, "data-ed-stages-edit")}
@@ -1752,7 +1752,7 @@ function viewEodSettingsRecon() {
       `<div class="sl-actions"><button type="button" class="btn-secondary vb-row-btn" data-ed-setting="${s.id}">${vt("common.edit")}</button></div>`,
     ];
   });
-  return `<div id="ed-root"><div class="list-hero">${pageHeader(ed("titles.settingsRecon"), t("navDescriptions.settings-eod-reconciliation"))}</div>
+  return `<div id="ed-root"><div class="list-hero">${pageHeader(ed("titles.settingsRecon"), t("navDescriptions.settings-eod-reconciliation"), sectionHintBtn("ed-set-recon-hint-btn", ed("info.settingsRecon")))}</div>
     <div class="profile-flat-block">${flatSection(f.title || ed("titles.settingsRecon"), `${vbMiniTable([f.type, f.frequency, f.tolerance, f.notes, ed("fields.updated"), ""], rows, "")}
     <p class="table-cell-muted vb-note">${f.frequencyNote}</p><p class="table-cell-muted vb-note">${f.toleranceNote}</p>`)}</div>
   </div>`;

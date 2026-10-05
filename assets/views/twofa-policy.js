@@ -215,7 +215,7 @@ function viewTwofaPolicy() {
          <div class="profile-flat-block tf-page tf-modules-block">${twofaActionsSection()}</div>
          ${twofaSaveBarHtml()}`;
   return `
-    <div class="list-hero">${pageHeader(t("nav.twofa-policy"), t("navDescriptions.twofa-policy"))}</div>
+    <div class="list-hero">${pageHeader(t("nav.twofa-policy"), t("navDescriptions.twofa-policy"), sectionHintBtn("tf-hint-btn", t("twofa.info")))}</div>
     ${twofaTabsHtml()}
     ${body}`;
 }

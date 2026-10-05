@@ -59,7 +59,7 @@ const tfLimitsList = createAccessList({
     ];
   },
   columns: [
-    { label: () => tf("columns.name"), sort: "name", html: (l) => `<div class="identity-cell">${vbLink(`#/settings-tariffs-limits/${l.id}`, pdEscape(l.name))}${vbIdCell(l.id)}</div>` },
+    { label: () => tf("columns.name"), sort: "name", html: (l) => `<div class="identity-cell">${vbLink(`#/settings-tariffs-limits/${l.id}`, pdEscape(l.name))}${vbCodeCell(l.code)}</div>` },
     { label: () => tf("columns.currency"), html: (l) => `<div class="identity-cell"><span>${l.currencyTicker}</span>${l.isBaseCurrency ? `<span class="badge badge-info tf-mini">${tf("common.base")}</span>` : ""}</div>` },
     { label: () => tf("columns.periods"), html: (l) => tfPeriodsCell(l) },
     { label: () => tf("columns.minMax"), html: (l) => `<div class="identity-cell"><span>${tf("fields.min")} ${tfNum(l.min)}</span><span class="table-cell-muted">${tf("fields.max")} ${tfNum(l.max)}</span></div>` },
@@ -145,7 +145,7 @@ function tfOpenLimitForm(limit) {
         return;
       }
       const opIds = v.tariffs.map((tid) => tfTariffOp(tid, tfOperationById(v.operation).name).id);
-      const created = tfStamp({ id: tfId(), name: v.name, description: v.description || null, currencyTicker: v.currency, isBaseCurrency: v.isBase, isRolling: v.isRolling, ...nums, clientId: v.client || null, restrictionId: v.restriction || null, tariffOperationIds: opIds, changes: [] }, now);
+      const created = tfStamp({ id: tfId(), code: tfCode("TFL"), name: v.name, description: v.description || null, currencyTicker: v.currency, isBaseCurrency: v.isBase, isRolling: v.isRolling, ...nums, clientId: v.client || null, restrictionId: v.restriction || null, tariffOperationIds: opIds, changes: [] }, now);
       tfSnapshotLimit(created, now);
       TF_LIMITS.unshift(created);
       window.location.hash = `#/settings-tariffs-limits/${created.id}`;
@@ -191,7 +191,7 @@ function viewLimitDetail(id) {
   const restr = l.restrictionId ? tfRestrictionById(l.restrictionId) : null;
   const client = l.clientId ? tfClientById(l.clientId) : null;
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, l.id)}${detailField(f.currency, `${l.currencyTicker}${l.isBaseCurrency ? ` ${tfBadge("badge-info", tf("common.base"))}` : ""}`)}${detailField(f.description, l.description ? pdEscape(l.description) : "—")}
+    ${copyableField(f.id, l.code)}${detailField(f.currency, `${l.currencyTicker}${l.isBaseCurrency ? ` ${tfBadge("badge-info", tf("common.base"))}` : ""}`)}${detailField(f.description, l.description ? pdEscape(l.description) : "—")}
     ${detailField(f.window, l.isRolling ? tfBadge("badge-warning", tf("limits.rolling")) : tf("limits.calendar"))}
     ${detailField(f.daily, tfNum(l.daily, l.currencyTicker))}${detailField(f.weekly, tfNum(l.weekly, l.currencyTicker))}${detailField(f.monthly, tfNum(l.monthly, l.currencyTicker))}${detailField(f.annual, tfNum(l.annual, l.currencyTicker))}
     ${detailField(f.min, tfNum(l.min, l.currencyTicker))}${detailField(f.max, tfNum(l.max, l.currencyTicker))}
@@ -208,7 +208,7 @@ function viewLimitDetail(id) {
   const history = vbMiniTable([f.created, f.daily, f.weekly, f.monthly, f.annual, f.min, f.max], histRows, d.noHistory);
   const actions = `<button type="button" class="btn-secondary" data-tf-act="edit">${vt("common.edit")}</button>${l.isBaseCurrency ? "" : `<button type="button" class="btn-secondary" data-tf-act="base">${tf("limits.makeBase")}</button>`}<button type="button" class="btn-danger" data-tf-act="delete">${vt("common.delete")}</button>`;
   return `<div id="tf-root">
-    ${vbDetailHeader({ backHash: "#/settings-tariffs-limits", title: pdEscape(l.name), badges: `${l.isBaseCurrency ? tfBadge("badge-info", tf("common.base")) : ""}${l.isRolling ? tfBadge("badge-warning", tf("limits.rolling")) : ""}${client ? tfBadge("badge-neutral", tf("common.personal")) : ""}`, subtitle: vbIdSubtitle(l.id, [l.currencyTicker, l.createdAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-tariffs-limits", title: pdEscape(l.name), badges: `${l.isBaseCurrency ? tfBadge("badge-info", tf("common.base")) : ""}${l.isRolling ? tfBadge("badge-warning", tf("limits.rolling")) : ""}${client ? tfBadge("badge-neutral", tf("common.personal")) : ""}`, subtitle: vbCodeSubtitle(l.code, [l.currencyTicker, l.createdAt]), actions })}
     <div class="pd-grid">
       <div class="pd-col"><div class="profile-flat-block">${flatSection(d.general, main)}${flatSection(`${d.bindings} · ${l.tariffOperationIds.length}`, bindings)}</div></div>
       <div class="pd-col">${sectionCard(d.restriction, restrBlock)}${sectionCard(`${d.history} · ${l.changes.length}`, history, "is-collapsed")}</div>
@@ -238,7 +238,7 @@ const tfRestrictionsList = createAccessList({
   key: "tf-restr",
   data: () => TF_RESTRICTIONS,
   searchPlaceholder: () => tf("restrictions.search"),
-  searchText: (r) => [r.id, r.name, r.description].filter(Boolean).join(" "),
+  searchText: (r) => [r.code, r.name, r.description].filter(Boolean).join(" "),
   filters: [
     { id: "currency", kind: "multi", label: () => tf("filters.currency"), get: (r) => r.currencyTicker, options: () => [...new Set(TF_RESTRICTIONS.map((r) => r.currencyTicker))].map((v) => ({ value: v, label: v })) },
     { id: "created", kind: "date", label: () => tf("filters.created"), get: (r) => r.createdDate },
@@ -303,7 +303,7 @@ function tfOpenRestrictionForm(r) {
     onSave: (v) => {
       const vals = { name: v.name, description: v.description || null, maxDaily: v.maxDaily, maxWeekly: v.maxWeekly, maxMonthly: v.maxMonthly, maxAnnual: v.maxAnnual, min: v.min, max: v.max };
       if (isEdit) { Object.assign(r, vals); acTouch(r); return; }
-      TF_RESTRICTIONS.unshift(tfStamp({ id: tfId(), currencyTicker: v.currency, ...vals }, pdNow()));
+      TF_RESTRICTIONS.unshift(tfStamp({ id: tfId(), code: tfCode("TFR"), currencyTicker: v.currency, ...vals }, pdNow()));
     },
   });
 }
@@ -337,7 +337,7 @@ const tfCommissionsList = createAccessList({
     return [{ value: list.reduce((n, c) => n + c.factors.length, 0), label: m.factors }, { value: list.filter((c) => c.factors.length > 1).length, label: m.multi }, { value: list.filter((c) => !c.tariffOperationIds.length).length, label: m.unbound }];
   },
   columns: [
-    { label: () => tf("columns.name"), sort: "name", html: (c) => `<div class="identity-cell">${vbLink(`#/settings-tariffs-commissions/${c.id}`, pdEscape(c.name))}${vbIdCell(c.id)}</div>` },
+    { label: () => tf("columns.name"), sort: "name", html: (c) => `<div class="identity-cell">${vbLink(`#/settings-tariffs-commissions/${c.id}`, pdEscape(c.name))}${vbCodeCell(c.code)}</div>` },
     { label: () => tf("columns.currency"), html: (c) => `<div class="identity-cell"><span>${c.currencyTicker}</span>${c.isBaseCurrency ? `<span class="badge badge-info tf-mini">${tf("common.base")}</span>` : ""}</div>` },
     { label: () => tf("columns.factors"), html: (c) => `<div class="identity-cell"><span>${c.factors.length}</span><span class="table-cell-muted">${c.factors[0] ? tfFactorText(c.factors[0], c.currencyTicker) : ""}</span></div>` },
     { label: () => tf("columns.bindings"), html: (c) => tfBindingsLabel(c.tariffOperationIds) },
@@ -394,7 +394,7 @@ function tfOpenFactorForm(commission, factor) {
     confirm: factor ? () => m.confirmEdit(tfAffectedClients(commission.tariffOperationIds)) : null,
     onSave: (v) => {
       if (factor) Object.assign(factor, tfFactorFromValues(v));
-      else commission.factors.push({ id: tfId(), description: null, ...tfFactorFromValues(v) });
+      else commission.factors.push({ id: tfId(), code: tfCode("TFF"), description: null, ...tfFactorFromValues(v) });
       acTouch(commission);
     },
   });
@@ -451,7 +451,7 @@ function tfOpenCommissionForm(c) {
       const opName = tfOperationById(v.operation).name;
       const opIds = v.tariffs.map((tid) => tfTariffOp(tid, opName).id);
       const fv = { name: v.f_name, type: v.f_type, amountFrom: v.f_amountFrom, amountTo: v.f_amountTo, percent: v.f_percent, fixed: v.f_fixed, min: v.f_min, max: v.f_max, order: v.f_order, formula: v.f_formula, conditions: v.f_conditions };
-      const created = tfStamp({ id: tfId(), name: v.name, description: v.description || null, currencyTicker: v.currency, isBaseCurrency: v.isBase, whitelabelId: v.whitelabel || null, clientId: v.client || null, tariffOperationIds: opIds, factors: [{ id: tfId(), description: null, ...tfFactorFromValues(fv) }] }, now);
+      const created = tfStamp({ id: tfId(), code: tfCode("TFC"), name: v.name, description: v.description || null, currencyTicker: v.currency, isBaseCurrency: v.isBase, whitelabelId: v.whitelabel || null, clientId: v.client || null, tariffOperationIds: opIds, factors: [{ id: tfId(), code: tfCode("TFF"), description: null, ...tfFactorFromValues(fv) }] }, now);
       TF_COMMISSIONS.unshift(created);
       window.location.hash = `#/settings-tariffs-commissions/${created.id}`;
     },
@@ -488,7 +488,7 @@ function viewCommissionDetail(id) {
   const d = tf("commissions.detail");
   const client = c.clientId ? tfClientById(c.clientId) : null;
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, c.id)}${detailField(f.currency, `${c.currencyTicker}${c.isBaseCurrency ? ` ${tfBadge("badge-info", tf("common.base"))}` : ""}`)}${detailField(f.description, c.description ? pdEscape(c.description) : "—")}
+    ${copyableField(f.id, c.code)}${detailField(f.currency, `${c.currencyTicker}${c.isBaseCurrency ? ` ${tfBadge("badge-info", tf("common.base"))}` : ""}`)}${detailField(f.description, c.description ? pdEscape(c.description) : "—")}
     ${detailField(f.whitelabel, c.whitelabelId ? tfMono(c.whitelabelId) : "—")}${detailField(f.client, client ? tfClientLink(client) : d.shared)}${detailField(f.created, c.createdAt)}${detailField(f.updated, c.updatedAt)}
   </div>`;
   const factorRows = c.factors.slice().sort((a, b) => a.order - b.order).map((fa) => [fa.order, `<strong>${pdEscape(fa.name)}</strong>`, fa.type, `${tfNum(fa.amountFrom)} — ${fa.amountTo >= 1000000000 ? "∞" : tfNum(fa.amountTo)}`, fa.percent === null ? "—" : `${fa.percent}%`, tfNum(fa.fixed), tfNum(fa.min), tfNum(fa.max), fa.formula ? tfMono(fa.formula) : "—", fa.conditions ? tfMono(fa.conditions) : "—", `<div class="sl-actions"><button type="button" class="btn-secondary vb-row-btn" data-tf-factor-edit="${fa.id}">${vt("common.edit")}</button><button type="button" class="btn-secondary vb-row-btn sl-del" data-tf-factor-del="${fa.id}">${TRASH_ICON_SVG}</button></div>`]);
@@ -498,7 +498,7 @@ function viewCommissionDetail(id) {
   const firstTariff = c.tariffOperationIds.map((bid) => tfTariffById((tfTariffOpById(bid) || {}).tariffId)).find(Boolean);
   const actions = `<button type="button" class="btn-secondary" data-tf-act="edit">${vt("common.edit")}</button>${firstTariff ? `<button type="button" class="btn-secondary" data-tf-act="calc">${d.calc}</button>` : ""}${c.isBaseCurrency ? "" : `<button type="button" class="btn-secondary" data-tf-act="base">${tf("limits.makeBase")}</button>`}<button type="button" class="btn-danger" data-tf-act="delete">${vt("common.delete")}</button>`;
   return `<div id="tf-root">
-    ${vbDetailHeader({ backHash: "#/settings-tariffs-commissions", title: pdEscape(c.name), badges: `${c.isBaseCurrency ? tfBadge("badge-info", tf("common.base")) : ""}${client ? tfBadge("badge-neutral", tf("common.personal")) : ""}`, subtitle: vbIdSubtitle(c.id, [c.currencyTicker, c.createdAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-tariffs-commissions", title: pdEscape(c.name), badges: `${c.isBaseCurrency ? tfBadge("badge-info", tf("common.base")) : ""}${client ? tfBadge("badge-neutral", tf("common.personal")) : ""}`, subtitle: vbCodeSubtitle(c.code, [c.currencyTicker, c.createdAt]), actions })}
     <div class="pd-grid">
       <div class="pd-col"><div class="profile-flat-block">${flatSection(d.general, main)}${flatSection(`${d.factors} · ${c.factors.length}`, factors)}</div></div>
       <div class="pd-col">${sectionCard(`${d.bindings} · ${c.tariffOperationIds.length}`, bindings)}</div>
@@ -536,7 +536,7 @@ function initCommissionDetail(id) {
 
 // ==== Обёртки для роутера ===================================================================================================
 function viewTariffsLimits() {
-  return `<div class="list-hero">${pageHeader(tf("titles.limits"), t("navDescriptions.settings-tariffs-limits"), `<button type="button" class="btn-primary" id="tf-limit-create">+ ${tf("limits.create")}</button>`)}</div>${tfLimitsList.view()}`;
+  return `<div class="list-hero">${pageHeader(tf("titles.limits"), t("navDescriptions.settings-tariffs-limits"), `${sectionHintBtn("tf-limit-hint-btn", tf("info.limits"))}<button type="button" class="btn-primary" id="tf-limit-create">+ ${tf("limits.create")}</button>`)}</div>${tfLimitsList.view()}`;
 }
 function initTariffsLimits() {
   tfLimitsList.init();
@@ -544,7 +544,7 @@ function initTariffsLimits() {
   if (b) b.addEventListener("click", () => tfOpenLimitForm(null));
 }
 function viewTariffsRestrictions() {
-  return `<div class="list-hero">${pageHeader(tf("titles.restrictions"), t("navDescriptions.settings-tariffs-restrictions"), `<button type="button" class="btn-primary" id="tf-restr-create">+ ${tf("restrictions.create")}</button>`)}</div>${tfRestrictionsList.view()}`;
+  return `<div class="list-hero">${pageHeader(tf("titles.restrictions"), t("navDescriptions.settings-tariffs-restrictions"), `${sectionHintBtn("tf-restr-hint-btn", tf("info.restrictions"))}<button type="button" class="btn-primary" id="tf-restr-create">+ ${tf("restrictions.create")}</button>`)}</div>${tfRestrictionsList.view()}`;
 }
 function initTariffsRestrictions() {
   tfRestrictionsList.init();
@@ -552,7 +552,7 @@ function initTariffsRestrictions() {
   if (b) b.addEventListener("click", () => tfOpenRestrictionForm(null));
 }
 function viewTariffsCommissions() {
-  return `<div class="list-hero">${pageHeader(tf("titles.commissions"), t("navDescriptions.settings-tariffs-commissions"), `<button type="button" class="btn-primary" id="tf-comm-create">+ ${tf("commissions.create")}</button>`)}</div>${tfCommissionsList.view()}`;
+  return `<div class="list-hero">${pageHeader(tf("titles.commissions"), t("navDescriptions.settings-tariffs-commissions"), `${sectionHintBtn("tf-comm-hint-btn", tf("info.commissions"))}<button type="button" class="btn-primary" id="tf-comm-create">+ ${tf("commissions.create")}</button>`)}</div>${tfCommissionsList.view()}`;
 }
 function initTariffsCommissions() {
   tfCommissionsList.init();

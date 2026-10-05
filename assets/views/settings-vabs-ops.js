@@ -24,7 +24,7 @@ const vbOperationsList = createAccessList({
   data: () => VB_OPERATIONS,
   searchPlaceholder: () => vt("operations.search"),
   searchText: (op) =>
-    [op.id, op.name, op.description, op.externalOperationId, ...op.virtualLegs.flatMap((l) => [l.id, l.accountId]), ...op.realLegs.flatMap((l) => [l.id, l.accountId, l.providerTxId])]
+    [op.code, op.name, op.description, op.externalOperationId, ...op.virtualLegs.flatMap((l) => [l.code, l.accountId]), ...op.realLegs.flatMap((l) => [l.code, l.accountId, l.providerTxId])]
       .filter(Boolean)
       .join(" "),
   tab: { get: (r) => r.status, values: VB_OP_STATUSES, label: (v) => accEnum("opStatus", v) },
@@ -81,7 +81,7 @@ function vbOpNameIdHeader() {
 }
 
 function vbOpNameIdCell(o, hashAttr) {
-  return `<div class="identity-cell"><div class="identity-cell-primary"><button type="button" class="table-link" ${hashAttr}="#/settings-vabs-operations/${o.id}">${pdEscape(o.name)}</button></div><div class="identity-cell-sub"><span class="identity-cell-tag">${t("clientsUsers.idTag")}</span>${vbIdCell(o.id)}</div></div>`;
+  return `<div class="identity-cell"><div class="identity-cell-primary"><button type="button" class="table-link" ${hashAttr}="#/settings-vabs-operations/${o.id}">${pdEscape(o.name)}</button></div><div class="identity-cell-sub"><span class="identity-cell-tag">${t("clientsUsers.idTag")}</span>${vbCodeCell(o.code)}</div></div>`;
 }
 
 function vbLegsTable(op, opts) {
@@ -94,7 +94,7 @@ function vbLegsTable(op, opts) {
       const inc = accIsIncrease(accFind("all", l.accountId) || { ledgerType: "ACTIVE" }, l);
       return [
         // ID транзакции, под ним (если есть) ID от провайдера с пометкой и копированием
-        `<div class="identity-cell"><div class="identity-cell-primary">${vbLink(`#/settings-vabs-operations/${op.id}`, pdShort(l.id))}${copyIconButton(l.id)}</div>${
+        `<div class="identity-cell"><div class="identity-cell-primary">${vbLink(`#/settings-vabs-operations/${op.id}`, l.code)}${copyIconButton(l.code)}</div>${
           l.providerTxId
             ? `<div class="identity-cell-sub"><span class="identity-cell-tag">${c.providerTx}</span><button type="button" class="id-copy" data-copy-value="${escapeAttr(l.providerTxId)}" title="${t("clientsUsers.copy")}"><span class="id-copy-label">${pdEscape(l.providerTxId)}</span>${COPY_ICON_SVG}</button></div>`
             : ""
@@ -126,7 +126,7 @@ function viewOperationDetail(id) {
   const f = vt("fields");
   const d = vt("operations.detail");
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, op.id)}${detailField(f.name, pdEscape(op.name))}${detailField(f.status, `${vbOpStatusBadge(op.status)}`)}
+    ${copyableField(f.id, op.code)}${detailField(f.name, pdEscape(op.name))}${detailField(f.status, `${vbOpStatusBadge(op.status)}`)}
     ${detailField(f.description, op.description ? pdEscape(op.description) : "—")}${op.externalOperationId ? copyableField(f.externalId, op.externalOperationId) : detailField(f.externalId, "—")}
     ${detailField(f.created, op.createdAt)}${detailField(f.updated, op.updatedAt)}</div>
     <p class="table-cell-muted vb-note">${d.statusNote}</p>`;
@@ -138,7 +138,7 @@ function viewOperationDetail(id) {
     : "";
   const actions = vbHeaderActions(`<button type="button" class="btn-primary" data-vb-action="edit">${vt("common.edit")}</button>`);
   return `<div id="vb-root">
-    ${vbDetailHeader({ backHash: "#/settings-vabs-operations", title: `${d.titlePrefix} — ${pdEscape(op.name)}`, badges: vbOpStatusBadge(op.status), subtitle: vbIdSubtitle(op.id, [op.createdAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-vabs-operations", title: `${d.titlePrefix} — ${pdEscape(op.name)}`, badges: vbOpStatusBadge(op.status), subtitle: vbCodeSubtitle(op.code, [op.createdAt]), actions })}
     ${errors}
     <div class="pd-grid">
       <div class="pd-col">${sectionCard(vt("sections.main"), main)}</div>
@@ -279,7 +279,7 @@ const vbProvidersList = createAccessList({
     ];
   },
   columns: [
-    { label: () => vt("columns.name"), sort: "name", html: (p) => `<div class="identity-cell">${vbLink(`#/settings-vabs-providers/${p.id}`, pdEscape(p.name))}${vbIdCell(p.id)}</div>` },
+    { label: () => vt("columns.name"), sort: "name", html: (p) => `<div class="identity-cell">${vbLink(`#/settings-vabs-providers/${p.id}`, pdEscape(p.name))}${vbCodeCell(p.code)}</div>` },
     { label: () => vt("columns.type"), html: (p) => vbTypeBadge(p.type) },
     { label: () => vt("columns.category"), html: (p) => p.category },
     { label: () => vt("columns.project"), html: (p) => pdEscape(p.project.name) },
@@ -306,7 +306,7 @@ function vbConfigValue(key, value) {
   }
   if (typeof value === "string" && (/AccountId$/.test(key) || key === "virtualAccountId")) {
     const acc = accFind("all", value);
-    if (acc) return `<button type="button" class="table-link" data-acc-hash="${accHref(acc)}">${pdEscape(accTitle(acc))}</button> <span class="table-cell-muted vb-mono">${pdShort(value)}</span>`;
+    if (acc) return `<button type="button" class="table-link" data-acc-hash="${accHref(acc)}">${pdEscape(accTitle(acc))}</button> <span class="table-cell-muted vb-mono">${acc.code}</span>`;
   }
   if (typeof value === "string" && /^[0-9a-f-]{36}$/.test(value)) return `<span class="inline-copy vb-mono">${pdShort(value)}${copyIconButton(value)}</span>`;
   return pdEscape(String(value));
@@ -341,14 +341,14 @@ function vbProviderTabBody(p) {
   }
   if (vbProvTab === "operations") {
     const ops = VB_OPERATIONS.filter((o) => o.providerRefs.some((x) => x.id === p.id));
-    const rows = ops.slice(0, 10).map((o) => [vbLink(`#/settings-vabs-operations/${o.id}`, pdShort(o.id)), pdEscape(o.name), vbOpStatusBadge(o.status), o.createdAt]);
+    const rows = ops.slice(0, 10).map((o) => [vbLink(`#/settings-vabs-operations/${o.id}`, o.code), pdEscape(o.name), vbOpStatusBadge(o.status), o.createdAt]);
     return sectionCard(
       `${d.tabs.operations} · ${ops.length}`,
       `${vbMiniTable([vt("columns.id"), vt("columns.name"), vt("columns.status"), vt("columns.created")], rows, d.noOperations)}${ops.length ? `<p class="table-cell-muted vb-note">${d.opsNote(Math.min(10, ops.length), ops.length)} ${vbLink("#/settings-vabs-operations", d.openOperations)}</p>` : ""}`
     );
   }
   const main = `<div class="profile-fields profile-fields-grid">
-    ${copyableField(f.id, p.id)}${detailField(f.name, pdEscape(p.name))}${detailField(f.type, vbTypeBadge(p.type))}${detailField(f.category, p.category)}
+    ${copyableField(f.id, p.code)}${detailField(f.name, pdEscape(p.name))}${detailField(f.type, vbTypeBadge(p.type))}${detailField(f.category, p.category)}
     ${detailField(f.project, pdEscape(p.project.name))}${detailField(f.status, vbStatusBadge(p.status))}${detailField(f.description, p.description ? pdEscape(p.description) : "—")}
     ${detailField(f.created, p.createdAt)}${detailField(f.updated, p.updatedAt)}</div>`;
   return `<div class="pd-grid"><div class="pd-col">${sectionCard(vt("sections.main"), main)}</div>
@@ -362,7 +362,7 @@ function viewProviderDetail(id) {
   const active = p.status === "ACTIVE";
   const actions = vbHeaderActions(`<button type="button" class="btn-primary" data-vb-action="edit">${vt("common.edit")}</button>`, [active ? vbActionItem("disable", vt("common.disable"), ICONS.lock, true) : vbActionItem("enable", vt("common.enable"), CHECK_ICON_SVG)]);
   return `<div id="vb-root">
-    ${vbDetailHeader({ backHash: "#/settings-vabs-providers", title: pdEscape(p.name), badges: `${vbStatusBadge(p.status)}${vbTypeBadge(p.type)}`, subtitle: vbIdSubtitle(p.id, [pdEscape(p.project.name), p.createdAt]), actions })}
+    ${vbDetailHeader({ backHash: "#/settings-vabs-providers", title: pdEscape(p.name), badges: `${vbStatusBadge(p.status)}${vbTypeBadge(p.type)}`, subtitle: vbCodeSubtitle(p.code, [pdEscape(p.project.name), p.createdAt]), actions })}
     <div class="cd-tabs-wrap" id="vb-prov-tabs">${vbProviderTabsBar()}</div>
     <div id="vb-prov-content">${vbProviderTabBody(p)}</div>
   </div>`;
@@ -475,16 +475,16 @@ function vbListOf(kind) {
 }
 
 function viewVabsList(kind) {
-  return `<div class="list-hero">${pageHeader(vt(`titles.${kind}`), t(`navDescriptions.settings-vabs-${kind}`))}</div>${vbListOf(kind).view()}`;
+  return `<div class="list-hero">${pageHeader(vt(`titles.${kind}`), t(`navDescriptions.settings-vabs-${kind}`), sectionHintBtn(`vb-${kind}-hint-btn`, vt(`info.${kind}`)))}</div>${vbListOf(kind).view()}`;
 }
 
 // ---- Экспорт списка (CSV / XLSX): то, что показывает таблица — поиск, вкладка, фильтры и сортировка, без учёта страницы ----
 const VB_EXPORT_ROWS = {
-  networks: (n) => [n.name, n.id, n.description || "", vbEnum("entityStatus", n.status), vbCurrenciesOfNetwork(n.name).length, n.createdAt, n.updatedAt],
-  currencies: (c) => [c.ticker, c.id, c.description || "", c.networkName, c.decimals, vbEnum("entityStatus", c.status), c.createdAt, c.updatedAt],
+  networks: (n) => [n.name, n.code, n.description || "", vbEnum("entityStatus", n.status), vbCurrenciesOfNetwork(n.name).length, n.createdAt, n.updatedAt],
+  currencies: (c) => [c.ticker, c.code, c.description || "", c.networkName, c.decimals, vbEnum("entityStatus", c.status), c.createdAt, c.updatedAt],
   enums: (e) => [e.name, vbEnumUsage(e) || "", e.values.length, e.values.join(", "), e.updatedAt],
-  operations: (o) => [o.id, o.name, o.description || "", accEnum("opStatus", o.status), o.externalOperationId || "", o.createdAt],
-  providers: (p) => [p.name, p.id, vbEnum("providerType", p.type), p.category, p.project.name, vbEnum("entityStatus", p.status), vbRealAccountsOfProvider(p.id).length, p.createdAt, p.updatedAt],
+  operations: (o) => [o.code, o.name, o.description || "", accEnum("opStatus", o.status), o.externalOperationId || "", o.createdAt],
+  providers: (p) => [p.name, p.code, vbEnum("providerType", p.type), p.category, p.project.name, vbEnum("entityStatus", p.status), vbRealAccountsOfProvider(p.id).length, p.createdAt, p.updatedAt],
 };
 
 function vbOpenExportModal(kind, format) {
@@ -547,7 +547,7 @@ function vbEntityTitle(ref) {
     ref.kind === "operations" ? vbOperationById(ref.id) :
     vbProviderById(ref.id);
   if (!e) return vt("common.notFoundTitle");
-  return ref.kind === "currencies" ? e.ticker : ref.kind === "operations" ? pdShort(e.id) : e.name;
+  return ref.kind === "currencies" ? e.ticker : ref.kind === "operations" ? e.code : e.name;
 }
 
 

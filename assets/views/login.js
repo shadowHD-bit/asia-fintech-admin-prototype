@@ -162,7 +162,7 @@ function loginBind() {
       if (email.toLowerCase() !== CURRENT_ADMIN.email.toLowerCase()) return fail(lg("errCredentials"));
       const goHome = () => { window.location.hash = `#/${DEFAULT_ROUTE}`; };
       // Код при входе — по политике "Управление 2FA → Вход в админку"
-      if (admin2fa.policy.login.required) openAdmin2faModal({ title: lg("confirmTitle"), intro: lg("confirmIntro"), remember: false, onSuccess: goHome });
+      if (admin2fa.policy.login.required) openAdmin2faModal({ title: lg("confirmTitle"), intro: lg("confirmIntro"), onSuccess: goHome });
       else goHome();
     } else if (s.step === "recovery-email") {
       const email = document.getElementById("login-email").value.trim();
