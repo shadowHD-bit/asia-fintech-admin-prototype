@@ -159,8 +159,7 @@ function acmPageRaw(code, group, requires) {
 const ACM_PAGES = [
   acmPageDef("clients-users", "clients", "clients_users"),
   acmPageDef("clients-companies", "clients", "clients_companies"),
-  ...["analytics-users", "analytics-operations", "analytics-accounts", "analytics-eod", "analytics-events"].map((id) => acmPageDef(id, "analytics-dashboards", "analytics")),
-  acmPageDef("analytics-routing", "analytics-dashboards", "payment_routing"),
+  ...["analytics-users", "analytics-ops", "analytics-accounts", "analytics-events"].map((id) => acmPageDef(id, "analytics-dashboards", "analytics")),
   acmPageDef("operations-payments", "operations", "payments_fiat"),
   acmPageDef("operations-crypto-payments", "operations", "payments_crypto"),
   acmPageDef("operations-exchanges", "operations", "exchanges"),

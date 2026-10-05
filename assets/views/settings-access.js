@@ -839,10 +839,12 @@ function openInviteModal() {
     title: m.inviteTitle,
     width: 520,
     bodyHtml: `<p class="modal-confirm-text pd-modal-intro">${m.inviteText}</p>
-      <label class="filters-field"><span class="filters-field-label">${m.nameLabel}</span><input class="address-form-input" type="text" id="ac-inv-name" /></label>
-      <label class="filters-field ac-field"><span class="filters-field-label">${m.emailLabel}</span><input class="address-form-input" type="email" id="ac-inv-email" /></label>
-      <div class="filters-field ac-field"><span class="filters-field-label">${m.rolesLabel}</span><div id="ac-inv-roles"></div></div>
-      <div class="form-error" id="ac-modal-error" hidden></div>`,
+      <div class="modal-form">
+      <label class="filters-field"><span class="filters-field-label">${m.nameLabel}<span class="req-star">*</span></span><input class="address-form-input" type="text" id="ac-inv-name" /></label>
+      <label class="filters-field ac-field"><span class="filters-field-label">${m.emailLabel}<span class="req-star">*</span></span><input class="address-form-input" type="email" id="ac-inv-email" /></label>
+      <div class="filters-field ac-field"><span class="filters-field-label">${m.rolesLabel}<span class="req-star">*</span></span><div id="ac-inv-roles"></div></div>
+      <div class="form-error" id="ac-modal-error" hidden></div>
+      </div>`,
     footerHtml: `<button type="button" class="btn-secondary" id="ac-cancel">${c.cancel}</button><button type="button" class="btn-primary" id="ac-submit">${m.inviteSubmit}</button>`,
     onMount: (el) => {
       const err = el.querySelector("#ac-modal-error");

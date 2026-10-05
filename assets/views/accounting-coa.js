@@ -253,10 +253,10 @@ function coaOpenForm(account, presetParentCode) {
   const parentOptions = coaParentOptions(account);
   const defaultParent = presetParentCode && parentOptions.some((o) => o.value === presetParentCode) ? presetParentCode : parentOptions[0] ? parentOptions[0].value : "";
   const html = `
-    ${vbInput("coa-code", `${f.code} *`, isEdit ? account.code : "", isEdit ? "disabled" : "")}
-    ${vbInput("coa-name", `${f.name} *`, isEdit ? account.name : "")}
+    ${vbInput("coa-code", `${f.code}<span class="req-star">*</span>`, isEdit ? account.code : "", isEdit ? "disabled" : "")}
+    ${vbInput("coa-name", `${f.name}<span class="req-star">*</span>`, isEdit ? account.name : "")}
     ${vbTextarea("coa-desc", f.description, isEdit ? account.description || "" : "", 2)}
-    ${isEdit ? "" : vbSelect("coa-parent", `${f.parent} *`, parentOptions, defaultParent)}
+    ${isEdit ? "" : vbSelect("coa-parent", `${f.parent}<span class="req-star">*</span>`, parentOptions, defaultParent)}
     ${vbSelect("coa-nodeType", f.nodeType, ["ANALYTICAL", "GROUP", "TECHNICAL"].map((v) => ({ value: v, label: co(`nodeType.${v}`) })), isEdit ? account.nodeType : "ANALYTICAL", isEdit ? "disabled" : "")}
     ${vbSelect("coa-currency", f.currency, [{ value: "", label: f.currencyAny }, ...["EUR", "USD", "GBP"].map((c) => ({ value: c, label: c }))], isEdit ? account.currency || "" : "", isEdit ? "disabled" : "")}
     <label class="filters-field vb-field"><span class="filters-field-label"><input type="checkbox" id="coa-allowManual"${isEdit ? (account.allowManualEntry ? " checked" : "") : ""} /> ${f.allowManual}</span></label>

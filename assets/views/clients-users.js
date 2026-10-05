@@ -798,14 +798,28 @@ document.addEventListener("click", (e) => {
 // ---- Кастомный single-select для форм (mfSelect) --------------------------------
 // Popup аппендится в document.body — корректно работает внутри модалок со своим stacking context
 const MF_CARET = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 8 4 4 4-4"/></svg>`;
-const _mfOpts = new Map(); // id → { options, searchable }
+const _mfOpts = new Map(); // id → { options, searchable, onChange }
 let _mfPopupEl = null;
 let _mfAnchorBtn = null;
 
-function mfSelect(id, options, selectedValue, searchable) {
-  _mfOpts.set(id, { options, searchable: !!searchable });
-  const sel = options.find((o) => o.v === selectedValue) || options[0] || { v: "", l: "—" };
-  return `<div class="mf-select"><button type="button" class="mf-select-btn" id="${id}" data-value="${escapeAttr(sel.v)}"><span class="mf-select-label">${sel.l}</span>${MF_CARET}</button></div>`;
+// options: [{ v, l }] (l — уже экранированная подпись). onChange(value, btn) — вызывается после выбора
+// (попап уже закрыт). placeholder — текст пустого триггера (selectedValue не найден в options); без него
+// показывается первая опция, как раньше. Для поздней привязки колбэка — mfSetOnChange.
+function mfSelect(id, options, selectedValue, searchable, onChange, placeholder) {
+  _mfOpts.set(id, { options, searchable: !!searchable, onChange: onChange || null });
+  const found = options.find((o) => o.v === selectedValue);
+  let label;
+  let value;
+  if (found) { label = found.l; value = found.v; }
+  else if (placeholder != null) { label = `<span style="color: var(--color-text-tertiary)">${placeholder}</span>`; value = ""; }
+  else { const first = options[0] || { v: "", l: "—" }; label = first.l; value = first.v; }
+  return `<div class="mf-select"><button type="button" class="mf-select-btn" id="${id}" data-value="${escapeAttr(value)}"><span class="mf-select-label">${label}</span>${MF_CARET}</button></div>`;
+}
+
+// Назначить onChange уже отрисованному mfSelect (после innerHTML шага); no-op, если такого триггера нет
+function mfSetOnChange(id, onChange) {
+  const reg = _mfOpts.get(id);
+  if (reg && document.getElementById(id)) reg.onChange = onChange;
 }
 
 function closeMfPopup() {
@@ -861,6 +875,8 @@ function openMfPopup(btn) {
     btn.dataset.value = opt.dataset.mfV;
     btn.querySelector(".mf-select-label").textContent = opt.textContent.trim();
     closeMfPopup();
+    const cur = _mfOpts.get(btn.id);
+    if (cur && cur.onChange) cur.onChange(opt.dataset.mfV, btn);
   });
 
   if (searchEl) setTimeout(() => searchEl.focus(), 0);
@@ -874,7 +890,6 @@ function _mfOutside(e) {
 document.addEventListener("click", (e) => {
   const btn = e.target.closest(".mf-select-btn");
   if (!btn) return;
-  if ("ccReg" in btn.dataset) return;
   if (_mfAnchorBtn === btn) closeMfPopup();
   else openMfPopup(btn);
 });
@@ -1977,8 +1992,9 @@ function openDocumentEditModal(user, doc) {
       <span class="doc-edit-meta-sep">·</span>
       <span>${cd.fields.updatedAt}: ${formatDateTime(doc.updatedAt)}</span>
     </div>
+    <div class="modal-form">
     <label class="filters-field">
-      <span class="filters-field-label">${cd.documentStatusLabel} *</span>
+      <span class="filters-field-label">${cd.documentStatusLabel}<span class="req-star">*</span></span>
       <select class="address-form-input" id="cu-doc-status">
         ${DOCUMENT_STATUSES.map((s) => `<option value="${s}"${doc.status === s ? " selected" : ""}>${cd.documentStatus[s]}</option>`).join("")}
       </select>
@@ -2000,11 +2016,12 @@ function openDocumentEditModal(user, doc) {
       <textarea class="form-textarea" id="cu-doc-reasons" rows="2">${pdEscape(doc.externalRejectReasons || "")}</textarea>
     </label>
     <div class="filters-field">
-      <span class="filters-field-label">${cd.attachFilesLabel} *</span>
+      <span class="filters-field-label">${cd.attachFilesLabel}<span class="req-star">*</span></span>
       <div class="doc-files-list" id="cu-doc-files">${workingFiles.map((f, i) => documentFileRowHtml(f, i)).join("")}</div>
       <button type="button" class="doc-upload-zone" id="cu-doc-upload">
         ${PLUS_ICON_SVG}<span>${cd.uploadFile}</span><span class="doc-upload-hint">${cd.uploadHint}</span>
       </button>
+    </div>
     </div>
   `;
 
@@ -2096,22 +2113,24 @@ function openDocumentAddWizard(user) {
   function stepBodyHtml() {
     if (state.step === 1) {
       return `
-        <label class="filters-field">
-          <span class="filters-field-label">${cd.wizard.country}</span>
-          <select class="address-form-input" id="dw-country">
-            <option value=""${!state.countryId ? " selected" : ""}>—</option>
-            ${COUNTRY_OPTIONS.map((c) => `<option value="${c.id}"${state.countryId === c.id ? " selected" : ""}>${c.name}</option>`).join("")}
-          </select>
-        </label>
-        <label class="filters-field">
-          <span class="filters-field-label">${cd.wizard.document}</span>
-          <select class="address-form-input" id="dw-config">
-            <option value=""${!state.configId ? " selected" : ""}>—</option>
-            ${availableConfigs()
-              .map((c) => `<option value="${c.id}"${state.configId === c.id ? " selected" : ""}>${c.name}</option>`)
-              .join("")}
-          </select>
-        </label>
+        <div class="modal-form">
+          <label class="filters-field">
+            <span class="filters-field-label">${cd.wizard.country}</span>
+            <select class="address-form-input" id="dw-country">
+              <option value=""${!state.countryId ? " selected" : ""}>—</option>
+              ${COUNTRY_OPTIONS.map((c) => `<option value="${c.id}"${state.countryId === c.id ? " selected" : ""}>${c.name}</option>`).join("")}
+            </select>
+          </label>
+          <label class="filters-field">
+            <span class="filters-field-label">${cd.wizard.document}<span class="req-star">*</span></span>
+            <select class="address-form-input" id="dw-config">
+              <option value=""${!state.configId ? " selected" : ""}>—</option>
+              ${availableConfigs()
+                .map((c) => `<option value="${c.id}"${state.configId === c.id ? " selected" : ""}>${c.name}</option>`)
+                .join("")}
+            </select>
+          </label>
+        </div>
         <div class="form-error" id="dw-error" hidden></div>
       `;
     }
@@ -3110,19 +3129,10 @@ function renderClientDetailCompaniesTab(user) {
   return `<div class="profile-flat-block">${flatSection(`${ct.title} · ${pairs.length}`, table, null, ct.desc, addBtn)}</div>`;
 }
 
-function ucompCandidateOptions(user, query) {
-  const q = query.trim().toLowerCase();
+// Кандидаты — все компании, где пользователь ещё не состоит (один mfSelect с поиском, без выпадающего списка сразу)
+function ucompCandidateOptions(user) {
   const memberCompanyIds = new Set(companiesOfUser(user).map((p) => p.company.id));
-  const list = CLIENTS_COMPANIES_MOCK.filter((c) => !memberCompanyIds.has(c.id));
-  const filtered = !q ? list.slice(0, 20) : list.filter((c) => c.name.toLowerCase().includes(q));
-  return filtered.slice(0, 20);
-}
-
-function ucompCandidateListHtml(user, query) {
-  const ct = t("clientDetail.companiesTab");
-  const options = ucompCandidateOptions(user, query);
-  if (!options.length) return `<div class="table-cell-muted filter-search-empty">${ct.pickCompanyEmpty}</div>`;
-  return options.map((c) => `<button type="button" class="filter-search-item" data-ucomp-pick="${c.id}">${pdEscape(c.name)}</button>`).join("");
+  return CLIENTS_COMPANIES_MOCK.filter((c) => !memberCompanyIds.has(c.id)).map((c) => ({ v: c.id, l: pdEscape(c.name) }));
 }
 
 function openAddToCompanyModal(user) {
@@ -3137,34 +3147,18 @@ function openAddToCompanyModal(user) {
     bodyHtml: `
       <div class="filters-field">
         <span class="filters-field-label">${ct.pickCompanyTitle}</span>
-        <div class="pc-client-picker">
-          <div class="pc-client-search" id="ucomp-pick-search-wrap">
-            <input type="text" class="address-form-input" id="ucomp-pick-search" placeholder="${ct.pickCompanySearch}" autocomplete="off" />
-            <div class="filter-search-list pc-client-list" id="ucomp-pick-list">${ucompCandidateListHtml(user, "")}</div>
-          </div>
-        </div>
+        ${mfSelect("ucomp-pick", ucompCandidateOptions(user), "", true, null, ct.pickCompanyPlaceholder)}
       </div>
     `,
     footerHtml: `<button type="button" class="btn-secondary" id="ucomp-cancel">${e.cancel}</button><button type="button" class="btn-primary" id="ucomp-save" disabled>${e.save}</button>`,
     onMount: (el) => {
       el.querySelector("#ucomp-cancel").addEventListener("click", closeModal);
-      const searchInput = el.querySelector("#ucomp-pick-search");
-      const listEl = el.querySelector("#ucomp-pick-list");
-      const bindPicks = () => {
-        listEl.querySelectorAll("[data-ucomp-pick]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            state.company = CLIENTS_COMPANIES_MOCK.find((c) => c.id === btn.dataset.ucompPick);
-            if (!state.company) return;
-            el.querySelector(".modal-body").innerHTML = `<p class="modal-confirm-text">${pdEscape(state.company.name)}</p>${coEmployeeFieldsHtml(draftMember())}`;
-            el.querySelector("#ucomp-save").disabled = false;
-          });
-        });
-      };
-      searchInput.addEventListener("input", () => {
-        listEl.innerHTML = ucompCandidateListHtml(user, searchInput.value);
-        bindPicks();
+      mfSetOnChange("ucomp-pick", (v) => {
+        state.company = CLIENTS_COMPANIES_MOCK.find((c) => c.id === v);
+        if (!state.company) return;
+        el.querySelector(".modal-body").innerHTML = `<p class="modal-confirm-text">${pdEscape(state.company.name)}</p>${coEmployeeFieldsHtml(draftMember())}`;
+        el.querySelector("#ucomp-save").disabled = false;
       });
-      bindPicks();
       el.querySelector("#ucomp-save").addEventListener("click", () => {
         if (!state.company) return;
         const data = coReadEmployeeForm(el);
@@ -3215,6 +3209,7 @@ function openKycStatusChangeModal(user) {
 
   const bodyHtml = `
     <p class="modal-confirm-text pd-modal-intro">${cd.kycChangeStatusHint}</p>
+    <div class="modal-form">
     <label class="filters-field">
       <span class="filters-field-label">${cd.kycTargetLevel}</span>
       <select class="address-form-input" id="cu-kyc-level">
@@ -3236,7 +3231,7 @@ function openKycStatusChangeModal(user) {
       </select>
     </label>
     <label class="filters-field">
-      <span class="filters-field-label">${cd.kycRejectReason} *</span>
+      <span class="filters-field-label">${cd.kycRejectReason}<span class="req-star">*</span></span>
       <textarea class="form-textarea" id="cu-kyc-reason" rows="2"></textarea>
     </label>
     <label class="filters-field">
@@ -3244,6 +3239,7 @@ function openKycStatusChangeModal(user) {
       <textarea class="form-textarea" id="cu-kyc-comment" rows="2"></textarea>
     </label>
     <div class="form-error" id="cu-edit-error" hidden></div>
+    </div>
   `;
 
   openModal({

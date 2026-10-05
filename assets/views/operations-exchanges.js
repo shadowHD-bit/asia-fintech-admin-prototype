@@ -1060,7 +1060,7 @@ function ecStepperHtml() {
 function ecStepBodyHtml() {
   const c = t("operationsExchanges.create");
   if (ecState.step === 1) {
-    return `${pcClientPickerHtml("ec", c.client, c.clientSearch, ecState.client, null)}<div class="form-error" id="ec-error" hidden></div>`;
+    return `${pcClientPickerHtml("ec", c.client, t("operationsPayments.create.pickClient"), ecState.client, null)}<div class="form-error" id="ec-error" hidden></div>`;
   }
   if (ecState.step === 2) {
     const sourceOptions = ecState.client ? ecAccountOptions(ecState.client.id) : [];
@@ -1068,15 +1068,17 @@ function ecStepBodyHtml() {
     const source = ecState.sourceAccount && ecState.sourceAccount.currency;
     const target = ecState.targetAccount && ecState.targetAccount.currency;
     return `
+      <div class="modal-form">
       <div class="profile-fields-grid profile-fields-grid-2">
-        <div class="filters-field"><span class="filters-field-label">${c.sourceAccount} *</span>${pcAccountDropdownHtml("ec-source", sourceOptions, ecState.sourceAccount)}</div>
-        <label class="filters-field"><span class="filters-field-label">${c.sourceAmount} *</span><input class="address-form-input" id="ec-sourceAmount" inputmode="decimal" value="${escapeAttr(ecState.sourceAmount)}" placeholder="0.00" /></label>
+        <div class="filters-field"><span class="filters-field-label">${c.sourceAccount}<span class="req-star">*</span></span>${pcAccountDropdownHtml("ec-source", sourceOptions, ecState.sourceAccount)}</div>
+        <label class="filters-field"><span class="filters-field-label">${c.sourceAmount}<span class="req-star">*</span></span><input class="address-form-input" id="ec-sourceAmount" inputmode="decimal" value="${escapeAttr(ecState.sourceAmount)}" placeholder="0.00" /></label>
       </div>
-      <div class="filters-field"><span class="filters-field-label">${c.targetAccount} *</span>${pcAccountDropdownHtml("ec-target", targetOptions, ecState.targetAccount)}</div>
+      <div class="filters-field"><span class="filters-field-label">${c.targetAccount}<span class="req-star">*</span></span>${pcAccountDropdownHtml("ec-target", targetOptions, ecState.targetAccount)}</div>
       ${ecState.sourceAccount && !targetOptions.length ? `<p class="table-cell-muted">${c.noOtherAccount}</p>` : ""}
       <label class="filters-field"><span class="filters-field-label">${c.rate}</span><input class="address-form-input" id="ec-rate" inputmode="decimal" value="${escapeAttr(String(ecState.rate || ecSuggestedRate(source, target) || ""))}" placeholder="${ecSuggestedRate(source, target) || ""}" /></label>
       <p class="table-cell-muted">${c.rateHint}</p>
       <div class="form-error" id="ec-error" hidden></div>
+      </div>
     `;
   }
   const fee = ecFee();
@@ -1127,20 +1129,16 @@ function ecBindStep(modalEl) {
     });
   }
   if (ecState.step === 2) {
-    modalEl.querySelectorAll(`[data-pc-account-pick^="ec-source:"]`).forEach((row) => {
-      row.addEventListener("click", () => {
-        const [, accountId, currency] = row.dataset.pcAccountPick.split(":");
-        ecState.sourceAccount = { accountId, currency, label: `${currency} - ...${accountId.slice(-6)}` };
-        if (ecState.targetAccount && ecState.targetAccount.currency === currency) ecState.targetAccount = null;
-        ecRenderStep(modalEl);
-      });
+    mfSetOnChange(pcAccountSelectId("ec-source"), (value) => {
+      const [accountId, currency] = value.split(":");
+      ecState.sourceAccount = { accountId, currency, label: `${currency} - ...${accountId.slice(-6)}` };
+      if (ecState.targetAccount && ecState.targetAccount.currency === currency) ecState.targetAccount = null;
+      ecRenderStep(modalEl);
     });
-    modalEl.querySelectorAll(`[data-pc-account-pick^="ec-target:"]`).forEach((row) => {
-      row.addEventListener("click", () => {
-        const [, accountId, currency] = row.dataset.pcAccountPick.split(":");
-        ecState.targetAccount = { accountId, currency, label: `${currency} - ...${accountId.slice(-6)}` };
-        ecRenderStep(modalEl);
-      });
+    mfSetOnChange(pcAccountSelectId("ec-target"), (value) => {
+      const [accountId, currency] = value.split(":");
+      ecState.targetAccount = { accountId, currency, label: `${currency} - ...${accountId.slice(-6)}` };
+      ecRenderStep(modalEl);
     });
     modalEl.querySelectorAll(`[data-pc-account-open]`).forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -1236,7 +1234,6 @@ function openCreateExchangeModal() {
     bodyHtml: `${ecStepperHtml()}${ecStepBodyHtml()}`,
     footerHtml: ecFooterHtml(),
     onMount: (modalEl) => {
-      pcBindDropdowns(modalEl);
       ecBindStepChrome(modalEl);
       ecBindStep(modalEl);
     },

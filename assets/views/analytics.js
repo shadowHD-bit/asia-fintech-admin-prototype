@@ -1075,9 +1075,11 @@ function anTopOperationsHtml() {
 }
 
 function viewAnalyticsOperations() {
-  return `
-    ${anOperationsHero()}
+  return `${anOperationsHero()}${anOperationsBody()}`;
+}
 
+function anOperationsBody() {
+  return `
     <div class="an-section" id="ao-fiat-body">${anFiatSectionHtml()}</div>
     <div class="an-section-divider"></div>
     <div class="an-section" id="ao-crypto-body">${anCryptoSectionHtml()}</div>
@@ -1436,6 +1438,10 @@ function anEodHero(d, c) {
 function viewAnalyticsEod() {
   const d = anEodData();
   const c = t("analyticsEod");
+  return `${anEodHero(d, c)}${anEodBody(d, c)}`;
+}
+
+function anEodBody(d, c) {
   const statusSegments = Object.keys(d.byDayStatus).map((k) => ({ value: d.byDayStatus[k], label: eodEnum("status", k), color: AN_EOD_STATUS_COLORS[k] || "var(--color-text-tertiary)" }));
   const closeSegments = Object.keys(d.byCloseType).map((k, i) => ({ label: eodEnum("closeType", k), value: d.byCloseType[k], color: AN_QUALITATIVE_COLORS[i % AN_QUALITATIVE_COLORS.length] }));
   const volRows = Object.keys(d.volumes).sort().map((cur) => { const v = Math.round(d.volumes[cur]); return { label: cur, value: v, displayValue: v.toLocaleString("ru-RU") }; });
@@ -1444,8 +1450,6 @@ function viewAnalyticsEod() {
   const resolutionRows = anSortedList(d.byResolution, (k) => eodEnum("resolution", k));
 
   return `
-    ${anEodHero(d, c)}
-
     <div class="metrics-grid an-kpi-grid">
       ${renderMetricCard(d.days, c.metrics.days)}
       ${renderMetricCard(d.operations.toLocaleString("ru-RU"), c.metrics.operations)}
@@ -1621,4 +1625,125 @@ function initAnalyticsEvents() {
   if (refreshBtn) refreshBtn.addEventListener("click", () => { render(); showToast(t("analyticsEvents.hero.refreshed")); });
   const exportBtn = document.getElementById("av-export-pdf");
   if (exportBtn) exportBtn.addEventListener("click", () => exportAnalyticsEventsPdf());
+}
+
+// ---- Объединённый дашборд «Операции и маршрутизация и операционный день» -------------------------
+// Один экран: шапка с графиком по количеству операций (как у прежних дашбордов), ниже — только основные метрики
+// каждого из трёх разделов.
+function anOpsHero() {
+  const cd = t("analyticsOperations");
+  const days = AN_OPS_HERO_DAYS;
+  const series = anOperationsSeries(days);
+  const vals = series.map((b, i) => ({ users: b.ok, companies: b.other, label: `${pad2(b.date.getDate())}.${pad2(b.date.getMonth() + 1)}`, isActive: i === series.length - 1 }));
+  const totalOk = series.reduce((s, b) => s + b.ok, 0);
+  const totalOther = series.reduce((s, b) => s + b.other, 0);
+  const totalAll = totalOk + totalOther;
+  const successPct = totalAll ? Math.round((totalOk / totalAll) * 100) : 0;
+  return `<div class="hm-hero">
+    <div class="hm-hero-main">
+      <div class="hm-hello-row"><h1 class="hm-hello">${t("nav.analytics-ops")}</h1>${sectionHintBtn("an-ops-hint-btn", cd.info)}</div>
+      <div class="hm-date">${anCurrentDateText()}</div>
+      <p class="hm-lead">${t("navDescriptions.analytics-ops")}</p>
+      <div class="hm-pills">
+        <span class="hm-pill"><strong>${totalAll.toLocaleString("ru-RU")}</strong> ${cd.hero.totalInPeriod(days)}</span>
+        <span class="hm-pill"><strong>${successPct}%</strong> ${cd.hero.successRate}</span>
+      </div>
+      <div class="ed-actions">
+        <button type="button" class="btn-secondary an-hero-btn" id="ao-refresh">${AN_REFRESH_ICON_SVG}<span>${cd.hero.refresh}</span></button>
+        <button type="button" class="btn-secondary an-hero-btn" id="ao-export-pdf">${DOWNLOAD_ICON_SVG}<span>${cd.hero.exportPdf}</span></button>
+      </div>
+    </div>
+    <div class="hm-hero-map">
+      ${anStackedBarsHtml(vals, { title: cd.hero.chartTitle(days), unitLabel: cd.hero.chartUnit, usersLabel: cd.hero.chartOk, companiesLabel: cd.hero.chartOther, labelEvery: 2 })}
+      <div class="an-chart-caption">${cd.hero.chartTitle(days)}</div>
+      <div class="ed-volume">
+        <span class="hm-chip ed-volume-chip"><span class="an-legend-dot an-legend-dot-users"></span><strong>${totalOk}</strong> ${cd.hero.chartOk}</span>
+        <span class="hm-chip ed-volume-chip"><span class="an-legend-dot an-legend-dot-companies"></span><strong>${totalOther}</strong> ${cd.hero.chartOther}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function anOpsMetricsBlock(title, cards, charts) {
+  return anFlatSection(
+    title,
+    `<div class="metrics-grid an-kpi-grid">${cards}</div>
+     <div class="an-split" style="display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:24px;margin-top:var(--space-4)">${charts.join("")}</div>`
+  );
+}
+
+function viewAnalyticsOps() {
+  const cd = t("analyticsOperations");
+  const fiat = anFiatOpsStats(anFiatPeriod);
+  const crypto = anCryptoOpsStats(anCryptoPeriod);
+  const exch = anExchangesOpsStats(anExchangesPeriod);
+  const otc = anOtcOpsStats(anOtcPeriod);
+  const all = [fiat, crypto, exch, otc];
+  const sum = (k) => all.reduce((n, s) => n + (s[k] || 0), 0);
+  const opsTotal = sum("count");
+  const opsSuccess = sum("successCount");
+  const opsRate = opsTotal ? Math.round((opsSuccess / opsTotal) * 100) : 0;
+  const opsCards = [
+    renderMetricCard(opsTotal, cd.kpi.total),
+    renderMetricCard(opsSuccess, cd.kpi.successful),
+    renderMetricCard(`${opsRate}%`, cd.kpi.successRate),
+    renderMetricCard(sum("pendingCount"), cd.kpi.pending),
+  ].join("");
+
+  const rs = rgStats(rgStatsDays);
+  const rPct = (n) => (rs.total ? Math.round((n / rs.total) * 100) : 0);
+  const routeCards = [
+    renderMetricCard(rs.total, rg("stats.total"), rg("stats.attemptsSub")(rs.attempts)),
+    renderMetricCard(`${rPct(rs.success)}%`, rg("stats.success"), `${rs.success}`),
+    renderMetricCard(`${rPct(rs.defaults)}%`, rg("stats.defaults"), `${rs.defaults}`),
+    renderMetricCard(rs.failed, rg("stats.failed"), `${rPct(rs.failed)}%`),
+  ].join("");
+
+  const d = anEodData();
+  const c = t("analyticsEod");
+  const eodCards = [
+    renderMetricCard(d.days, c.metrics.days),
+    renderMetricCard(d.operations.toLocaleString("ru-RU"), c.metrics.operations),
+    renderMetricCard(d.discrepancies, c.metrics.discrepancies),
+    renderMetricCard(d.open, c.metrics.open),
+  ].join("");
+
+  const opsSegments = [
+    { label: cd.sections.fiatTitle, value: fiat.count, color: AN_QUALITATIVE_COLORS[0] },
+    { label: cd.sections.cryptoTitle, value: crypto.count, color: AN_QUALITATIVE_COLORS[1] },
+    { label: cd.sections.exchangesTitle, value: exch.count, color: AN_QUALITATIVE_COLORS[2] },
+    { label: cd.sections.otcTitle, value: otc.count, color: AN_QUALITATIVE_COLORS[3] },
+  ];
+  const eodStatusSegments = Object.keys(d.byDayStatus).map((k) => ({ value: d.byDayStatus[k], label: eodEnum("status", k), color: AN_EOD_STATUS_COLORS[k] || "var(--color-text-tertiary)" }));
+
+  const fiatStatusSegments = Object.keys(fiat.statusCounts).map((k) => ({ label: paymentStatusLabel(k), value: fiat.statusCounts[k], color: AN_OPERATIONS_STATUS_COLORS[k] || "var(--color-text-tertiary)" }));
+  const ruleRows = rs.rules.map((r) => { const rule = rgRuleById(r.ruleId); return { label: rule ? rule.name : "—", value: r.count, displayValue: String(r.count) }; });
+  const errorRows = rs.errors.map(([code, n]) => ({ label: rg(`errorNames.${code}`), value: n, displayValue: String(n) }));
+  const providerRows = rs.providers.map((p) => { const pr = rgProviderById(p.providerId); return { label: pr ? pr.name : "—", value: p.count, displayValue: String(p.count) }; });
+  const reconRows = anSortedList(d.byReconType, (k) => eodEnum("reconType", k));
+
+  return `
+    ${anOpsHero()}
+    ${anOpsMetricsBlock(t("nav.analytics-operations"), opsCards, [
+      anChartCard(cd.sections.byStatus, dashDonut(opsSegments, { emptyText: cd.noData, stacked: true })),
+      anChartCard(cd.sections.byStatus, dashDonut(fiatStatusSegments, { emptyText: cd.noData, stacked: true })),
+    ])}
+    ${anOpsMetricsBlock(t("nav.analytics-routing"), routeCards, [
+      anChartCard(rg("stats.total"), dashDonut(rgStatusDonutSegments(rs), { emptyText: rg("stats.empty"), stacked: true })),
+      anChartCard(rg("stats.byProvider"), anBarListHtml(providerRows, { emptyText: rg("stats.empty") })),
+      anChartCard(rg("stats.byRule"), anBarListHtml(ruleRows, { emptyText: rg("stats.empty") })),
+      anChartCard(rg("stats.errors"), anBarListHtml(errorRows, { emptyText: rg("stats.empty") })),
+    ])}
+    ${anOpsMetricsBlock(t("nav.analytics-eod"), eodCards, [
+      anChartCard(c.sections.statusCloseTitle, dashDonut(eodStatusSegments, { emptyText: c.noData, stacked: true })),
+      anChartCard(c.sections.reconTitle, anBarListHtml(reconRows, { emptyText: c.noData })),
+    ])}
+  `;
+}
+
+function initAnalyticsOps() {
+  const refreshBtn = document.getElementById("ao-refresh");
+  if (refreshBtn) refreshBtn.addEventListener("click", () => { render(); showToast(t("analyticsOperations.hero.refreshed")); });
+  const exportBtn = document.getElementById("ao-export-pdf");
+  if (exportBtn) exportBtn.addEventListener("click", () => exportAnalyticsOperationsPdf());
 }

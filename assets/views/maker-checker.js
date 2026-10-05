@@ -80,7 +80,7 @@ function mcOpenRuleForm(rule) {
   const html = `
     ${vbSelect("mc-actionType", fl.actionType, MC_ACTION_TYPES.map((v) => ({ value: v, label: mc(`actionType.${v}`) })), isEdit ? rule.actionType : "CREATE", isEdit ? "disabled" : "")}
     ${vbSelect("mc-entity", fl.entity, MC_ENTITIES.map((v) => ({ value: v, label: mcEntityLabel(v) })), isEdit ? rule.entity : MC_ENTITIES[0], isEdit ? "disabled" : "")}
-    <div class="filters-field vb-field" style="margin-top:6px"><span class="filters-field-label">${fl.checkerRoles} *</span><div class="rt-clients">${ACCESS_ROLES.filter((r) => r.type === "ADMIN" && r.status === "ACTIVE").map(
+    <div class="filters-field vb-field" style="margin-top:6px"><span class="filters-field-label">${fl.checkerRoles}<span class="req-star">*</span></span><div class="rt-clients">${ACCESS_ROLES.filter((r) => r.type === "ADMIN" && r.status === "ACTIVE").map(
       (r) => `<label class="rt-client"><input type="checkbox" data-mc-checker-role value="${r.id}"${isEdit && rule.checkerRoleIds.includes(r.id) ? " checked" : ""} /><span>${r.name}</span></label>`
     ).join("")}</div></div>
     ${vbSelect("mc-requiredApprovals", fl.requiredApprovals, [{ value: "1", label: mc("rules.fourEyes") }, { value: "2", label: `${mc("rules.sixEyes")} (2)` }], isEdit ? String(rule.requiredApprovals) : "1")}

@@ -70,7 +70,7 @@ function tfTariffKind(tariff) {
 // type: text | number | select | textarea | checkbox | checks | json
 function tfFieldHtml(f) {
   const id = `tff-${f.id}`;
-  const label = `${f.label}${f.required ? " *" : ""}`;
+  const label = `${f.label}${f.required ? '<span class="req-star">*</span>' : ""}`;
   const dis = f.disabled ? " disabled" : "";
   const hint = f.hint ? `<div class="table-cell-muted sl-hint">${f.hint}</div>` : "";
   if (f.type === "checkbox") return `${switchRowHtml(id, f.label, f.value, { cls: "vb-field", attrs: dis.trim() })}${hint}`;
@@ -518,7 +518,7 @@ function tfOpenCalc({ tariff, client }) {
     title: client ? f.titleClient(pdEscape(client.name)) : f.titleTariff(pdEscape(tariffObj.name)),
     width: 720,
     bodyHtml: `<p class="modal-confirm-text pd-modal-intro">${client ? f.introClient(pdEscape(tariffObj.name)) : f.introTariff}</p>
-      <div class="sl-grid sl-grid-3">${vbSelect("tfx-op", f.operation, ops.map((o) => ({ value: o.name, label: o.name })), (ops[0] || {}).name)}${vbSelect("tfx-ticker", f.currency, TF_TICKERS.map((c) => ({ value: c, label: c })), "USDT")}${vbInput("tfx-amount", f.amount, "100")}</div>
+      <div class="sl-grid sl-grid-3">${vbSelect("tfx-op", f.operation, ops.map((o) => ({ value: o.name, label: o.name })), (ops[0] || {}).name)}${vbSelect("tfx-ticker", f.currency, TF_TICKERS.map((c) => ({ value: c, label: c })), "USDT")}${vbInput("tfx-amount", `${f.amount}<span class="req-star">*</span>`, "100")}</div>
       <div id="tfx-result" class="tf-result"></div><div class="form-error" id="tfx-error" hidden></div>`,
     footerHtml: `<button type="button" class="btn-secondary" id="tfx-close">${vt("common.close")}</button><button type="button" class="btn-primary" id="tfx-run">${f.run}</button>`,
     onMount: (el) => {

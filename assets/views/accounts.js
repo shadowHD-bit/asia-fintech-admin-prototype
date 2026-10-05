@@ -1011,6 +1011,11 @@ function accOpenFreezeModal(acc) {
 
 function accOpenEditModal(acc) {
   const m = t("accounts.modals");
+  // Известные теги — те же, что подхватывает План счетов (coaKnownTags, accounting-coa.mock.js):
+  // реальные значения с других ВА/РА плюс те, что уже привязаны к счетам плана счетов. Список для
+  // datalist — выбрать существующий тег или ввести новый обычным вводом (input остаётся свободным
+  // текстом, list только подсказывает варианты).
+  const tagOptions = coaKnownTags().filter((tg) => tg !== acc.tag);
   openModal({
     title: m.editTitle,
     width: 480,
@@ -1021,10 +1026,17 @@ function accOpenEditModal(acc) {
     // плана счетов (см. "Бухгалтерия → План счетов") либо произвольное новое —
     // именно так в прототипе появляется "новый тег", который потом можно привязать
     // к счёту плана счетов (coaOpenLinkForm подхватит его автоматически).
-    bodyHtml: `<label class="filters-field"><span class="filters-field-label">${m.descriptionLabel}</span><input class="address-form-input" type="text" id="acc-desc" value="${escapeAttr(acc.description || "")}" /></label>
-      <label class="filters-field ac-field"><span class="filters-field-label">${m.ledgerLabel}</span>
+    bodyHtml: `<div class="modal-form">
+      <label class="filters-field vb-field"><span class="filters-field-label">${m.descriptionLabel}</span><input class="address-form-input" type="text" id="acc-desc" value="${escapeAttr(acc.description || "")}" /></label>
+      <label class="filters-field vb-field"><span class="filters-field-label">${m.ledgerLabel}</span>
         <select class="address-form-input" id="acc-ledger">${["ACTIVE", "PASSIVE"].map((v) => `<option value="${v}"${acc.ledgerType === v ? " selected" : ""}>${accEnum("ledger", v)}</option>`).join("")}</select></label>
-      <label class="filters-field"><span class="filters-field-label">${m.tagLabel}</span><input class="address-form-input" type="text" id="acc-tag" value="${escapeAttr(acc.tag || "")}" placeholder="PAYABLE_TO_CUSTOMER" /></label>`,
+      <label class="filters-field vb-field">
+        <span class="filters-field-label">${m.tagLabel}</span>
+        <input class="address-form-input" type="text" id="acc-tag" value="${escapeAttr(acc.tag || "")}" placeholder="PAYABLE_TO_CUSTOMER" list="acc-tag-options" autocomplete="off" />
+        <datalist id="acc-tag-options">${tagOptions.map((tg) => `<option value="${escapeAttr(tg)}"></option>`).join("")}</datalist>
+        <p class="table-cell-muted">${m.tagHint}</p>
+      </label>
+    </div>`,
     footerHtml: `<button type="button" class="btn-secondary" id="acc-cancel">${m.cancel}</button><button type="button" class="btn-primary" id="acc-submit">${m.save}</button>`,
     onMount: (el) => {
       el.querySelector("#acc-cancel").addEventListener("click", closeModal);

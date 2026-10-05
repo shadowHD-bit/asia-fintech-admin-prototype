@@ -630,11 +630,13 @@ function tfOpenEvaluate() {
     title: f.title,
     width: 640,
     bodyHtml: `<p class="modal-confirm-text pd-modal-intro">${f.intro}</p>
+      <div class="modal-form">
       ${vbSelect("tfe-client", tf("columns.client"), tfClientOptions(false).filter((o) => tfClientById(o.value).category === "INDIVIDUAL"), TF_CLIENTS[0].id)}
-      <div class="sl-grid">${vbInput("tfe-risk", f.risk, "3")}${switchRowHtml("tfe-trigger", f.manualTrigger, true, { cls: "vb-field tf-check-inline" })}</div>
-      ${vbTextarea("tfe-params", f.params, JSON.stringify({ risk: { score: 3 }, user: { level: "low" } }, null, 2), 5)}
+      <div class="sl-grid">${vbInput("tfe-risk", `${f.risk}<span class="req-star">*</span>`, "3")}${switchRowHtml("tfe-trigger", f.manualTrigger, true, { cls: "vb-field tf-check-inline" })}</div>
+      ${vbTextarea("tfe-params", `${f.params}<span class="req-star">*</span>`, JSON.stringify({ risk: { score: 3 }, user: { level: "low" } }, null, 2), 5)}
       <div class="table-cell-muted sl-hint">${f.paramsHint}</div>
-      <div id="tfe-result" class="tf-result"></div><div class="form-error" id="tfe-error" hidden></div>`,
+      <div id="tfe-result" class="tf-result"></div><div class="form-error" id="tfe-error" hidden></div>
+      </div>`,
     footerHtml: `<button type="button" class="btn-secondary" id="tfe-close">${vt("common.close")}</button><button type="button" class="btn-primary" id="tfe-run">${f.run}</button>`,
     onMount: (el) => {
       el.querySelector("#tfe-close").addEventListener("click", () => { closeModal(); render(); });

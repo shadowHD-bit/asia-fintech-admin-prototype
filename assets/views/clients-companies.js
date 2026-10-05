@@ -937,22 +937,9 @@ function initClientsCompaniesView() {
 // формы в карточке компании), компания заводится без KYB (currentKYBLevelStatusV2 null), как и часть реальных записей.
 let companyCreateSeq = 900;
 
-function ccRegistrantOptions(query) {
-  const q = query.trim().toLowerCase();
-  const list = !q ? CLIENTS_USERS_MOCK.slice(0, 20) : CLIENTS_USERS_MOCK.filter((u) => (u.fullName || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q));
-  return list.slice(0, 20);
-}
-
-function ccRegistrantListHtml(query) {
-  const c = t("clientsCompanies.create");
-  const options = ccRegistrantOptions(query);
-  if (!options.length) return `<div class="table-cell-muted filter-search-empty">${c.registrantEmpty}</div>`;
-  return options.map((u) => `<button type="button" class="filter-search-item" data-cc-registrant-pick="${u.id}">${pdEscape(u.fullName || u.email)}<span class="table-cell-muted"> · ${pdEscape(u.email)}</span></button>`).join("");
-}
-
-function ccRegistrantChipHtml(user) {
-  const c = t("clientsCompanies.create");
-  return `<span>${pdEscape(user.fullName || user.email)}</span><span class="table-cell-muted">${pdEscape(user.email)}</span><button type="button" class="table-link" data-cc-registrant-change>${c.change}</button>`;
+// Регистрант — один пользователь из CLIENTS_USERS_MOCK; подпись "Имя · email" (поиск mfSelect — по подписи)
+function ccRegistrantOptions() {
+  return CLIENTS_USERS_MOCK.map((u) => ({ v: u.id, l: pdEscape(`${u.fullName || u.email} · ${u.email}`) }));
 }
 
 function ccStepperHtml(step) {
@@ -998,12 +985,7 @@ function openCompanyCreateWizard() {
         <div class="filters-field">
           <span class="filters-field-label">${c.registrant}<span class="req-star">*</span></span>
           <p class="table-cell-muted" style="margin:0 0 var(--space-2)">${c.registrantHint}</p>
-          <div class="pc-client-picker">
-            <div id="cc-reg-trigger-wrap"${state.registrant ? " hidden" : ""}>
-              <button type="button" class="mf-select-btn" id="cc-registrant-trigger" data-cc-reg><span class="mf-select-label">—</span>${MF_CARET}</button>
-            </div>
-            <div class="pc-client-chip" id="cc-registrant-chip"${state.registrant ? "" : " hidden"}>${state.registrant ? ccRegistrantChipHtml(state.registrant) : ""}</div>
-          </div>
+          ${mfSelect("cc-registrant", ccRegistrantOptions(), state.registrant ? state.registrant.id : "", true, null, c.registrantPlaceholder)}
         </div>
         <div class="form-error" id="cc-error" hidden></div>
       </div>`;
@@ -1099,72 +1081,12 @@ function openCompanyCreateWizard() {
   }
 
   function bindRegistrantPicker(modalEl) {
-    const triggerBtn = modalEl.querySelector("#cc-registrant-trigger");
-    if (!triggerBtn) return;
-    let regPopup = null;
-
-    function closeRegPopup() {
-      if (regPopup) { regPopup.remove(); regPopup = null; }
-      triggerBtn.classList.remove("is-open");
-      document.removeEventListener("click", outsideReg, true);
-    }
-
-    function outsideReg(e) {
-      if (regPopup && !regPopup.contains(e.target) && !triggerBtn.contains(e.target)) closeRegPopup();
-    }
-
-    function openRegPopup() {
-      closeRegPopup();
-      regPopup = document.createElement("div");
-      regPopup.className = "mf-popup";
-
-      const searchEl = document.createElement("input");
-      searchEl.type = "text";
-      searchEl.className = "address-form-input mf-popup-search";
-      searchEl.placeholder = t("clientsCompanies.create.registrantSearch");
-      searchEl.autocomplete = "off";
-      regPopup.appendChild(searchEl);
-
-      const listBody = document.createElement("div");
-      listBody.className = "mf-popup-body filter-search-list pc-client-list";
-      listBody.innerHTML = ccRegistrantListHtml("");
-      regPopup.appendChild(listBody);
-
-      document.body.appendChild(regPopup);
-      const r = triggerBtn.getBoundingClientRect();
-      regPopup.style.top = `${r.bottom + 4}px`;
-      regPopup.style.left = `${r.left}px`;
-      regPopup.style.width = `${Math.max(r.width, 280)}px`;
-
-      triggerBtn.classList.add("is-open");
-
-      const bindPicks = () => {
-        listBody.querySelectorAll("[data-cc-registrant-pick]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const user = CLIENTS_USERS_MOCK.find((u) => u.id === btn.dataset.ccRegistrantPick);
-            if (!user) return;
-            state.registrant = user;
-            closeRegPopup();
-            render(modalEl);
-          });
-        });
-      };
-      bindPicks();
-      searchEl.addEventListener("input", () => {
-        listBody.innerHTML = ccRegistrantListHtml(searchEl.value);
-        bindPicks();
-      });
-      setTimeout(() => { searchEl.focus(); document.addEventListener("click", outsideReg, true); }, 0);
-    }
-
-    triggerBtn.addEventListener("click", () => {
-      if (regPopup) closeRegPopup();
-      else openRegPopup();
+    mfSetOnChange("cc-registrant", (v) => {
+      const user = CLIENTS_USERS_MOCK.find((u) => u.id === v);
+      if (!user) return;
+      state.registrant = user;
+      render(modalEl);
     });
-
-    const chipEl = modalEl.querySelector("#cc-registrant-chip");
-    const changeBtn = chipEl?.querySelector("[data-cc-registrant-change]");
-    if (changeBtn) changeBtn.addEventListener("click", () => { state.registrant = null; render(modalEl); });
   }
 
   function bind(modalEl) {
@@ -1468,25 +1390,27 @@ function openAddPaymentRowModal(company, direction) {
   const cod = t("companyDetail");
 
   const bodyHtml = `
+    <div class="modal-form">
     <label class="filters-field">
-      <span class="filters-field-label">${cod.paymentColumns.country} *</span>
+      <span class="filters-field-label">${cod.paymentColumns.country}<span class="req-star">*</span></span>
       <select class="address-form-input" id="co-payment-country">
         <option value="">—</option>
         ${COUNTRY_OPTIONS.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")}
       </select>
     </label>
     <label class="filters-field">
-      <span class="filters-field-label">${cod.paymentColumns.percentage} *</span>
+      <span class="filters-field-label">${cod.paymentColumns.percentage}<span class="req-star">*</span></span>
       <input class="address-form-input" type="number" min="1" max="100" id="co-payment-percentage" placeholder="0–100" />
     </label>
     <label class="filters-field">
-      <span class="filters-field-label">${cod.businessActivityIdLabel} *</span>
+      <span class="filters-field-label">${cod.businessActivityIdLabel}<span class="req-star">*</span></span>
       <select class="address-form-input" id="co-payment-activity">
         <option value="">—</option>
         ${BUSINESS_ACTIVITY_CODES.map((a) => `<option value="${a.code}">${a.code}: ${a.name}</option>`).join("")}
       </select>
     </label>
     <div class="form-error" id="co-payment-error" hidden></div>
+    </div>
   `;
 
   openModal({
@@ -1563,6 +1487,106 @@ function attachPaymentsByCountryHandlers(company) {
 // чтением company-info.type.ts/common-company.entity.ts 23.09.2026); paidUpShareCapital/
 // annualTurnover/totalNumberOfEmployees вынесены в отдельную секцию "Финансовые
 // показатели" — тот же источник, там же подтверждена форма FinancialAmountType.
+// ---- Редактирование общих сведений и контактов компании (только мок: правки живут в памяти вкладки) ----
+function coGeneralEditBodyHtml(company) {
+  const cod = t("companyDetail");
+  const f = cod.fields;
+  const countryOpts = [{ v: "", l: "—" }, ...COUNTRY_OPTIONS.map((c) => ({ v: c.id, l: c.name }))];
+  const ownershipOpts = [{ v: "", l: "—" }, ...COMPANY_OWNERSHIP_STRUCTURES.map((k) => ({ v: k, l: cod.ownershipStructure[k] || k }))];
+  return `<div class="modal-form">
+    <div class="address-form-grid">
+      <label class="filters-field"><span class="filters-field-label">${f.registeredBusinessName}<span class="req-star">*</span></span><input class="address-form-input" type="text" data-field="registeredBusinessName" value="${escapeAttr(company.registeredBusinessName || "")}" /></label>
+      <div class="filters-field"><span class="filters-field-label">${f.countryOfIncorporation}</span>${mfSelect("co-edit-country", countryOpts, company.countryOfIncorporationId || "", true)}</div>
+      <label class="filters-field"><span class="filters-field-label">${f.companyType}</span><input class="address-form-input" type="text" data-field="companyTypeName" value="${escapeAttr(company.companyTypeName || "")}" /></label>
+      <div class="filters-field"><span class="filters-field-label">${f.ownershipStructure}</span>${mfSelect("co-edit-ownership", ownershipOpts, company.companyOwnershipStructure || "", true)}</div>
+      <label class="filters-field"><span class="filters-field-label">${f.registrationNumber}</span><input class="address-form-input" type="text" data-field="registrationNumber" value="${escapeAttr(company.registrationNumber || "")}" /></label>
+      <label class="filters-field"><span class="filters-field-label">${f.taxNumber}</span><input class="address-form-input" type="text" data-field="taxNumber" value="${escapeAttr(company.taxNumber || "")}" /></label>
+      <label class="filters-field"><span class="filters-field-label">${f.dateOfIncorporation}</span><input class="address-form-input" type="text" data-field="dateOfIncorporation" placeholder="ДД.ММ.ГГГГ" value="${company.dateOfIncorporation ? company.dateOfIncorporationLabel : ""}" /></label>
+      <label class="filters-field"><span class="filters-field-label">${f.website}</span><input class="address-form-input" type="text" data-field="website" value="${escapeAttr(company.website || "")}" /></label>
+      <label class="filters-field"><span class="filters-field-label">${f.faxNumber}</span><input class="address-form-input" type="text" data-field="faxNumber" value="${escapeAttr(company.faxNumber || "")}" /></label>
+    </div>
+    <div class="form-error" id="co-edit-error" hidden></div>
+  </div>`;
+}
+
+function openCompanyGeneralEditModal(company) {
+  const cod = t("companyDetail");
+  openModal({
+    title: cod.editGeneralTitle,
+    width: 560,
+    bodyHtml: coGeneralEditBodyHtml(company),
+    footerHtml: `<button type="button" class="btn-secondary" id="co-edit-cancel">${t("clientDetail.cancel")}</button><button type="button" class="btn-primary" id="co-edit-save">${t("clientDetail.save")}</button>`,
+    onMount: (modalEl) => {
+      const err = modalEl.querySelector("#co-edit-error");
+      const getVal = (field) => modalEl.querySelector(`[data-field="${field}"]`).value.trim();
+      modalEl.querySelector("#co-edit-cancel").addEventListener("click", closeModal);
+      modalEl.querySelector("#co-edit-save").addEventListener("click", () => {
+        const registeredBusinessName = getVal("registeredBusinessName");
+        if (!registeredBusinessName) {
+          err.textContent = cod.errRegisteredName;
+          err.hidden = false;
+          return;
+        }
+        const dateRaw = getVal("dateOfIncorporation");
+        let dateOfIncorporation = null;
+        if (dateRaw) {
+          const m = dateRaw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+          const d = m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
+          if (!m || d.getDate() !== Number(m[1]) || d.getMonth() !== Number(m[2]) - 1) {
+            err.textContent = cod.errDate;
+            err.hidden = false;
+            return;
+          }
+          dateOfIncorporation = d;
+        }
+        company.registeredBusinessName = registeredBusinessName;
+        company.countryOfIncorporationId = modalEl.querySelector("#co-edit-country").dataset.value || null;
+        company.companyTypeName = getVal("companyTypeName") || null;
+        company.companyOwnershipStructure = modalEl.querySelector("#co-edit-ownership").dataset.value || null;
+        company.registrationNumber = getVal("registrationNumber") || null;
+        company.taxNumber = getVal("taxNumber") || null;
+        company.dateOfIncorporation = dateOfIncorporation;
+        company.dateOfIncorporationLabel = dateRaw || null;
+        company.website = getVal("website") || null;
+        company.faxNumber = getVal("faxNumber") || null;
+        closeModal();
+        updateCompanyDetailView(company);
+      });
+    },
+  });
+}
+
+function coContactsEditBodyHtml(company) {
+  const f = t("companyDetail.fields");
+  return `<div class="modal-form">
+    <div class="address-form-grid">
+      <label class="filters-field"><span class="filters-field-label">${f.email}</span><input class="address-form-input" type="email" data-field="businessEmail" value="${escapeAttr(company.businessEmail || "")}" /></label>
+      <label class="filters-field"><span class="filters-field-label">${f.tradingName}</span><input class="address-form-input" type="text" data-field="tradingName" value="${escapeAttr(company.tradingName || "")}" /></label>
+    </div>
+    <div class="form-error" id="co-edit-error" hidden></div>
+  </div>`;
+}
+
+function openCompanyContactsEditModal(company) {
+  const cod = t("companyDetail");
+  openModal({
+    title: cod.editContactsTitle,
+    width: 480,
+    bodyHtml: coContactsEditBodyHtml(company),
+    footerHtml: `<button type="button" class="btn-secondary" id="co-edit-cancel">${t("clientDetail.cancel")}</button><button type="button" class="btn-primary" id="co-edit-save">${t("clientDetail.save")}</button>`,
+    onMount: (modalEl) => {
+      const getVal = (field) => modalEl.querySelector(`[data-field="${field}"]`).value.trim();
+      modalEl.querySelector("#co-edit-cancel").addEventListener("click", closeModal);
+      modalEl.querySelector("#co-edit-save").addEventListener("click", () => {
+        company.businessEmail = getVal("businessEmail") || null;
+        company.tradingName = getVal("tradingName") || null;
+        closeModal();
+        updateCompanyDetailView(company);
+      });
+    },
+  });
+}
+
 function renderCompanyDetailMainTab(company) {
   const cod = t("companyDetail");
   const f = cod.fields;
@@ -1585,7 +1609,7 @@ function renderCompanyDetailMainTab(company) {
       ${company.website ? copyableField(f.website, company.website, `<a class="table-link" href="${escapeAttr(company.website)}" target="_blank" rel="noopener">${pdEscape(company.website)}</a>`) : detailField(f.website, "—")}
       ${copyableField(f.faxNumber, company.faxNumber)}
     </div>`,
-    null,
+    `id="co-edit-general"`,
     cod.sectionDesc.general
   );
 
@@ -1621,7 +1645,7 @@ function renderCompanyDetailMainTab(company) {
       ${copyableField(f.email, company.businessEmail)}
       ${copyableField(f.tradingName, company.tradingName)}
     </div>`,
-    null,
+    `id="co-edit-contacts"`,
     cod.sectionDesc.contacts
   );
 
@@ -1929,8 +1953,9 @@ function openCompanyDocumentEditModal(company, doc) {
       <span class="doc-edit-meta-sep">·</span>
       <span>${cod.fields.updatedAt}: ${formatDateTime(doc.updatedAt)}</span>
     </div>
+    <div class="modal-form">
     <label class="filters-field">
-      <span class="filters-field-label">${cod.documentStatusLabel} *</span>
+      <span class="filters-field-label">${cod.documentStatusLabel}<span class="req-star">*</span></span>
       <select class="address-form-input" id="co-doc-status">
         ${DOCUMENT_STATUSES.map((s) => `<option value="${s}"${doc.status === s ? " selected" : ""}>${cod.documentStatus[s]}</option>`).join("")}
       </select>
@@ -1952,11 +1977,12 @@ function openCompanyDocumentEditModal(company, doc) {
       <textarea class="form-textarea" id="co-doc-reasons" rows="2">${pdEscape(doc.externalRejectReasons || "")}</textarea>
     </label>
     <div class="filters-field">
-      <span class="filters-field-label">${cod.attachFilesLabel} *</span>
+      <span class="filters-field-label">${cod.attachFilesLabel}<span class="req-star">*</span></span>
       <div class="doc-files-list" id="co-doc-files">${workingFiles.map((f, i) => documentFileRowHtml(f, i)).join("")}</div>
       <button type="button" class="doc-upload-zone" id="co-doc-upload">
         ${PLUS_ICON_SVG}<span>${cod.uploadFile}</span><span class="doc-upload-hint">${cod.uploadHint}</span>
       </button>
+    </div>
     </div>
   `;
 
@@ -2017,8 +2043,13 @@ function openCompanyDocumentAddModal(company) {
   let workingFiles = [];
 
   const bodyHtml = `
+    <div class="doc-edit-top">
+      <label class="switch"><input type="checkbox" id="co-doc-add-active" checked /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+      <span class="doc-edit-active-label">${cod.documentActiveLabel}</span>
+    </div>
+    <div class="modal-form">
     <label class="filters-field">
-      <span class="filters-field-label">${cod.documentTypeLabel} *</span>
+      <span class="filters-field-label">${cod.documentTypeLabel}<span class="req-star">*</span></span>
       <select class="address-form-input" id="co-doc-config">
         ${COMPANY_DOCUMENT_CONFIGS.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")}
       </select>
@@ -2029,18 +2060,15 @@ function openCompanyDocumentAddModal(company) {
         ${DOCUMENT_STATUSES.map((s) => `<option value="${s}">${cod.documentStatus[s]}</option>`).join("")}
       </select>
     </label>
-    <div class="doc-edit-top">
-      <label class="switch"><input type="checkbox" id="co-doc-add-active" checked /><span class="switch-track"><span class="switch-thumb"></span></span></label>
-      <span class="doc-edit-active-label">${cod.documentActiveLabel}</span>
-    </div>
     <div class="filters-field">
-      <span class="filters-field-label">${cod.attachFilesLabel} *</span>
+      <span class="filters-field-label">${cod.attachFilesLabel}<span class="req-star">*</span></span>
       <div class="doc-files-list" id="co-doc-add-files"></div>
       <button type="button" class="doc-upload-zone" id="co-doc-add-upload">
         ${PLUS_ICON_SVG}<span>${cod.uploadFile}</span><span class="doc-upload-hint">${cod.uploadHint}</span>
       </button>
     </div>
     <div class="form-error" id="co-doc-add-error" hidden></div>
+    </div>
   `;
 
   openModal({
@@ -2159,6 +2187,7 @@ function openKybStatusChangeModal(company) {
 
   const bodyHtml = `
     <p class="modal-confirm-text pd-modal-intro">${cod.kybChangeStatusHint}</p>
+    <div class="modal-form">
     <label class="filters-field">
       <span class="filters-field-label">${cod.kybTargetLevel}</span>
       <select class="address-form-input" id="co-kyb-level">
@@ -2178,7 +2207,7 @@ function openKybStatusChangeModal(company) {
       </select>
     </label>
     <label class="filters-field">
-      <span class="filters-field-label">${cod.kybRejectReason} *</span>
+      <span class="filters-field-label">${cod.kybRejectReason}<span class="req-star">*</span></span>
       <textarea class="form-textarea" id="co-kyb-reason" rows="2"></textarea>
     </label>
     <label class="filters-field">
@@ -2186,6 +2215,7 @@ function openKybStatusChangeModal(company) {
       <textarea class="form-textarea" id="co-kyb-comment" rows="2"></textarea>
     </label>
     <div class="form-error" id="co-kyb-error" hidden></div>
+    </div>
   `;
 
   openModal({
@@ -2297,6 +2327,7 @@ function renderCompanyDetailEmployeesTab(company) {
 function coEmployeeFieldsHtml(m) {
   const e = t("companyDetail.employees");
   return `
+    <div class="modal-form">
     <label class="filters-field">
       <span class="filters-field-label">${e.fieldType}</span>
       <select class="address-form-input" id="co-emp-type">
@@ -2314,6 +2345,7 @@ function coEmployeeFieldsHtml(m) {
     <label class="filters-field"><span class="filters-field-label">${e.fieldPositions}</span><input class="address-form-input" type="text" id="co-emp-positions" value="${escapeAttr(m.positions.join(", "))}" /></label>
     <label class="filters-field"><span class="filters-field-label">${e.fieldShare}</span><input class="address-form-input" type="number" min="0" max="100" id="co-emp-share" value="${m.share != null ? m.share : ""}" /></label>
     <div class="form-error" id="co-emp-error" hidden></div>
+    </div>
   `;
 }
 
@@ -2387,19 +2419,10 @@ function coConfirmRemoveEmployee(company, member, onDone) {
 
 // ---- "Добавить сотрудника": выбор существующего физлица (не создаём тут же — как и регистрант компании,
 // это реальное ограничение createCompanyMemberFromExistingUser: userId ссылается на уже заведённого клиента)
-function coEmployeeCandidateOptions(company, query) {
-  const q = query.trim().toLowerCase();
+// Кандидаты — все физлица, ещё не состоящие в компании (один mfSelect с поиском)
+function coEmployeeCandidateOptions(company) {
   const memberUserIds = new Set((company.members || []).map((m) => m.userId));
-  const list = CLIENTS_USERS_MOCK.filter((u) => !memberUserIds.has(u.id));
-  const filtered = !q ? list.slice(0, 20) : list.filter((u) => (u.fullName || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q));
-  return filtered.slice(0, 20);
-}
-
-function coEmployeeCandidateListHtml(company, query) {
-  const e = t("companyDetail.employees");
-  const options = coEmployeeCandidateOptions(company, query);
-  if (!options.length) return `<div class="table-cell-muted filter-search-empty">${e.pickUserEmpty}</div>`;
-  return options.map((u) => `<button type="button" class="filter-search-item" data-co-emp-pick="${u.id}">${pdEscape(u.fullName || u.email)}<span class="table-cell-muted"> · ${pdEscape(u.email)}</span></button>`).join("");
+  return CLIENTS_USERS_MOCK.filter((u) => !memberUserIds.has(u.id)).map((u) => ({ v: u.id, l: pdEscape(`${u.fullName || u.email} · ${u.email}`) }));
 }
 
 function coOpenAddEmployeeModal(company) {
@@ -2407,42 +2430,22 @@ function coOpenAddEmployeeModal(company) {
   const state = { user: null };
   const draftMember = () => coMakeMember(company.id, state.user, { type: "director", accessRoles: [], positions: [], share: null });
 
-  const renderStep1 = () => `
-    <div class="filters-field">
-      <span class="filters-field-label">${e.pickUserTitle}</span>
-      <div class="pc-client-picker">
-        <div class="pc-client-search" id="co-emp-pick-search-wrap">
-          <input type="text" class="address-form-input" id="co-emp-pick-search" placeholder="${e.pickUserSearch}" autocomplete="off" />
-          <div class="filter-search-list pc-client-list" id="co-emp-pick-list">${coEmployeeCandidateListHtml(company, "")}</div>
-        </div>
-      </div>
-    </div>
-  `;
-
   openModal({
     title: e.modalAddTitle,
     width: 480,
-    bodyHtml: renderStep1(),
+    bodyHtml: `<div class="filters-field">
+      <span class="filters-field-label">${e.pickUserTitle}</span>
+      ${mfSelect("co-emp-pick", coEmployeeCandidateOptions(company), "", true, null, e.pickUserPlaceholder)}
+    </div>`,
     footerHtml: `<button type="button" class="btn-secondary" id="co-emp-cancel">${e.cancel}</button><button type="button" class="btn-primary" id="co-emp-save" disabled>${e.save}</button>`,
     onMount: (el) => {
       el.querySelector("#co-emp-cancel").addEventListener("click", closeModal);
-      const searchInput = el.querySelector("#co-emp-pick-search");
-      const listEl = el.querySelector("#co-emp-pick-list");
-      const bindPicks = () => {
-        listEl.querySelectorAll("[data-co-emp-pick]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            state.user = CLIENTS_USERS_MOCK.find((u) => u.id === btn.dataset.coEmpPick);
-            if (!state.user) return;
-            el.querySelector(".modal-body").innerHTML = `<p class="modal-confirm-text">${pdEscape(state.user.fullName || state.user.email)}</p>${coEmployeeFieldsHtml(draftMember())}`;
-            el.querySelector("#co-emp-save").disabled = false;
-          });
-        });
-      };
-      searchInput.addEventListener("input", () => {
-        listEl.innerHTML = coEmployeeCandidateListHtml(company, searchInput.value);
-        bindPicks();
+      mfSetOnChange("co-emp-pick", (v) => {
+        state.user = CLIENTS_USERS_MOCK.find((u) => u.id === v);
+        if (!state.user) return;
+        el.querySelector(".modal-body").innerHTML = `<p class="modal-confirm-text">${pdEscape(state.user.fullName || state.user.email)}</p>${coEmployeeFieldsHtml(draftMember())}`;
+        el.querySelector("#co-emp-save").disabled = false;
       });
-      bindPicks();
       el.querySelector("#co-emp-save").addEventListener("click", () => {
         if (!state.user) return;
         const data = coReadEmployeeForm(el);
@@ -2571,6 +2574,11 @@ function attachCompanyDetailContentHandlers(company) {
 
   const addEmployeeBtn = content.querySelector("#co-emp-add");
   if (addEmployeeBtn) addEmployeeBtn.addEventListener("click", () => coOpenAddEmployeeModal(company));
+
+  const editGeneralBtn = content.querySelector("#co-edit-general");
+  if (editGeneralBtn) editGeneralBtn.addEventListener("click", () => openCompanyGeneralEditModal(company));
+  const editContactsBtn = content.querySelector("#co-edit-contacts");
+  if (editContactsBtn) editContactsBtn.addEventListener("click", () => openCompanyContactsEditModal(company));
 
   content.querySelectorAll("[data-emp-edit]").forEach((btn) => {
     btn.addEventListener("click", () => {

@@ -152,9 +152,9 @@ function pnOpenCreate() {
     title: f.createTitle,
     width: 620,
     intro: f.createIntro,
-    fieldsHtml: `${vbInput("pn-name", `${f.name} *`, "")}${vbInput("pn-desc", f.description, "")}${vbInput("pn-email", `${f.email} *`, "", 'type="email"')}${vbInput("pn-logo", `${f.logoUrl} *`, "", 'placeholder="https://"')}
+    fieldsHtml: `${vbInput("pn-name", `${f.name}<span class="req-star">*</span>`, "")}${vbInput("pn-desc", f.description, "")}${vbInput("pn-email", `${f.email}<span class="req-star">*</span>`, "", 'type="email"')}${vbInput("pn-logo", `${f.logoUrl}<span class="req-star">*</span>`, "", 'placeholder="https://"')}
       <label class="filters-field vb-field"><span class="filters-field-label">${f.mode}</span>${mfSelect("pn-mode", ["FULL_OAUTH", "LIGHT"].map((m) => ({ v: m, l: pn(`mode.${m}.title`) })), "FULL_OAUTH")}</label>
-      ${vbTextarea("pn-uris", `${f.redirectUris} *`, "", 2)}${vbTextarea("pn-ips", f.ips, "", 2)}${pnScopeChecklist([])}`,
+      ${vbTextarea("pn-uris", `${f.redirectUris}<span class="req-star">*</span>`, "", 2)}${vbTextarea("pn-ips", f.ips, "", 2)}${pnScopeChecklist([])}`,
     submitLabel: vt("common.create"),
     onSubmit: (el) => {
       const e = f.errors;
@@ -299,7 +299,7 @@ function pnOpenEdit(s) {
   const f = pn("form");
   vbOpenForm({
     title: f.editTitle,
-    fieldsHtml: `${vbInput("pn-name", `${f.name} *`, s.name)}${vbInput("pn-desc", f.description, s.description || "")}${vbInput("pn-email", `${f.email} *`, s.email, 'type="email"')}${vbInput("pn-logo", `${f.logoUrl} *`, s.logoUrl)}`,
+    fieldsHtml: `${vbInput("pn-name", `${f.name}<span class="req-star">*</span>`, s.name)}${vbInput("pn-desc", f.description, s.description || "")}${vbInput("pn-email", `${f.email}<span class="req-star">*</span>`, s.email, 'type="email"')}${vbInput("pn-logo", `${f.logoUrl}<span class="req-star">*</span>`, s.logoUrl)}`,
     submitLabel: vt("common.save"),
     onSubmit: (el) => {
       const e = f.errors;
@@ -470,9 +470,9 @@ function pnOpenWebhook(s, w) {
   vbOpenForm({
     title: w ? f.editTitle : f.addTitle,
     width: 620,
-    fieldsHtml: `${vbInput("pn-wh-url", `${f.url} *`, w ? w.url : "", 'placeholder="https://"')}${vbInput("pn-wh-secret", w ? f.secretEdit : `${f.secret} *`, "", 'type="password" autocomplete="new-password"')}<p class="table-cell-muted pn-hint">${f.secretHint}</p>${vbInput("pn-wh-desc", f.description, w ? w.description : "")}
+    fieldsHtml: `${vbInput("pn-wh-url", `${f.url}<span class="req-star">*</span>`, w ? w.url : "", 'placeholder="https://"')}${vbInput("pn-wh-secret", w ? f.secretEdit : `${f.secret}<span class="req-star">*</span>`, "", 'type="password" autocomplete="new-password"')}<p class="table-cell-muted pn-hint">${f.secretHint}</p>${vbInput("pn-wh-desc", f.description, w ? w.description : "")}
       <label class="rt-client pn-active"><input type="checkbox" id="pn-wh-active"${!w || w.isActive ? " checked" : ""} /><span>${f.active}</span></label>
-      <div class="filters-field vb-field"><span class="filters-field-label">${f.events} *</span><div class="rt-clients pn-events">${groups}</div></div>`,
+      <div class="filters-field vb-field"><span class="filters-field-label">${f.events}<span class="req-star">*</span></span><div class="rt-clients pn-events">${groups}</div></div>`,
     submitLabel: w ? vt("common.save") : vt("common.create"),
     onSubmit: (el) => {
       const url = el.querySelector("#pn-wh-url").value.trim();

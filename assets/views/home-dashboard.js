@@ -158,7 +158,7 @@ function hmHero() {
   return `<section class="hm-hero">
     <div class="hm-hero-main">
       <div class="hm-brand"><img class="sidebar-brand-mark" src="assets/images/logo-icon.svg" alt="Asia Fintech" /><div class="sidebar-brand-text"><span class="sidebar-brand-title"><span class="brand-word">Asia</span> <span class="brand-word-accent">Fintech</span></span><span class="sidebar-brand-subtitle">${t("home.brandTag")}</span></div></div>
-      <div class="hm-hello-row"><h1 class="hm-hello">${greeting}, ${pdEscape(CURRENT_ADMIN.name)}!</h1>${sectionHintBtn("hm-hint-btn", t("home.info"))}</div>
+      <div class="hm-hello-row"><h1 class="hm-hello">${greeting}, ${pdEscape(CURRENT_ADMIN.name)}!</h1></div>
       <div class="hm-date">${date}</div>
       <div class="hm-pills">
         <button type="button" class="hm-pill" data-dash-hash="#/clients-users"><strong>${clients.toLocaleString("ru-RU")}</strong> ${t("home.pillClients")}</button>
@@ -258,13 +258,13 @@ function hmCardMeta() {
   return {
     clients: { label: t("nav.clients"), list: "#/clients-users", stats: "#/analytics-users", settings: "#/settings-verif-kyc" },
     companies: { label: t("nav.clients-companies"), list: "#/clients-companies", stats: "#/analytics-users", settings: "#/settings-verif-kyb" },
-    operations: { label: t("nav.operations"), list: "#/operations-payments", stats: "#/analytics-operations", settings: "#/settings-tariffs-catalog" },
+    operations: { label: t("nav.operations"), list: "#/operations-payments", stats: "#/analytics-ops/operations", settings: "#/settings-tariffs-catalog" },
     accounts: { label: t("home.volumeTitle"), list: "#/accounts-virtual", stats: "#/analytics-accounts", settings: "#/settings-vabs-currencies" },
-    eod: { label: t("nav.eod"), list: "#/eod-dashboard", stats: "#/analytics-eod", settings: "#/settings-eod-day" },
+    eod: { label: t("nav.eod"), list: "#/eod-dashboard", stats: "#/analytics-ops/eod", settings: "#/settings-eod-day" },
     events: { label: t("home.eventsTitle"), list: "#/security-audit-logs", stats: "#/analytics-events", settings: "#/settings-kyt-configs" },
-    payments: { label: t("nav.operations-payments"), list: "#/operations-payments", stats: "#/analytics-operations", settings: "#/settings-tariffs-catalog" },
-    exchanges: { label: t("nav.operations-exchanges"), list: "#/operations-exchanges", stats: "#/analytics-operations", settings: "#/settings-rates" },
-    discrepancies: { label: t("nav.eod-discrepancies"), list: "#/eod-discrepancies", stats: "#/analytics-eod", settings: "#/settings-eod-reconciliation" },
+    payments: { label: t("nav.operations-payments"), list: "#/operations-payments", stats: "#/analytics-ops/operations", settings: "#/settings-tariffs-catalog" },
+    exchanges: { label: t("nav.operations-exchanges"), list: "#/operations-exchanges", stats: "#/analytics-ops/operations", settings: "#/settings-rates" },
+    discrepancies: { label: t("nav.eod-discrepancies"), list: "#/eod-discrepancies", stats: "#/analytics-ops/eod", settings: "#/settings-eod-reconciliation" },
     partners: { label: t("nav.clients-partners"), list: "#/clients-partners", stats: null, settings: null },
     currencies: { label: t("nav.settings-vabs-currencies"), list: "#/settings-vabs-currencies", stats: null, settings: null },
   };
@@ -542,7 +542,7 @@ function hmTiles() {
 
 // Выбор метрики — не нативный <select>, а тот же кастомный попап-дропдаун, что и
 // на экране создания платежа (.pc-dropdown/.pc-dropdown-trigger/-panel/-option,
-// см. cwDropdownField в operations-payments.js) — переиспользуем готовые классы,
+// см. pcBindDropdowns в operations-payments.js) — переиспользуем готовые классы,
 // открытие/закрытие вешаем один раз на модалку через hmBindCardDropdowns.
 function hmCardSettingsRowHtml(c, meta) {
   const mt = t("home.cardSettings.metrics");

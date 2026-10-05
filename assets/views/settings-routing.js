@@ -940,7 +940,7 @@ function rgRuleMainContent() {
   const routesHtml = rgRouteRowsHtml(d.routes, editing, null);
   const routeWarn = warns.some(Boolean) ? `<div class="rg-warn">${warns.map((w, i) => (w ? `${i + 1}: ${pdEscape(w)}` : "")).filter(Boolean).join("<br>")}</div>` : "";
   const params = editing
-    ? `<div class="rg-params-col">${vbInput("rg-name", `${rg("rule.name")} *`, d.name, 'maxlength="64"')}${vbTextarea("rg-desc", rg("rule.description"), d.description, 3)}${vbInput("rg-from", rg("rule.dateStart"), rgToInput(d.dateStart), 'type="datetime-local"')}${vbInput("rg-to", rg("rule.dateEnd"), rgToInput(d.dateEnd), 'type="datetime-local"')}<p class="table-cell-muted rg-hint">${rg("rule.priorityHint")}</p></div>`
+    ? `<div class="rg-params-col">${vbInput("rg-name", `${rg("rule.name")}<span class="req-star">*</span>`, d.name, 'maxlength="64"')}${vbTextarea("rg-desc", rg("rule.description"), d.description, 3)}${vbInput("rg-from", rg("rule.dateStart"), rgToInput(d.dateStart), 'type="datetime-local"')}${vbInput("rg-to", rg("rule.dateEnd"), rgToInput(d.dateEnd), 'type="datetime-local"')}<p class="table-cell-muted rg-hint">${rg("rule.priorityHint")}</p></div>`
     : `<div class="rg-meta-list">${rgMetaRow(rg("columns.status"), rgStatusBadge(rule.status))}${rgMetaRow(rg("columns.priority"), rule.priority)}${rgMetaRow(rg("columns.period"), rgPeriod(rule))}${rgMetaRow(rg("rule.author"), pdEscape(rule.createdBy))}${rgMetaRow(rg("rule.created"), rule.createdAt)}${rgMetaRow(rg("rule.updated"), rule.updatedAt)}</div>`;
   let usage = "";
   if (rule) {
@@ -1189,7 +1189,7 @@ function rwStepHtml() {
   if (s.step === 1) {
     const others = rgVisibleRules().map((r) => ({ value: r.id, label: `${r.priority} · ${r.name}` }));
     const showTarget = s.pos === "BEFORE" || s.pos === "AFTER";
-    return `${vbInput("rw-name", `${rg("rule.name")} *`, d.name, 'maxlength="64"')}
+    return `${vbInput("rw-name", `${rg("rule.name")}<span class="req-star">*</span>`, d.name, 'maxlength="64"')}
       ${vbTextarea("rw-desc", rg("rule.description"), d.description, 3)}
       <div class="rg-route-fields">${vbInput("rw-from", rg("rule.dateStart"), rgToInput(d.dateStart), 'type="datetime-local"')}${vbInput("rw-to", rg("rule.dateEnd"), rgToInput(d.dateEnd), 'type="datetime-local"')}</div>
       ${vbSelect("rw-status", rg("rule.startStatus"), [{ value: "DRAFT", label: rg("status.DRAFT") }, { value: "ACTIVE", label: rg("status.ACTIVE") }], s.status)}

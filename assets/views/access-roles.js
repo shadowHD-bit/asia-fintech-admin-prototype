@@ -450,10 +450,12 @@ function openRoleParamsModal(role) {
   openModal({
     title: m.roleEditTitle,
     width: 480,
-    bodyHtml: `<label class="filters-field"><span class="filters-field-label">${m.roleNameLabel}</span><input class="address-form-input" type="text" id="ac-role-name" maxlength="200" value="${escapeAttr(role.name)}" /></label>
+    bodyHtml: `<div class="modal-form">
+      <label class="filters-field"><span class="filters-field-label">${m.roleNameLabel}<span class="req-star">*</span></span><input class="address-form-input" type="text" id="ac-role-name" maxlength="200" value="${escapeAttr(role.name)}" /></label>
       <label class="filters-field ac-field"><span class="filters-field-label">${m.roleDescLabel}</span><textarea class="form-textarea" id="ac-role-desc" rows="3" maxlength="200">${pdEscape(role.description)}</textarea></label>
       <label class="filters-field ac-field"><span class="filters-field-label">${m.roleStatusLabel}</span><select class="address-form-input" id="ac-role-status">${statuses.map((s) => `<option value="${s}"${role.status === s ? " selected" : ""}>${t(`access.enums.roleStatus.${s}`)}</option>`).join("")}</select></label>
-      <div class="form-error" id="ac-modal-error" hidden></div>`,
+      <div class="form-error" id="ac-modal-error" hidden></div>
+    </div>`,
     footerHtml: `<button type="button" class="btn-secondary" id="ac-cancel">${c.cancel}</button><button type="button" class="btn-primary" id="ac-submit">${c.save}</button>`,
     onMount: (el) => {
       const err = el.querySelector("#ac-modal-error");
@@ -555,10 +557,12 @@ function openRoleParamsStep(mode, baseRole, canGoBack) {
   openModal({
     title: mode === "new" ? d.newParamsTitle : d.basedParamsTitle,
     width: 480,
-    bodyHtml: `${mode === "based" ? vbSelect("ac-role-base", d.baseLabel, baseOptions, baseRole ? baseRole.id : baseOptions[0].value) : ""}
-      <label class="filters-field ac-field"><span class="filters-field-label">${m.roleNameLabel}</span><input class="address-form-input" type="text" id="ac-role-name" maxlength="200" value="" /></label>
+    bodyHtml: `<div class="modal-form">
+      ${mode === "based" ? vbSelect("ac-role-base", d.baseLabel, baseOptions, baseRole ? baseRole.id : baseOptions[0].value) : ""}
+      <label class="filters-field ac-field"><span class="filters-field-label">${m.roleNameLabel}<span class="req-star">*</span></span><input class="address-form-input" type="text" id="ac-role-name" maxlength="200" value="" /></label>
       <label class="filters-field ac-field"><span class="filters-field-label">${m.roleDescLabel}</span><textarea class="form-textarea" id="ac-role-desc" rows="3" maxlength="200"></textarea></label>
-      <div class="form-error" id="ac-modal-error" hidden></div>`,
+      <div class="form-error" id="ac-modal-error" hidden></div>
+    </div>`,
     footerHtml: `${canGoBack ? `<button type="button" class="btn-secondary" id="ac-back-step">${d.back}</button>` : `<button type="button" class="btn-secondary" id="ac-cancel">${c.cancel}</button>`}<button type="button" class="btn-primary" id="ac-submit">${c.create}</button>`,
     onMount: (el) => {
       const err = el.querySelector("#ac-modal-error");

@@ -1160,7 +1160,7 @@ function openPaymentTextModal({ title, intro, label, value = "", requiredMsg, su
     bodyHtml: `
       ${intro ? `<p class="modal-confirm-text pd-modal-intro">${intro}</p>` : ""}
       <label class="filters-field">
-        <span class="filters-field-label">${label}</span>
+        <span class="filters-field-label">${label}<span class="req-star">*</span></span>
         ${field}
       </label>
       <div class="form-error" id="pd-modal-error" hidden>${requiredMsg}</div>
@@ -1253,7 +1253,7 @@ function openChangeRateModal(row, ref) {
     width: 420,
     bodyHtml: `
       <label class="filters-field">
-        <span class="filters-field-label">${m.rateLabel}</span>
+        <span class="filters-field-label">${m.rateLabel}<span class="req-star">*</span></span>
         <input class="address-form-input" type="number" step="any" min="0" id="pd-rate-input" value="${row.exchangeRate}" />
       </label>
       <div class="pd-rate-preview" id="pd-rate-preview"></div>
@@ -1366,16 +1366,18 @@ function openAddAttachmentModal(extras, ref) {
     title: m.attachTitle,
     width: 480,
     bodyHtml: `
+      <div class="modal-form">
       <label class="filters-field">
-        <span class="filters-field-label">${m.attachFileLabel}</span>
+        <span class="filters-field-label">${m.attachFileLabel}<span class="req-star">*</span></span>
         <input type="file" id="pd-attach-file" />
       </label>
       <div class="form-error" id="pd-attach-file-error" hidden>${m.attachFileRequired}</div>
       <label class="filters-field">
-        <span class="filters-field-label">${m.attachLabel}</span>
+        <span class="filters-field-label">${m.attachLabel}<span class="req-star">*</span></span>
         <input class="address-form-input" type="text" id="pd-attach-name" placeholder="${m.attachLabel}" />
       </label>
       <div class="form-error" id="pd-attach-name-error" hidden>${m.attachRequired}</div>
+      </div>
     `,
     footerHtml: `
       <button type="button" class="btn-secondary" id="pd-attach-cancel">${c.cancel}</button>

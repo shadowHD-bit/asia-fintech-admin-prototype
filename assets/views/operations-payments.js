@@ -1412,14 +1412,12 @@ function pcClientsWithAccounts() {
 // Поиск клиента по имени/ID среди клиентов с реальным счётом (не только тех,
 // что уже встречались в платежах — иначе только что заведённого клиента было
 // бы не найти); typeFilter сужает до физ- или юрлиц (по карточке "Тип клиента").
-function paymentClientSearchOptions(query, typeFilter) {
-  const q = query.trim().toLowerCase();
+// Все клиенты с активными счетами (без лимита), опционально по типу (INDIVIDUAL/CORPORATE)
+function pcClientCandidates(typeFilter) {
   const withAccounts = pcClientsWithAccounts();
   const users = CLIENTS_USERS_MOCK.filter((u) => withAccounts.has(u.id)).map((u) => ({ id: u.id, type: "INDIVIDUAL", name: u.fullName || u.email }));
   const companies = CLIENTS_COMPANIES_MOCK.filter((c) => withAccounts.has(c.id)).map((c) => ({ id: c.id, type: "CORPORATE", name: c.name }));
-  const all = typeFilter === "CORPORATE" ? companies : typeFilter === "INDIVIDUAL" ? users : [...users, ...companies];
-  const filtered = q ? all.filter((x) => x.name.toLowerCase().includes(q) || x.id.toLowerCase().includes(q)) : all;
-  return filtered.slice(0, 30);
+  return typeFilter === "CORPORATE" ? companies : typeFilter === "INDIVIDUAL" ? users : [...users, ...companies];
 }
 
 function paymentClientById(id) {
@@ -1450,65 +1448,26 @@ function pcAccountOptionsForClient(clientId) {
   return options;
 }
 
-function pcClientListHtml(query, typeFilter) {
-  const options = paymentClientSearchOptions(query, typeFilter);
-  if (!options.length) return `<div class="table-cell-muted filter-search-empty">${t("operationsPayments.filters.noMatches")}</div>`;
-  return options
-    .map((o) => `<button type="button" class="filter-search-item" data-pc-pick="${o.id}">${pdEscape(o.name)}<span class="table-cell-muted"> · ${paymentClientTypeLabel(o.type)}</span></button>`)
-    .join("");
-}
-
-function pcClientChipInnerHtml(client) {
-  const c = t("operationsPayments.create");
-  return `<span class="badge badge-neutral">${paymentClientTypeLabel(client.type)}</span><span>${pdEscape(client.name)}</span><button type="button" class="table-link" data-pc-change>${c.senderChange}</button>`;
-}
-
+// Клиент — один mfSelect с поиском (значение — id клиента). Пустой выбор показывает placeholder.
+// Список кандидатов строится при каждой отрисовке шага, поэтому смена типа клиента сразу видна.
 function pcClientPickerHtml(pickerId, label, placeholder, selected, typeFilter) {
+  const options = pcClientCandidates(typeFilter).map((x) => ({ v: x.id, l: pdEscape(`${x.name} · ${paymentClientTypeLabel(x.type)}`) }));
   return `
     <div class="filters-field">
       <span class="filters-field-label">${label}</span>
-      <div class="pc-client-picker">
-        <div class="pc-client-search" id="pc-${pickerId}-search-wrap"${selected ? " hidden" : ""}>
-          <input type="text" class="address-form-input" id="pc-${pickerId}-search" placeholder="${placeholder}" autocomplete="off" />
-          <div class="filter-search-list pc-client-list" id="pc-${pickerId}-list">${pcClientListHtml("", typeFilter)}</div>
-        </div>
-        <div class="pc-client-chip" id="pc-${pickerId}-chip"${selected ? "" : " hidden"}>${selected ? pcClientChipInnerHtml(selected) : ""}</div>
-      </div>
+      ${mfSelect(`pc-${pickerId}`, options, selected ? selected.id : "", true, null, placeholder)}
     </div>
   `;
 }
 
-// onSelect всегда полностью перерисовывает шаг (pcRenderStep) — смена клиента
-// должна пересобрать список его счетов, поэтому точечный патч чипа тут не
-// подходит (в отличие от обычных поисков-фильтров в списке).
-function attachPcClientPicker(modalEl, pickerId, onSelect, getTypeFilter) {
-  const searchInput = modalEl.querySelector(`#pc-${pickerId}-search`);
-  const listEl = modalEl.querySelector(`#pc-${pickerId}-list`);
-  const chipEl = modalEl.querySelector(`#pc-${pickerId}-chip`);
-  if (!searchInput || !listEl) return;
-
-  const bindPicks = () => {
-    listEl.querySelectorAll("[data-pc-pick]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const client = paymentClientById(btn.dataset.pcPick);
-        if (!client) return;
-        onSelect(client);
-      });
-    });
-  };
-
-  const bindChangeBtn = () => {
-    const changeBtn = chipEl.querySelector("[data-pc-change]");
-    if (changeBtn) changeBtn.addEventListener("click", () => onSelect(null));
-  };
-
-  searchInput.addEventListener("input", () => {
-    listEl.innerHTML = pcClientListHtml(searchInput.value, getTypeFilter ? getTypeFilter() : null);
-    bindPicks();
+// onSelect(client) вызывается при выборе; шаг полностью перерисовывается (смена клиента
+// пересобирает список его счетов), поэтому колбэк привязывается через mfSetOnChange.
+function attachPcClientPicker(modalEl, pickerId, onSelect) {
+  if (!modalEl.querySelector(`#pc-${pickerId}`)) return;
+  mfSetOnChange(`pc-${pickerId}`, (value) => {
+    const client = paymentClientById(value);
+    if (client) onSelect(client);
   });
-
-  bindPicks();
-  bindChangeBtn();
 }
 
 // ---- Шаг 1: Направление платежа — определяет РОЛИ сторон (не рельс). Три
@@ -1567,33 +1526,20 @@ function pcReq(label) {
 // остальной части строки выбирает счёт для платежа. Счета клиента в этой
 // форме всегда из ACCOUNTS_VIRTUAL_MOCK (accHref даёт #/accounts-virtual/:id,
 // accounts.js).
+// Значение mfSelect — "accountId:currency" (как и раньше); выбор — через mfSetOnChange(pcAccountSelectId(side), …).
+// В попапе mfSelect ссылок нет, поэтому карточка счёта открывается отдельной ссылкой под полем (data-pc-account-open).
+function pcAccountSelectId(side) {
+  return `pc-${side}-account`;
+}
+
 function pcAccountDropdownHtml(side, options, selected) {
   const c = t("operationsPayments.create");
-  const triggerLabel = selected ? selected.label : c.accountPlaceholder;
+  const selValue = selected ? `${selected.accountId}:${selected.currency}` : "";
+  const opts = options.map((o) => ({ v: o.value, l: pdEscape(o.label) }));
+  const code = selected ? (ACCOUNTS_VIRTUAL_MOCK.find((a) => a.id === selected.accountId) || {}).code || pdShort(selected.accountId) : "";
   return `
-    <div class="pc-dropdown" id="pc-dropdown-${side}-account">
-      <button type="button" class="pc-dropdown-trigger" data-pc-dropdown-toggle="${side}-account">
-        <span>${pdEscape(triggerLabel)}</span>
-        <span class="pc-dropdown-chevron">${FILTER_GROUP_CHEVRON}</span>
-      </button>
-      <div class="pc-dropdown-panel">
-        ${
-          options.length
-            ? options
-                .map((o) => {
-                  const isSelected = selected && selected.accountId === o.accountId && selected.currency === o.currency;
-                  return `
-                    <div class="pc-account-item${isSelected ? " is-selected" : ""}" data-pc-account-pick="${side}:${o.value}">
-                      <span class="badge badge-neutral">${o.currency}</span>
-                      <button type="button" class="table-link" data-pc-account-open="${o.accountId}">${(ACCOUNTS_VIRTUAL_MOCK.find((a) => a.id === o.accountId) || {}).code || pdShort(o.accountId)}</button>
-                      ${isSelected ? `<span class="pc-account-item-check">${CHECK_ICON_SVG}</span>` : ""}
-                    </div>`;
-                })
-                .join("")
-            : `<div class="table-cell-muted" style="padding: var(--space-2) var(--space-3);">${c.notSpecified}</div>`
-        }
-      </div>
-    </div>
+    ${mfSelect(pcAccountSelectId(side), opts, selValue, true, null, c.accountPlaceholder)}
+    ${selected ? `<div style="margin-top: var(--space-1)"><button type="button" class="table-link" data-pc-account-open="${selected.accountId}">${pdEscape(code)}</button></div>` : ""}
   `;
 }
 
@@ -1645,7 +1591,7 @@ function pcSimplePartyHtml(side) {
     ${
       clientType
         ? `<div class="profile-fields-grid profile-fields-grid-2">
-            ${pcClientPickerHtml(side, pcReq(side === "sender" ? c.sender : c.recipientClient), c.senderPlaceholder, client, clientType)}
+            ${pcClientPickerHtml(side, pcReq(side === "sender" ? c.sender : c.recipientClient), c.pickClient, client, clientType)}
             ${
               client
                 ? `<div class="filters-field">
@@ -1672,16 +1618,17 @@ function pcBindSimpleParty(modalEl, side) {
     pcRenderStep(modalEl);
   });
 
-  attachPcClientPicker(
-    modalEl,
-    side,
-    (client) => {
-      pcState[clientKey] = client;
-      pcState[accountKey] = null;
-      pcRenderStep(modalEl);
-    },
-    () => pcState[clientTypeKey]
-  );
+  attachPcClientPicker(modalEl, side, (client) => {
+    pcState[clientKey] = client;
+    pcState[accountKey] = null;
+    pcRenderStep(modalEl);
+  });
+
+  mfSetOnChange(pcAccountSelectId(side), (value) => {
+    const [accountId, currency] = value.split(":");
+    pcState[accountKey] = { accountId, currency, label: `${currency} - ...${accountId.slice(-6)}` };
+    pcRenderStep(modalEl);
+  });
 
   modalEl.querySelectorAll(`[data-pc-account-open]`).forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -1689,14 +1636,6 @@ function pcBindSimpleParty(modalEl, side) {
       const accountId = btn.dataset.pcAccountOpen;
       closeModal();
       window.location.hash = `#/accounts-virtual/${accountId}`;
-    });
-  });
-
-  modalEl.querySelectorAll(`[data-pc-account-pick^="${side}:"]`).forEach((row) => {
-    row.addEventListener("click", () => {
-      const [, accountId, currency] = row.dataset.pcAccountPick.split(":");
-      pcState[accountKey] = { accountId, currency, label: `${currency} - ...${accountId.slice(-6)}` };
-      pcRenderStep(modalEl);
     });
   });
 }
@@ -2458,20 +2397,14 @@ function cwAccounts(clientId) {
   );
 }
 
-function cwDropdownField(id, label, options, selected, placeholder, emptyText) {
-  const sel = options.find((o) => o.value === selected);
-  const items = options.length
-    ? options
-        .map((o) => `<div class="pc-account-item${o.value === selected ? " is-selected" : ""}" data-cw-pick="${id}:${escapeAttr(o.value)}"><span>${pdEscape(o.label)}</span>${o.value === selected ? `<span class="pc-account-item-check">${CHECK_ICON_SVG}</span>` : ""}</div>`)
-        .join("")
-    : `<div class="table-cell-muted" style="padding: var(--space-2) var(--space-3);">${emptyText || ""}</div>`;
+// Поле крипто-мастера — mfSelect (id "cw-<key>", значение — value опции). Выбор обрабатывает cwBind.
+// emptyText показываем под полем, когда список пуст (например, у клиента нет USDT-счёта).
+function cwSelectField(key, label, options, selected, placeholder, emptyText, searchable = true) {
   return `
     <div class="filters-field vb-field">
       <span class="filters-field-label">${label}</span>
-      <div class="pc-dropdown" id="pc-dropdown-cw-${id}">
-        <button type="button" class="pc-dropdown-trigger" data-pc-dropdown-toggle="cw-${id}"><span>${pdEscape(sel ? sel.label : placeholder)}</span><span class="pc-dropdown-chevron">${FILTER_GROUP_CHEVRON}</span></button>
-        <div class="pc-dropdown-panel">${items}</div>
-      </div>
+      ${mfSelect(`cw-${key}`, options.map((o) => ({ v: o.value, l: pdEscape(o.label) })), selected, searchable, null, placeholder)}
+      ${!options.length && emptyText ? `<div class="table-cell-muted">${emptyText}</div>` : ""}
     </div>`;
 }
 
@@ -2506,21 +2439,21 @@ function cwStepHtml() {
   if (s.step === 2) {
     const accs = cwAccounts(s.senderId);
     const acc = accs.find((a) => a.value === s.senderAcc);
-    return `${cwDropdownField("senderId", c.client, clients, s.senderId, c.pick)}
-      ${cwDropdownField("senderAcc", c.account, accs, s.senderAcc, c.pick, s.senderId ? c.noAccounts : "")}
+    return `${cwSelectField("senderId", c.client, clients, s.senderId, c.pick)}
+      ${cwSelectField("senderAcc", c.account, accs, s.senderAcc, c.pick, s.senderId ? c.noAccounts : "")}
       ${acc ? `<div class="table-cell-muted">${c.available}: ${formatPaymentAmount(acc.available)} USDT</div>` : ""}`;
   }
   if (s.step === 3) {
     if (s.op === "WITHDRAWAL") {
       const nets = Object.keys(CW_NETWORK_FEE).map((n) => ({ value: n, label: n }));
-      return `${cwDropdownField("network", c.network, nets, s.network, c.pick)}
+      return `${cwSelectField("network", c.network, nets, s.network, c.pick, "", false)}
         ${vbInput("cw-address", c.address, s.address)}<div class="table-cell-muted">${c.addressHint}</div>
         ${vbInput("cw-tag", c.tag, s.tag)}<div class="table-cell-muted">${c.tagHint}</div>`;
     }
     const others = clients.filter((x) => x.value !== s.senderId);
     const accs = cwAccounts(s.recipientId);
-    return `${cwDropdownField("recipientId", c.recipientClient, others, s.recipientId, c.pick)}
-      ${cwDropdownField("recipientAcc", c.recipientAccount, accs, s.recipientAcc, c.pick, s.recipientId ? c.noAccounts : "")}`;
+    return `${cwSelectField("recipientId", c.recipientClient, others, s.recipientId, c.pick)}
+      ${cwSelectField("recipientAcc", c.recipientAccount, accs, s.recipientAcc, c.pick, s.recipientId ? c.noAccounts : "")}`;
   }
   if (s.step === 4) {
     const acc = cwAccounts(s.senderId).find((a) => a.value === s.senderAcc);
@@ -2634,12 +2567,9 @@ function cwBind(modalEl) {
   const s = cwState;
   const fail = (msg) => { const el = modalEl.querySelector("#cw-error"); if (el) { el.textContent = msg; el.hidden = false; } };
   modalEl.querySelectorAll("[data-cw-op]").forEach((b) => b.addEventListener("click", () => { s.op = b.dataset.cwOp; cwRenderStep(modalEl); }));
-  modalEl.querySelectorAll("[data-cw-pick]").forEach((row) =>
-    row.addEventListener("click", () => {
-      const raw = row.dataset.cwPick;
-      const i = raw.indexOf(":");
-      const key = raw.slice(0, i);
-      const val = raw.slice(i + 1);
+  // Выбор в mfSelect-полях: клиент сбрасывает его счёт, перерисовка шага — как и раньше
+  ["senderId", "senderAcc", "recipientId", "recipientAcc", "network"].forEach((key) =>
+    mfSetOnChange(`cw-${key}`, (val) => {
       s[key] = val;
       if (key === "senderId") s.senderAcc = "";
       if (key === "recipientId") s.recipientAcc = "";
@@ -2685,7 +2615,6 @@ function openCreateCryptoPaymentModal() {
     bodyHtml: `${cwStepperHtml()}<div class="pc-form-stack">${cwStepHtml()}<div class="form-error" id="cw-error" hidden></div></div>`,
     footerHtml: cwFooterHtml(),
     onMount: (modalEl) => {
-      pcBindDropdowns(modalEl);
       cwBind(modalEl);
     },
   });

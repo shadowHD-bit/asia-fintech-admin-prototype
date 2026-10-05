@@ -127,10 +127,10 @@ function vfKybStepRowHtml(st, i) {
   return `<div class="vf-step" data-vf-kyb-step>
     <div class="vf-step-head"><strong>${f.step} ${i + 1}</strong><button type="button" class="btn-secondary vb-row-btn" data-vf-kyb-del title="${f.remove}">${TRASH_ICON_SVG}</button></div>
     <div class="sl-grid">
-      <label class="filters-field vb-field"><span class="filters-field-label">${f.step} *</span><select class="address-form-input" data-vf-kyb-kind>${kinds}</select></label>
-      <label class="filters-field vb-field"><span class="filters-field-label">${vf("fields.order")} *</span><input class="address-form-input" type="text" inputmode="numeric" data-vf-kyb-order value="${escapeAttr(String(st.order))}" /></label>
+      <label class="filters-field vb-field"><span class="filters-field-label">${f.step}<span class="req-star">*</span></span><select class="address-form-input" data-vf-kyb-kind>${kinds}</select></label>
+      <label class="filters-field vb-field"><span class="filters-field-label">${vf("fields.order")}<span class="req-star">*</span></span><input class="address-form-input" type="text" inputmode="numeric" data-vf-kyb-order value="${escapeAttr(String(st.order))}" /></label>
     </div>
-    <label class="filters-field vb-field"><span class="filters-field-label">${vf("fields.name")} *</span><input class="address-form-input" type="text" data-vf-kyb-sname value="${escapeAttr(st.name)}" /></label>
+    <label class="filters-field vb-field"><span class="filters-field-label">${vf("fields.name")}<span class="req-star">*</span></span><input class="address-form-input" type="text" data-vf-kyb-sname value="${escapeAttr(st.name)}" /></label>
   </div>`;
 }
 
@@ -247,8 +247,8 @@ function vfWzMainHtml() {
   const ver = s.service.trim() && /^\d+$/.test(String(s.level)) ? vfWzNextVersion() : "—";
   return `
     <div class="sl-grid-3">
-      ${vbInput("vfw-service", `${vf("fields.service")} *`, s.service, `list="vf-services" ${lock}`)}<datalist id="vf-services">${services.map((x) => `<option value="${escapeAttr(x)}"></option>`).join("")}</datalist>
-      ${vbInput("vfw-level", `${vf("fields.level")} *`, String(s.level), `inputmode="numeric" ${lock}`)}
+      ${vbInput("vfw-service", `${vf("fields.service")}<span class="req-star">*</span>`, s.service, `list="vf-services" ${lock}`)}<datalist id="vf-services">${services.map((x) => `<option value="${escapeAttr(x)}"></option>`).join("")}</datalist>
+      ${vbInput("vfw-level", `${vf("fields.level")}<span class="req-star">*</span>`, String(s.level), `inputmode="numeric" ${lock}`)}
       <label class="filters-field vb-field"><span class="filters-field-label">${w.versionLabel}</span><input class="address-form-input" type="text" id="vfw-version" value="${ver}" disabled /></label>
     </div>
     <p class="table-cell-muted sl-hint">${w.versionHint}</p>
@@ -265,12 +265,12 @@ function vfWzStepRowHtml(st, i) {
   return `<div class="pc-section acw-set">
     <div class="acw-set-head"><span class="acw-set-group-title">${vf("kyc.form.step")} ${i + 1}</span><button type="button" class="icon-btn" data-vfw-remove="${st._row}" title="${vf("kyc.form.remove")}">${TRASH_ICON_SVG}</button></div>
     <div class="acw-set-grid">
-      <div class="filters-field"><span class="filters-field-label">${vf("kyc.form.stepType")} *</span>
+      <div class="filters-field"><span class="filters-field-label">${vf("kyc.form.stepType")}<span class="req-star">*</span></span>
         ${acwMsHtml(`vfw-kind-${st._row}`, w.stepPlaceholder, { single: true, options: kindOptions, get: () => (st.step ? [st.step] : []), set: (v) => { st.step = v[0] || st.step; if (!st.cfgTouched) st.cfgText = JSON.stringify(vfStepDefault(st.step), null, 2); }, onChange: vfWzRender })}
       </div>
-      ${vbInput(`vfw-order-${st._row}`, `${w.order} *`, st.order, 'inputmode="numeric"')}
+      ${vbInput(`vfw-order-${st._row}`, `${w.order}<span class="req-star">*</span>`, st.order, 'inputmode="numeric"')}
     </div>
-    <div class="acw-set-grid">${vbInput(`vfw-sname-${st._row}`, `${vf("fields.name")} *`, st.name)}${vbInput(`vfw-sdesc-${st._row}`, vf("fields.description"), st.description)}</div>
+    <div class="acw-set-grid">${vbInput(`vfw-sname-${st._row}`, `${vf("fields.name")}<span class="req-star">*</span>`, st.name)}${vbInput(`vfw-sdesc-${st._row}`, vf("fields.description"), st.description)}</div>
     ${vbTextarea(`vfw-scfg-${st._row}`, vf("fields.providerConfig"), st.cfgText, 5)}
   </div>`;
 }
@@ -651,8 +651,8 @@ function vfOpenDocForm(doc) {
     title: isEdit ? f.editTitle : f.createTitle,
     width: 600,
     intro: isEdit ? f.editIntro : f.createIntro,
-    fieldsHtml: `${vbInput("vf-name", `${vf("fields.name")} *`, isEdit ? doc.name : "")}
-      <div class="sl-grid">${vbInput("vf-doctype", `${vf("fields.docType")} *`, isEdit ? doc.docType : "", `list="vf-doctypes" ${isEdit ? "disabled" : ""}`)}<datalist id="vf-doctypes">${docTypes.map((v) => `<option value="${escapeAttr(v)}"></option>`).join("")}</datalist>${vbInput("vf-code", vf("fields.code"), isEdit && doc.code ? doc.code : "")}</div>
+    fieldsHtml: `${vbInput("vf-name", `${vf("fields.name")}<span class="req-star">*</span>`, isEdit ? doc.name : "")}
+      <div class="sl-grid">${vbInput("vf-doctype", `${vf("fields.docType")}<span class="req-star">*</span>`, isEdit ? doc.docType : "", `list="vf-doctypes" ${isEdit ? "disabled" : ""}`)}<datalist id="vf-doctypes">${docTypes.map((v) => `<option value="${escapeAttr(v)}"></option>`).join("")}</datalist>${vbInput("vf-code", vf("fields.code"), isEdit && doc.code ? doc.code : "")}</div>
       ${vbInput("vf-desc", vf("fields.description"), isEdit && doc.description ? doc.description : "")}
       <div class="filters-field vb-field"><span class="filters-field-label">${vf("fields.countries")}</span><div class="ac-checklist">${vfCheckboxes(countries, isEdit ? doc.availableCountryIds : [], "data-vf-country")}</div></div>`,
     submitLabel: isEdit ? vt("common.save") : vt("common.create"),
@@ -772,9 +772,9 @@ function vfOpenFieldForm(doc, field) {
     title: field ? m.editTitle : m.addTitle,
     width: 560,
     intro: m.intro,
-    fieldsHtml: `<div class="sl-grid">${vbInput("vf-key", `${vf("fields.key")} *`, field ? field.key : "")}${vbInput("vf-label", `${vf("fields.label")} *`, field ? field.label : "")}</div>
-      ${vbInput("vf-fdesc", `${vf("fields.description")} *`, field ? field.description : "")}
-      <div class="sl-grid">${vbSelect("vf-type", vf("fields.type"), types, field ? field.type : "STRING")}${vbInput("vf-order", `${vf("fields.order")} *`, String(field ? field.order : doc.fieldConfigs.length + 1), 'inputmode="numeric"')}</div>
+    fieldsHtml: `<div class="sl-grid">${vbInput("vf-key", `${vf("fields.key")}<span class="req-star">*</span>`, field ? field.key : "")}${vbInput("vf-label", `${vf("fields.label")}<span class="req-star">*</span>`, field ? field.label : "")}</div>
+      ${vbInput("vf-fdesc", `${vf("fields.description")}<span class="req-star">*</span>`, field ? field.description : "")}
+      <div class="sl-grid">${vbSelect("vf-type", vf("fields.type"), types, field ? field.type : "STRING")}${vbInput("vf-order", `${vf("fields.order")}<span class="req-star">*</span>`, String(field ? field.order : doc.fieldConfigs.length + 1), 'inputmode="numeric"')}</div>
       ${checkbox("vf-active", vf("fields.state"), field ? field.isActive : true)}${checkbox("vf-intable", m.displayInTable, field ? field.displayInTable : false)}`,
     submitLabel: field ? vt("common.save") : vt("common.create"),
     onSubmit: (el) => {
@@ -844,7 +844,7 @@ function vfOpenCategoryForm(cat) {
   vbOpenForm({
     title: cat ? m.editTitle : m.addTitle,
     intro: cat && vfCategoryUsed(cat) ? m.kycWarning(pdEscape(cat.name)) : null,
-    fieldsHtml: `${vbInput("vf-name", `${vf("fields.name")} *`, cat ? cat.name : "")}${vbInput("vf-desc", vf("fields.description"), cat && cat.description ? cat.description : "")}`,
+    fieldsHtml: `${vbInput("vf-name", `${vf("fields.name")}<span class="req-star">*</span>`, cat ? cat.name : "")}${vbInput("vf-desc", vf("fields.description"), cat && cat.description ? cat.description : "")}`,
     submitLabel: cat ? vt("common.save") : vt("common.create"),
     onSubmit: (el) => {
       const name = el.querySelector("#vf-name").value.trim();

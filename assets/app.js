@@ -63,11 +63,9 @@ const NAV_TREE = [
     icon: "analytics",
     children: [
       { id: "analytics-users", icon: "user" },
-      { id: "analytics-operations", icon: "operations" },
+      { id: "analytics-ops", icon: "operations" },
       { id: "analytics-accounts", icon: "accounts" },
-      { id: "analytics-eod", icon: "box" },
       { id: "analytics-events", icon: "security" },
-      { id: "analytics-routing", icon: "exchange" },
     ],
   },
   {
@@ -79,15 +77,6 @@ const NAV_TREE = [
       { id: "operations-crypto-payments", icon: "payments" },
       { id: "operations-exchanges", icon: "exchange" },
       { id: "operations-otc", icon: "otc" },
-    ],
-  },
-  {
-    id: "eod",
-    icon: "operations",
-    children: [
-      { id: "eod-dashboard", icon: "analytics" },
-      { id: "eod-discrepancies", icon: "security" },
-      { id: "eod-history", icon: "box" },
     ],
   },
   {
@@ -103,6 +92,15 @@ const NAV_TREE = [
       { id: "accounts-virtual", icon: "accounts" },
       { id: "accounting-coa", icon: "box" },
       { id: "financial-reports", icon: "box" },
+    ],
+  },
+  {
+    id: "eod",
+    icon: "operations",
+    children: [
+      { id: "eod-dashboard", icon: "analytics" },
+      { id: "eod-discrepancies", icon: "security" },
+      { id: "eod-history", icon: "box" },
     ],
   },
   {
@@ -877,7 +875,7 @@ function openPasswordChangeModal() {
   openModal({
     title: p.changeTitle,
     width: 440,
-    bodyHtml: `<div class="login-form">${inp("pw-old", p.old, "current-password")}${inp("pw-new", p.new, "new-password")}${inp("pw-new2", p.repeat, "new-password")}${loginRulesHtml()}${loginCaptchaHtml()}<div class="form-error login-error" id="pw-error" hidden></div></div>`,
+    bodyHtml: `<div class="login-form">${inp("pw-old", `${p.old}<span class="req-star">*</span>`, "current-password")}${inp("pw-new", `${p.new}<span class="req-star">*</span>`, "new-password")}${inp("pw-new2", `${p.repeat}<span class="req-star">*</span>`, "new-password")}${loginRulesHtml()}${loginCaptchaHtml()}<div class="form-error login-error" id="pw-error" hidden></div></div>`,
     footerHtml: `<button type="button" class="btn-secondary" id="pw-cancel">${p.cancel}</button><button type="button" class="btn-primary" id="pw-save">${p.save}</button>`,
     onMount: (el) => {
       el.querySelector("#pw-cancel").addEventListener("click", closeModal);
@@ -925,7 +923,7 @@ function openPasswordNewModal() {
   openModal({
     title: p.resetTitle,
     width: 440,
-    bodyHtml: `<div class="login-form">${inp("pw-new", p.new)}${inp("pw-new2", p.repeat)}${loginRulesHtml()}${loginCaptchaHtml()}<div class="form-error login-error" id="pw-error" hidden></div></div>`,
+    bodyHtml: `<div class="login-form">${inp("pw-new", `${p.new}<span class="req-star">*</span>`)}${inp("pw-new2", `${p.repeat}<span class="req-star">*</span>`)}${loginRulesHtml()}${loginCaptchaHtml()}<div class="form-error login-error" id="pw-error" hidden></div></div>`,
     footerHtml: `<button type="button" class="btn-secondary" id="pw-cancel">${p.cancel}</button><button type="button" class="btn-primary" id="pw-save">${p.save}</button>`,
     onMount: (el) => {
       el.querySelector("#pw-cancel").addEventListener("click", closeModal);
@@ -1001,6 +999,7 @@ function viewLoggedOut() {
 // ---- Роутер -------------------------------------------------------------------------
 function currentRouteId() {
   const hash = window.location.hash.replace(/^#\/?/, "");
+  if (/^analytics-(ops(\/.+)?|operations|eod|routing)$/.test(hash)) return "analytics-ops";
   if (/^clients-users\/.+/.test(hash)) return "clients-users-detail";
   if (/^clients-companies\/.+/.test(hash)) return "clients-companies-detail";
   if (/^accounting-coa\/.+/.test(hash)) return "accounting-coa-detail";
@@ -1129,9 +1128,6 @@ function render() {
   } else if (routeId === "settings-routing-execution") {
     content.innerHTML = viewExecutionDetail(rgExecutionRef());
     initExecutionDetail();
-  } else if (routeId === "analytics-routing") {
-    content.innerHTML = viewAnalyticsRouting();
-    initAnalyticsRouting();
   } else if (routeId === "settings-routing-rule") {
     const rid = rgRuleRef();
     content.innerHTML = viewRuleDetail(rid);
@@ -1226,15 +1222,12 @@ function render() {
   } else if (routeId === "analytics-users") {
     content.innerHTML = viewAnalyticsUsers();
     initAnalyticsUsers();
-  } else if (routeId === "analytics-operations") {
-    content.innerHTML = viewAnalyticsOperations();
-    initAnalyticsOperations();
+  } else if (routeId === "analytics-ops") {
+    content.innerHTML = viewAnalyticsOps();
+    initAnalyticsOps();
   } else if (routeId === "analytics-accounts") {
     content.innerHTML = viewAnalyticsAccounts();
     initAnalyticsAccounts();
-  } else if (routeId === "analytics-eod") {
-    content.innerHTML = viewAnalyticsEod();
-    initAnalyticsEod();
   } else if (routeId === "analytics-events") {
     content.innerHTML = viewAnalyticsEvents();
     initAnalyticsEvents();

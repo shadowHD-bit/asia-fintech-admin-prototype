@@ -1422,9 +1422,10 @@ select.address-form-input {
 .mf-popup-empty { padding: 8px 12px; color: var(--color-text-tertiary); font-size: var(--font-size-sm); }
 
 
-/* Убираем двойной отступ (margin-bottom + gap) под лейблом в .modal-form и vb-field */
-.modal-form .filters-field { gap: 4px; }
-.modal-form .filters-field-label { margin-bottom: 0 !important; }
+/* .vb-field вне модалок — блочный элемент с margin-top у соседей (.vb-field + .vb-field),
+   внутри .modal-form это бы задвоило отступ с gap самого .modal-form — возвращаем
+   обычное флекс-поведение .filters-field, межполевой отступ тогда только один раз,
+   от gap родителя .modal-form. */
 .modal-form .vb-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 
 /* Нативный <input type="file"> без класса (модалка вложений и т.п.) — тот же
@@ -6559,11 +6560,16 @@ body.is-auth .content { padding: 0; }
 .a2f-hint { margin-top: 12px; }
 .a2f-resend { margin-top: 4px; flex-wrap: wrap; }
 .a2f-resend .table-link, .login-resend .table-link { padding: 0; background: none; border: 0; cursor: pointer; }
-.modal-body .filters-field-label { font-size: 13px; font-weight: 600; color: inherit; margin-bottom: 8px; display: block; }
+/* Отступ подпись→поле внутри модалок — всегда маленький (0, флекс-гап .filters-field
+   уже даёт 4px), одинаково что в .modal-form, что в .address-form-grid, что без
+   обёртки вовсе. Раньше здесь было два конфликтующих правила (8px и 10px) — второе
+   побеждало и давало непарный, "рваный" отступ подпись→поле именно там, где не было
+   компенсирующего .modal-form .filters-field-label{margin-bottom:0!important} — теперь
+   компенсировать нечего, поведение одно на всё приложение. */
+.modal-body .filters-field-label { font-size: 13px; font-weight: 600; color: inherit; margin-bottom: 0; display: block; }
 .modal-body .login-otp-cell { font-family: inherit; }
 .modal-body .modal-confirm-text { font-family: inherit; font-size: 14px; line-height: 1.5; color: var(--color-text, #1a2233); margin: 0 0 20px; }
 .modal-body .filters-field.vb-field { display: block; min-width: 0; }
-.modal-body .filters-field-label { margin-bottom: 10px; }
 .modal-body .login-otp { width: 100%; }
 .modal-body .login-otp-cell { min-width: 0; width: 100%; box-sizing: border-box; padding: 0; }
 .a2f-resend { margin-top: 14px; }

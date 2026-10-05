@@ -209,9 +209,9 @@ function slIndividualFields(r) {
   const f = sl("fields");
   const v = (x) => (x == null ? "" : String(x));
   return `<div class="sl-section-title">${sl("form.ru")}</div>
-    <div class="sl-grid">${vbInput("sl-last", `${f.lastName} *`, v(r && r.lastName))}${vbInput("sl-first", `${f.firstName} *`, v(r && r.firstName))}${vbInput("sl-middle", f.middleName, v(r && r.middleName))}</div>
+    <div class="sl-grid">${vbInput("sl-last", `${f.lastName}<span class="req-star">*</span>`, v(r && r.lastName))}${vbInput("sl-first", `${f.firstName}<span class="req-star">*</span>`, v(r && r.firstName))}${vbInput("sl-middle", f.middleName, v(r && r.middleName))}</div>
     <div class="sl-section-title">${sl("form.en")}</div>
-    <div class="sl-grid">${vbInput("sl-last-en", `${f.lastNameEn} *`, v(r && r.lastNameEn))}${vbInput("sl-first-en", `${f.firstNameEn} *`, v(r && r.firstNameEn))}${vbInput("sl-middle-en", f.middleNameEn, v(r && r.middleNameEn))}</div>
+    <div class="sl-grid">${vbInput("sl-last-en", `${f.lastNameEn}<span class="req-star">*</span>`, v(r && r.lastNameEn))}${vbInput("sl-first-en", `${f.firstNameEn}<span class="req-star">*</span>`, v(r && r.firstNameEn))}${vbInput("sl-middle-en", f.middleNameEn, v(r && r.middleNameEn))}</div>
     <div class="sl-section-title">${sl("form.dob")}</div>
     <div class="sl-grid sl-grid-3">${vbInput("sl-day", f.dobDay, v(r && r.dobDay), 'inputmode="numeric" placeholder="дд"')}${vbInput("sl-month", f.dobMonth, v(r && r.dobMonth), 'inputmode="numeric" placeholder="мм"')}${vbInput("sl-year", f.dobYear, v(r && r.dobYear), 'inputmode="numeric" placeholder="гггг"')}</div>
     <div class="sl-section-title">${sl("form.place")}</div>
@@ -242,7 +242,7 @@ function slReadIndividual(el) {
 function slCompanyFields(r) {
   const f = sl("fields");
   const v = (x) => (x == null ? "" : String(x));
-  return `${vbInput("sl-name", `${f.name} *`, v(r && r.name))}${vbInput("sl-name-en", f.nameEn, v(r && r.nameEn))}
+  return `${vbInput("sl-name", `${f.name}<span class="req-star">*</span>`, v(r && r.name))}${vbInput("sl-name-en", f.nameEn, v(r && r.nameEn))}
     <div class="sl-grid sl-grid-3">${vbInput("sl-reg", f.regNumber, v(r && r.registrationNumber))}${vbInput("sl-tin", f.tin, v(r && r.tin))}${vbInput("sl-okpo", f.okpo, v(r && r.okpo))}</div>
     <div class="sl-grid">${vbSelect("sl-country", f.country, slCountryOptions(), r && r.countryId ? r.countryId : "")}${vbInput("sl-activity", f.activity, v(r && r.activityCode))}</div>
     ${vbInput("sl-founder", f.founder, v(r && r.founderFullName))}${vbInput("sl-address", f.address, v(r && r.address))}

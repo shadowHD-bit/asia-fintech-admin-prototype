@@ -83,11 +83,11 @@ function ktStepRowHtml(data) {
     <div class="vf-step-head"><strong class="kt-step-no"></strong>
       <span class="vf-step-tools"><button type="button" class="btn-secondary vb-row-btn" data-kt-up>↑</button><button type="button" class="btn-secondary vb-row-btn" data-kt-down>↓</button><button type="button" class="btn-secondary vb-row-btn" data-kt-del title="${kt("configs.form.remove")}">${TRASH_ICON_SVG}</button></span></div>
     <div class="sl-grid">
-      <label class="filters-field vb-field"><span class="filters-field-label">${kt("fields.stepProvider")} *</span><select class="address-form-input" data-kt-provider>${providers}</select></label>
-      <label class="filters-field vb-field"><span class="filters-field-label">${kt("fields.name")} *</span><input class="address-form-input" type="text" data-kt-sname value="${escapeAttr(data.name || "")}" /></label>
+      <label class="filters-field vb-field"><span class="filters-field-label">${kt("fields.stepProvider")}<span class="req-star">*</span></span><select class="address-form-input" data-kt-provider>${providers}</select></label>
+      <label class="filters-field vb-field"><span class="filters-field-label">${kt("fields.name")}<span class="req-star">*</span></span><input class="address-form-input" type="text" data-kt-sname value="${escapeAttr(data.name || "")}" /></label>
     </div>
     <label class="filters-field vb-field"><span class="filters-field-label">${kt("fields.description")}</span><input class="address-form-input" type="text" data-kt-sdesc value="${escapeAttr(data.description || "")}" /></label>
-    <label class="filters-field vb-field"><span class="filters-field-label">${kt("fields.format")} *</span><textarea class="form-textarea vb-mono" data-kt-sfmt rows="5">${pdEscape(JSON.stringify(data.format || {}, null, 2))}</textarea></label>
+    <label class="filters-field vb-field"><span class="filters-field-label">${kt("fields.format")}<span class="req-star">*</span></span><textarea class="form-textarea vb-mono" data-kt-sfmt rows="5">${pdEscape(JSON.stringify(data.format || {}, null, 2))}</textarea></label>
     <label class="filters-field vb-field"><span class="filters-field-label">${kt("fields.providerData")}</span><textarea class="form-textarea vb-mono" data-kt-sdata rows="3">${pdEscape(data.providerData ? JSON.stringify(data.providerData, null, 2) : "")}</textarea></label>
   </div>`;
 }
@@ -103,9 +103,9 @@ function ktOpenConfigForm(base) {
     title: isVersion ? f.versionTitle : f.createTitle,
     width: 780,
     bodyHtml: `<p class="modal-confirm-text pd-modal-intro">${isVersion ? f.versionIntro(pdEscape(b.name), b.configVersion + 1) : f.createIntro}</p>
-      <div class="sl-grid">${vbInput("kt-name", `${kt("fields.name")} *`, b.name, isVersion ? "disabled" : "")}${vbInput("kt-type", `${kt("fields.type")} *`, b.type)}</div>
+      <div class="sl-grid">${vbInput("kt-name", `${kt("fields.name")}<span class="req-star">*</span>`, b.name, isVersion ? "disabled" : "")}${vbInput("kt-type", `${kt("fields.type")}<span class="req-star">*</span>`, b.type)}</div>
       ${vbInput("kt-desc", kt("fields.description"), b.description || "")}
-      ${vbTextarea("kt-schema", `${kt("fields.schema")} *`, JSON.stringify(b.schema, null, 2), 10)}
+      ${vbTextarea("kt-schema", `${kt("fields.schema")}<span class="req-star">*</span>`, JSON.stringify(b.schema, null, 2), 10)}
       <p class="table-cell-muted sl-hint">${f.schemaHint}</p>
       <div class="sl-section-title">${kt("fields.notify")}</div>
       ${vbInput("kt-exchange", kt("fields.exchange"), b.notify.rmq.exchange || "")}
@@ -224,7 +224,7 @@ function ktOpenStepEdit(c, s) {
     title: f.title,
     width: 620,
     intro: f.intro,
-    fieldsHtml: `${vbInput("kt-sdesc", kt("fields.description"), s.description || "")}${vbTextarea("kt-sfmt", `${kt("fields.format")} *`, JSON.stringify(s.format, null, 2), 12)}`,
+    fieldsHtml: `${vbInput("kt-sdesc", kt("fields.description"), s.description || "")}${vbTextarea("kt-sfmt", `${kt("fields.format")}<span class="req-star">*</span>`, JSON.stringify(s.format, null, 2), 12)}`,
     submitLabel: vt("common.save"),
     danger: true,
     onSubmit: (el) => {
@@ -722,7 +722,7 @@ function ktOpenDecision(x) {
     intro: m.intro(pdEscape(step.scoringOutput ? String(step.score) : "—")),
     fieldsHtml: `${vbSelect("kt-dec", m.decision, [{ value: "MANUAL_SUCCESS", label: m.approve }, { value: "MANUAL_FAILED", label: m.reject }], "MANUAL_SUCCESS")}
       ${vbSelect("kt-risk", m.riskClass, risks, step.riskClass || "SUSPICIOUS")}
-      ${vbTextarea("kt-comment", m.comment, "", 3)}`,
+      ${vbTextarea("kt-comment", `${m.comment}<span class="req-star">*</span>`, "", 3)}`,
     submitLabel: m.submit,
     onSubmit: (el) => {
       const status = el.querySelector("#kt-dec").value;

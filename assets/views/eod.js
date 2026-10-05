@@ -865,12 +865,12 @@ function edAdjStepMainHtml() {
   const s = edAdjState;
   return `
     <div class="filters-field">
-      <span class="filters-field-label">${c.clientId} *</span>
+      <span class="filters-field-label">${c.clientId}<span class="req-star">*</span></span>
       ${acwMsHtml("adj-client", c.clientPlaceholder, { single: true, options: edAdjClientOptions, get: () => (s.clientId ? [s.clientId] : []), set: (v) => { s.clientId = v[0] || null; }, onChange: edAdjRenderStep })}
     </div>
     <div class="sl-grid">
       ${vbInput("adj-ext", c.externalId, s.externalOperationId)}
-      ${vbInput("adj-name", `${c.name} *`, s.name)}
+      ${vbInput("adj-name", `${c.name}<span class="req-star">*</span>`, s.name)}
     </div>
     ${vbTextarea("adj-desc", c.description, s.description, 2)}
     ${vbTextarea("adj-meta", c.metadata, s.metadataText, 4)}
@@ -900,12 +900,12 @@ function edAdjLegRowHtml(kind, leg) {
   return `<div class="pc-section acw-set">
     ${head(false)}
     <div class="acw-set-grid">
-      ${msField(`adj-${kind}-cur-${leg._row}`, `${c.currency} *`, c.selectPlaceholder, curOptions, () => (leg.currency ? [leg.currency] : []), (v) => { leg.currency = v[0] || ""; })}
-      ${msField(`adj-${kind}-acc-${leg._row}`, `${kind === "real" ? c.realAccount : c.virtualAccount} *`, c.selectPlaceholder, accOptions, () => (leg.accountId ? [leg.accountId] : []), (v) => { leg.accountId = v[0] || ""; })}
+      ${msField(`adj-${kind}-cur-${leg._row}`, `${c.currency}<span class="req-star">*</span>`, c.selectPlaceholder, curOptions, () => (leg.currency ? [leg.currency] : []), (v) => { leg.currency = v[0] || ""; })}
+      ${msField(`adj-${kind}-acc-${leg._row}`, `${kind === "real" ? c.realAccount : c.virtualAccount}<span class="req-star">*</span>`, c.selectPlaceholder, accOptions, () => (leg.accountId ? [leg.accountId] : []), (v) => { leg.accountId = v[0] || ""; })}
     </div>
     <div class="acw-set-grid">
-      ${vbInput(`adj-${kind}-amt-${leg._row}`, `${c.amount} *`, leg.amount)}
-      ${msField(`adj-${kind}-side-${leg._row}`, `${c.transferType} *`, c.selectPlaceholder, sideOptions, () => (leg.transferType ? [leg.transferType] : []), (v) => { leg.transferType = v[0] || "DEBIT"; })}
+      ${vbInput(`adj-${kind}-amt-${leg._row}`, `${c.amount}<span class="req-star">*</span>`, leg.amount)}
+      ${msField(`adj-${kind}-side-${leg._row}`, `${c.transferType}<span class="req-star">*</span>`, c.selectPlaceholder, sideOptions, () => (leg.transferType ? [leg.transferType] : []), (v) => { leg.transferType = v[0] || "DEBIT"; })}
     </div>
     <div class="acw-set-grid">
       ${vbInput(`adj-${kind}-ptx-${leg._row}`, c.providerTx, leg.providerTxId)}
@@ -1686,12 +1686,12 @@ function eodOpenConfigForm() {
     width: 560,
     intro: m.intro,
     fieldsHtml: `${vbSelect("ed-cfg-init", f.initializingProcess, EOD_CLOSE_TYPES.map((v) => ({ value: v, label: eodEnum("closeType", v) })), c.initializingProcess)}
-      <div class="sl-grid">${vbInput("ed-cfg-cutoff", `${f.cutoffTime} *`, c.cutoffTime, 'placeholder="23:40"')}${vbSelect("ed-cfg-tz", f.cutoffTimezone, zones.map((z) => ({ value: z, label: z })), c.cutoffTimezone)}</div>
-      ${vbInput("ed-cfg-delay", `${f.delay} (${ed("units.minutes")}) *`, String(c.nonFinalOperationsDelayMinutes))}
+      <div class="sl-grid">${vbInput("ed-cfg-cutoff", `${f.cutoffTime}<span class="req-star">*</span>`, c.cutoffTime, 'placeholder="23:40"')}${vbSelect("ed-cfg-tz", f.cutoffTimezone, zones.map((z) => ({ value: z, label: z })), c.cutoffTimezone)}</div>
+      ${vbInput("ed-cfg-delay", `${f.delay} (${ed("units.minutes")})<span class="req-star">*</span>`, String(c.nonFinalOperationsDelayMinutes))}
       ${eodChecklist("ed-cfg-weekends", f.activeInWeekends, c.activeInWeekends)}${eodChecklist("ed-cfg-holidays", f.activeInHolidays, c.activeInHolidays)}
       ${vbTextarea("ed-cfg-holidayDates", f.holidayDates, c.holidayDates.join("\n"), 3)}<p class="table-cell-muted sl-hint">${m.holidaysHint}</p>
       ${eodChecklist("ed-cfg-retries", f.allowStageRetries, c.allowStageRetries)}
-      <div class="sl-grid">${vbInput("ed-cfg-max", `${f.maxRetries} *`, String(c.maxRetries))}${vbInput("ed-cfg-backoff", `${f.retryBackoff} (${ed("units.minutes")}) *`, String(c.retryBackoffMinutes))}</div>`,
+      <div class="sl-grid">${vbInput("ed-cfg-max", `${f.maxRetries}<span class="req-star">*</span>`, String(c.maxRetries))}${vbInput("ed-cfg-backoff", `${f.retryBackoff} (${ed("units.minutes")})<span class="req-star">*</span>`, String(c.retryBackoffMinutes))}</div>`,
     submitLabel: vt("common.save"),
     onSubmit: (el) => {
       const cutoff = el.querySelector("#ed-cfg-cutoff").value.trim();
