@@ -129,7 +129,7 @@ function matchesUserFilters(row, { ignoreStatus } = {}) {
   const search = s.search.trim().toLowerCase();
 
   if (search) {
-    const haystack = `${row.fullName} ${row.email || ""} ${row.phone || ""} ${row.id} ${row.code || ""}`.toLowerCase();
+    const haystack = `${row.fullName || ""} ${row.email || ""} ${row.phone || ""} ${row.id} ${row.code || ""}`.toLowerCase();
     if (!haystack.includes(search)) return false;
   }
   if (s.countryIds.length && !s.countryIds.includes(row.residenceCountryId)) return false;
@@ -169,8 +169,8 @@ function sortClientsUsers(list) {
     if (sortBy === "createdAt") return (a.createdDate - b.createdDate) * dir;
     if (sortBy === "updatedAt") return (a.updatedDate - b.updatedDate) * dir;
 
-    const va = sortBy === "identity" ? (a.email || a.phone || "") : a.fullName;
-    const vb = sortBy === "identity" ? (b.email || b.phone || "") : b.fullName;
+    const va = sortBy === "identity" ? (a.email || a.phone || "") : (a.fullName || "");
+    const vb = sortBy === "identity" ? (b.email || b.phone || "") : (b.fullName || "");
     return va.toLowerCase().localeCompare(vb.toLowerCase()) * dir;
   });
 }
@@ -335,7 +335,7 @@ function renderClientsUsersFilters() {
     <div class="filters-bar-compact">
       <div class="filters-search">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5.5"/><path d="m17 17-3.5-3.5"/></svg>
-        <input type="text" id="cu-filter-search" placeholder="${f.searchPlaceholder}" value="${clientsUsersState.search}" />
+        <input type="text" id="cu-filter-search" placeholder="${f.searchPlaceholder}" value="${escapeAttr(clientsUsersState.search)}" />
         <button type="button" class="filters-search-clear" id="cu-filter-search-clear"${hasSearch ? "" : " hidden"}>
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 6 8 8M14 6l-8 8"/></svg>
         </button>
@@ -917,7 +917,7 @@ function sectionCard(title, contentHtml, extraClass, headRight) {
 
 // Иконка-кнопка копирования рядом со значением (email/телефон) — без текста
 function copyIconButton(value) {
-  return `<button type="button" class="copy-icon-btn" data-copy-value="${value}" title="${t("clientsUsers.copy")}">${COPY_ICON_SVG}</button>`;
+  return `<button type="button" class="copy-icon-btn" data-copy-value="${escapeAttr(value)}" title="${t("clientsUsers.copy")}">${COPY_ICON_SVG}</button>`;
 }
 
 function renderClientsUsersRow(row) {
@@ -932,24 +932,24 @@ function renderClientsUsersRow(row) {
       <td>
         <div class="identity-cell">
           <div class="identity-cell-primary">
-            <button type="button" class="table-link identity-link" data-user-id="${row.id}">${row.email}</button>
+            <button type="button" class="table-link identity-link" data-user-id="${escapeAttr(row.id)}">${pdEscape(row.email || "—")}</button>
             ${copyIconButton(row.email)}
           </div>
           <div class="identity-cell-sub">
             <span class="identity-cell-tag">${t("clientsUsers.idTag")}</span>
-            <button type="button" class="id-copy" data-copy-value="${row.code}" title="${t("clientsUsers.copy")}">
-              <span class="id-copy-label">${row.code}</span>
+            <button type="button" class="id-copy" data-copy-value="${escapeAttr(row.code)}" title="${t("clientsUsers.copy")}">
+              <span class="id-copy-label">${pdEscape(row.code)}</span>
               ${COPY_ICON_SVG}
             </button>
           </div>
           ${svc ? `<div class="identity-cell-sub"><span class="identity-cell-tag">${t("clientsUsers.partnerTag")}</span>${vbLink(`#/clients-partners/${svc.id}`, pdEscape(svc.name))}</div>` : ""}
         </div>
       </td>
-      <td>${(() => { const b = !!(row.blockReasons && row.blockReasons.length); const l = t(b ? "clientDetail.blocked" : "clientDetail.active"); return `<span class="user-name-cell"><span class="status-dot ${b ? "is-blocked" : "is-active"}" title="${l}" aria-label="${l}"></span><span>${row.fullName}</span></span>`; })()}</td>
+      <td>${(() => { const b = !!(row.blockReasons && row.blockReasons.length); const l = t(b ? "clientDetail.blocked" : "clientDetail.active"); return `<span class="user-name-cell"><span class="status-dot ${b ? "is-blocked" : "is-active"}" title="${l}" aria-label="${l}"></span><span>${row.fullName ? pdEscape(row.fullName) : "—"}</span></span>`; })()}</td>
       <td>
         ${
           row.phone
-            ? `<div class="inline-copy"><span>${row.phone}</span>${copyIconButton(row.phone)}</div>`
+            ? `<div class="inline-copy"><span>${pdEscape(row.phone)}</span>${copyIconButton(row.phone)}</div>`
             : "—"
         }
       </td>
@@ -1241,7 +1241,7 @@ function exportClientsUsers(format) {
   const x = t("clientsUsers.export");
   const rows = sortClientsUsers(getFilteredClientsUsers().slice()).map((r) => {
     const country = findCountry(r.residenceCountryId);
-    return [r.email, r.code, r.fullName, r.phone || "", country ? country.name : "", kycStatusLabel(r.kycStatus), kycLevelLabel(r.kycConfigName), r.createdAt, r.updatedAt];
+    return [r.email, r.code, r.fullName || "", r.phone || "", country ? country.name : "", kycStatusLabel(r.kycStatus), kycLevelLabel(r.kycConfigName), r.createdAt, r.updatedAt];
   });
   exportTable(`users_${new Date().toISOString().slice(0, 10)}`, format, x.columns, rows);
   showToast(x.done(rows.length));
@@ -1368,9 +1368,9 @@ function renderClientDetailHeader(user) {
   const isExternal = isExternalService(user.service);
 
   const subtitleParts = [
-    titleIsEmail ? null : `<span class="inline-copy">${user.email}${copyIconButton(user.email)}</span>`,
-    `<span class="inline-copy">ID: ${user.code}${copyIconButton(user.code)}</span>`,
-    user.phone ? `<span class="inline-copy">${user.phone}${copyIconButton(user.phone)}</span>` : null,
+    titleIsEmail ? null : `<span class="inline-copy">${pdEscape(user.email)}${copyIconButton(user.email)}</span>`,
+    `<span class="inline-copy">ID: ${pdEscape(user.code)}${copyIconButton(user.code)}</span>`,
+    user.phone ? `<span class="inline-copy">${pdEscape(user.phone)}${copyIconButton(user.phone)}</span>` : null,
   ].filter(Boolean);
 
   return `
@@ -1381,7 +1381,7 @@ function renderClientDetailHeader(user) {
       ${cdAvatar(titleIsEmail ? user.email : user.fullName)}
       <div class="client-detail-header-main">
         <div class="client-detail-title-row">
-          <span class="page-title">${titleIsEmail ? user.email : user.fullName}</span>
+          <span class="page-title">${pdEscape(titleIsEmail ? user.email : user.fullName)}</span>
           <span class="badge ${isBlocked ? "badge-danger" : "badge-success"}">${isBlocked ? cd.blocked : cd.active}</span>
           <span class="badge badge-neutral">${isExternal ? cd.externalClient : cd.internalClient}</span>
         </div>

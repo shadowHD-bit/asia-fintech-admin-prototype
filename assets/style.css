@@ -892,11 +892,18 @@ body.docs-view-open {
 }
 .docs-view-block-text ul,
 .docs-view-block-text ol {
-  margin: var(--space-2) 0 0;
+  margin: var(--space-2) 0 var(--space-3);
   padding-left: var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
+}
+.docs-view-block-text ul ul,
+.docs-view-block-text ol ol,
+.docs-view-block-text ul ol,
+.docs-view-block-text ol ul {
+  margin: var(--space-1) 0 0;
+  gap: var(--space-1);
 }
 .docs-view-block-text li {
   line-height: var(--line-height-base);
@@ -904,6 +911,12 @@ body.docs-view-open {
 .docs-view-block-text br + ol,
 .docs-view-block-text br + ul {
   margin-top: var(--space-2);
+}
+.docs-view-block-text mark.docs-todo {
+  background: #fff4d6;
+  color: inherit;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
 }
 .docs-view-block pre.mermaid {
   margin-top: var(--space-4);

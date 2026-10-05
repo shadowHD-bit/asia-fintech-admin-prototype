@@ -506,7 +506,7 @@ function openSectionDocsView() {
   document.getElementById("docs-view-eyebrow").textContent = SECTION_DOCS_COMMON.eyebrow;
   document.getElementById("docs-view-title").textContent = doc.title;
   document.getElementById("docs-view-body").innerHTML = `<p class="docs-view-intro">${doc.intro}</p>${doc.blocks
-    .map((b) => `<div class="docs-view-block"><h2 class="docs-view-block-heading">${b.heading}</h2>${b.mermaid ? `<pre class="mermaid">${b.mermaid}</pre>` : `<div class="docs-view-block-text">${b.text}</div>`}</div>`)
+    .map((b) => `<div class="docs-view-block"><h2 class="docs-view-block-heading">${b.heading}</h2>${b.text ? `<div class="docs-view-block-text">${b.text.replace(/==(.+?)==/g, '<mark class="docs-todo">$1</mark>')}</div>` : ""}${b.mermaid ? `<pre class="mermaid">${b.mermaid}</pre>` : ""}</div>`)
     .join("")}`;
   document.getElementById("docs-view").classList.add("is-open");
   document.body.classList.add("docs-view-open");

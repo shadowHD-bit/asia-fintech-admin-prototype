@@ -620,14 +620,14 @@ function renderClientsCompaniesRow(row) {
           <div class="identity-cell-primary">
             ${(() => { const b = companyAccountStatus(row) === "BLOCKED"; const l = t(b ? "companyDetail.blocked" : "companyDetail.active"); return `<span class="status-dot ${b ? "is-blocked" : "is-active"}" title="${l}" aria-label="${l}"></span>`; })()}
             <button type="button" class="table-link identity-link" data-company-id="${row.id}">
-              <span class="table-truncate has-tooltip" data-tooltip="${escapeAttr(row.name)}">${row.name}</span>
+              <span class="table-truncate has-tooltip" data-tooltip="${escapeAttr(row.name)}">${pdEscape(row.name)}</span>
             </button>
             ${copyIconButton(row.name)}
           </div>
           <div class="identity-cell-sub">
             <span class="identity-cell-tag">${t("clientsCompanies.idTag")}</span>
-            <button type="button" class="id-copy" data-copy-value="${row.code}" title="${t("clientsCompanies.copy")}">
-              <span class="id-copy-label">${row.code}</span>
+            <button type="button" class="id-copy" data-copy-value="${escapeAttr(row.code)}" title="${t("clientsCompanies.copy")}">
+              <span class="id-copy-label">${pdEscape(row.code)}</span>
               ${COPY_ICON_SVG}
             </button>
           </div>
@@ -635,8 +635,8 @@ function renderClientsCompaniesRow(row) {
             row.registrationNumber
               ? `<div class="identity-cell-sub">
                   <span class="identity-cell-tag">${t("clientsCompanies.regNumberTag")}</span>
-                  <button type="button" class="id-copy" data-copy-value="${row.registrationNumber}" title="${t("clientsCompanies.copy")}">
-                    <span class="id-copy-label">${row.registrationNumber}</span>
+                  <button type="button" class="id-copy" data-copy-value="${escapeAttr(row.registrationNumber)}" title="${t("clientsCompanies.copy")}">
+                    <span class="id-copy-label">${pdEscape(row.registrationNumber)}</span>
                     ${COPY_ICON_SVG}
                   </button>
                 </div>`
@@ -647,21 +647,21 @@ function renderClientsCompaniesRow(row) {
       <td>
         ${
           row.registeredBusinessName
-            ? `<div class="inline-copy inline-copy-wrap"><span class="table-clamp-2 has-tooltip" data-tooltip="${escapeAttr(row.registeredBusinessName)}">${row.registeredBusinessName}</span>${copyIconButton(row.registeredBusinessName)}</div>`
+            ? `<div class="inline-copy inline-copy-wrap"><span class="table-clamp-2 has-tooltip" data-tooltip="${escapeAttr(row.registeredBusinessName)}">${pdEscape(row.registeredBusinessName)}</span>${copyIconButton(row.registeredBusinessName)}</div>`
             : noValue
         }
       </td>
       <td>
         ${
           row.businessEmail
-            ? `<div class="inline-copy"><span>${row.businessEmail}</span>${copyIconButton(row.businessEmail)}</div>`
+            ? `<div class="inline-copy"><span>${pdEscape(row.businessEmail)}</span>${copyIconButton(row.businessEmail)}</div>`
             : noValue
         }
       </td>
       <td>
         ${
           row.businessPhone
-            ? `<div class="inline-copy"><span>${row.businessPhone}</span>${copyIconButton(row.businessPhone)}</div>`
+            ? `<div class="inline-copy"><span>${pdEscape(row.businessPhone)}</span>${copyIconButton(row.businessPhone)}</div>`
             : noValue
         }
       </td>
@@ -1245,12 +1245,12 @@ function renderCompanyDetailHeader(company) {
       ${cdAvatar(company.name)}
       <div class="client-detail-header-main">
         <div class="client-detail-title-row">
-          <span class="page-title">${company.name}</span>
+          <span class="page-title">${pdEscape(company.name)}</span>
           <span class="badge ${isBlocked ? "badge-danger" : "badge-success"}">${isBlocked ? cod.blocked : cod.active}</span>
         </div>
         <div class="client-detail-subtitle">
-          <span class="inline-copy">ID: ${company.code}${copyIconButton(company.code)}</span>
-          ${company.registrationNumber ? `<span class="client-detail-subtitle-sep">·</span><span class="inline-copy">${cod.headerRegNumber}: ${company.registrationNumber}${copyIconButton(company.registrationNumber)}</span>` : ""}
+          <span class="inline-copy">ID: ${pdEscape(company.code)}${copyIconButton(company.code)}</span>
+          ${company.registrationNumber ? `<span class="client-detail-subtitle-sep">·</span><span class="inline-copy">${cod.headerRegNumber}: ${pdEscape(company.registrationNumber)}${copyIconButton(company.registrationNumber)}</span>` : ""}
           <span class="client-detail-subtitle-sep">·</span><span>${cod.headerCreated}: ${company.createdAt}</span>
         </div>
         ${renderClientHeroPills(company, "company")}
