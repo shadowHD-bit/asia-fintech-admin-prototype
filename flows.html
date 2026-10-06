@@ -6,8 +6,8 @@
 <title>Флоу и экраны | Азия Финтех</title>
 <link rel="icon" type="image/svg+xml" href="assets/images/logo-icon.svg" />
 <link href="https://fonts.googleapis.com/css2?family=Bruno+Ace&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="assets/tokens.css?v=98" />
-<link rel="stylesheet" href="assets/style.css?v=98" />
+<link rel="stylesheet" href="assets/tokens.css?v=266" />
+<link rel="stylesheet" href="assets/style.css?v=266" />
 <style>
   body { background: var(--color-bg); color: var(--color-text); font-family: var(--font-family); margin: 0; }
   .flows-page { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
@@ -22,10 +22,13 @@
     <div id="flows-root"></div>
   </div>
 
-  <script src="assets/i18n.js?v=98"></script>
-  <script src="assets/i18n-rates.js?v=98"></script>
-  <script src="assets/i18n-partners.js?v=98"></script>
-  <script src="assets/i18n-routing.js?v=98"></script>
+  <script src="assets/i18n.js?v=266"></script>
+  <script src="assets/i18n-rates.js?v=266"></script>
+  <script src="assets/i18n-partners.js?v=266"></script>
+  <script src="assets/i18n-routing.js?v=266"></script>
+  <script src="assets/i18n-accounting.js?v=266"></script>
+  <script src="assets/i18n-maker-checker.js?v=266"></script>
+  <script src="assets/i18n-aggregation.js?v=266"></script>
   <script>
     /* ==========================================================================
        "Флоу и экраны" — полностью отдельная страница (НЕ часть SPA, не в сайдбаре):
@@ -59,11 +62,13 @@
       security: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 16 5v4.7c0 4-2.6 6.8-6 8.3-3.4-1.5-6-4.3-6-8.3V5l6-2.5Z"/><path d="M7.5 10 9 11.5 12.5 8"/></svg>`,
       settings: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.6"/><path d="M10 3v1.6M10 15.4V17M17 10h-1.6M4.6 10H3M15 5l-1.2 1.2M6.2 13.8 5 15M15 15l-1.2-1.2M6.2 6.2 5 5"/></svg>`,
       box: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 17 6v8l-7 3.5L3 14V6l7-3.5Z"/><path d="M3 6l7 3.5L17 6M10 9.5V17"/></svg>`,
+      globe: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2.2 2 2.2 12 0 14M10 3c-2.2 2-2.2 12 0 14"/></svg>`,
       lock: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="9" width="11" height="7.5" rx="1.5"/><path d="M6.5 9V6.5a3.5 3.5 0 0 1 7 0V9"/></svg>`,
       accounts: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="15" height="11" rx="1.6"/><path d="M2.5 8h15"/><path d="M13 12.5h2.5"/></svg>`,
     };
 
     // Только то, что реально в NAV_TREE app.js сейчас (settings-masks выключен флагом TF_MASKS_ENABLED = false).
+    // Масками (settings-masks) не показываем: раздел выключен флагом TF_MASKS_ENABLED = false.
     const NAV_TREE = [
       { id: "home", icon: "home" },
       { id: "clients", icon: "clients", children: [
@@ -73,11 +78,9 @@
       ] },
       { id: "analytics-dashboards", icon: "analytics", children: [
         { id: "analytics-users", icon: "user" },
-        { id: "analytics-operations", icon: "operations" },
+        { id: "analytics-ops", icon: "operations" },
         { id: "analytics-accounts", icon: "accounts" },
-        { id: "analytics-eod", icon: "box" },
         { id: "analytics-events", icon: "security" },
-        { id: "analytics-routing", icon: "exchange" },
       ] },
       { id: "operations", icon: "operations", children: [
         { id: "operations-payments", icon: "payments" },
@@ -85,13 +88,16 @@
         { id: "operations-exchanges", icon: "exchange" },
         { id: "operations-otc", icon: "otc" },
       ] },
-      { id: "accounts-virtual", icon: "accounts" },
+      { id: "accounting", icon: "box", children: [
+        { id: "accounts-virtual", icon: "accounts" },
+        { id: "accounting-coa", icon: "box" },
+        { id: "financial-reports", icon: "box" },
+      ] },
       { id: "eod", icon: "operations", children: [
         { id: "eod-dashboard", icon: "analytics" },
         { id: "eod-discrepancies", icon: "security" },
         { id: "eod-history", icon: "box" },
       ] },
-      { id: "financial-reports", icon: "box" },
       { id: "security", icon: "security", children: [
         { id: "security-audit-logs", icon: "lock" },
         { id: "security-aml-checks", icon: "exchange" },
@@ -100,6 +106,10 @@
       ] },
       { id: "settings-operational", icon: "settings", children: [
         { id: "settings-access", icon: "security" },
+        { id: "settings-maker-checker", icon: "lock", children: [
+          { id: "settings-maker-checker-rules", icon: "box" },
+          { id: "settings-maker-checker-requests", icon: "operations" },
+        ] },
         { id: "settings-rates", icon: "exchange" },
         { id: "settings-vabs-accounts", icon: "accounts" },
         { id: "settings-routing", icon: "payments", children: [
@@ -109,7 +119,6 @@
         ] },
         { id: "settings-tariffs", icon: "payments", children: [
           { id: "settings-tariffs-catalog", icon: "box" },
-          { id: "settings-tariffs-operations", icon: "operations" },
           { id: "settings-tariffs-limits", icon: "security" },
           { id: "settings-tariffs-restrictions", icon: "lock" },
           { id: "settings-tariffs-commissions", icon: "payments" },
@@ -117,10 +126,15 @@
         { id: "settings-sanctions", icon: "lock", children: [
           { id: "settings-sanctions-individuals", icon: "user" },
           { id: "settings-sanctions-companies", icon: "building" },
+          { id: "settings-sanctions-countries", icon: "globe" },
         ] },
         { id: "settings-eod", icon: "operations", children: [
           { id: "settings-eod-day", icon: "settings" },
           { id: "settings-eod-reconciliation", icon: "security" },
+        ] },
+        { id: "settings-aggregation", icon: "exchange", children: [
+          { id: "settings-aggregation-networks", icon: "exchange" },
+          { id: "settings-aggregation-batches", icon: "box" },
         ] },
       ] },
       { id: "settings-core", icon: "lock", children: [
@@ -131,6 +145,7 @@
           { id: "settings-verif-addresses", icon: "building" },
         ] },
         { id: "settings-kyt", icon: "security", children: [{ id: "settings-kyt-configs", icon: "box" }] },
+        { id: "settings-tariffs-operations", icon: "operations" },
         { id: "settings-vabs", icon: "settings", children: [
           { id: "settings-vabs-networks", icon: "exchange" },
           { id: "settings-vabs-currencies", icon: "payments" },

@@ -183,6 +183,20 @@ const NAV_TREE = [
           { id: "settings-eod-reconciliation", icon: "security" },
         ],
       },
+      {
+        // Сбор депозитных адресов крипто-кошельков на сервисный адрес (SERVICE) — допущение
+        // прототипа: в основных ветках бэкенда (core-feature-dev_bank_core,
+        // monorepo-backend-feature-dev_bank_core) этого раздела нет, он найден в более новой
+        // ветке core-dev (providers/crypto-cp-provider, aggregation-admin-ui.md и смежные доки).
+        // В операционных настройках, а не в основе системы: администратор включает/выключает
+        // триггеры и запускает сбор в рабочем режиме, это не разовая конфигурация основы.
+        id: "settings-aggregation",
+        icon: "exchange",
+        children: [
+          { id: "settings-aggregation-networks", icon: "exchange" },
+          { id: "settings-aggregation-batches", icon: "box" },
+        ],
+      },
     ],
   },
   {
@@ -325,6 +339,8 @@ function activeNavId(routeId = currentRouteId()) {
   if (routeId === "settings-maker-checker-request-detail") return "settings-maker-checker-requests";
   if (routeId === "settings-routing-rule") return "settings-routing-rules";
   if (routeId === "settings-routing-execution") return "settings-routing-executions";
+  if (routeId === "settings-aggregation-network") return "settings-aggregation-networks";
+  if (routeId === "settings-aggregation-batch") return "settings-aggregation-batches";
   return routeId;
 }
 
@@ -600,6 +616,22 @@ function renderBreadcrumbs(routeId, navItem) {
       { label: navLabel(NAV_INDEX["settings-routing"]) },
       { label: navLabel(NAV_INDEX["settings-routing-executions"]), route: "settings-routing-executions" },
       { label: ex ? pdShort(ex.id) : t("vabs.common.notFoundTitle") },
+    ];
+  } else if (routeId === "settings-aggregation-network") {
+    const net = aggNetworkRef();
+    parts = [
+      { label: navLabel(NAV_INDEX["settings-operational"]) },
+      { label: navLabel(NAV_INDEX["settings-aggregation"]) },
+      { label: navLabel(NAV_INDEX["settings-aggregation-networks"]), route: "settings-aggregation-networks" },
+      { label: net || t("vabs.common.notFoundTitle") },
+    ];
+  } else if (routeId === "settings-aggregation-batch") {
+    const b = aggBatchById(aggBatchRef());
+    parts = [
+      { label: navLabel(NAV_INDEX["settings-operational"]) },
+      { label: navLabel(NAV_INDEX["settings-aggregation"]) },
+      { label: navLabel(NAV_INDEX["settings-aggregation-batches"]), route: "settings-aggregation-batches" },
+      { label: b ? b.code : t("vabs.common.notFoundTitle") },
     ];
   } else if (routeId === "clients-partners-detail") {
     const svc = pnById(pnRef());
@@ -1020,6 +1052,8 @@ function currentRouteId() {
   if (/^(settings-kyt-configs|security-aml-checks)\/.+/.test(hash)) return "kyt-detail";
   if (/^eod-(days|discrepancies)\/.+/.test(hash)) return "eod-detail";
   if (/^settings-(tariffs-(catalog|limits|commissions|clients)|masks-list)\/.+/.test(hash) && (TF_MASKS_ENABLED || !hash.startsWith("settings-masks-list"))) return "tariffs-detail";
+  if (/^settings-aggregation-networks\/.+/.test(hash)) return "settings-aggregation-network";
+  if (/^settings-aggregation-batches\/.+/.test(hash)) return "settings-aggregation-batch";
   if (/^accept-invite\/.+/.test(hash)) return "accept-invite";
   if (LEAF_ROUTE_IDS.includes(hash)) return hash;
   if (EXTRA_ROUTE_IDS.includes(hash)) return hash;
@@ -1135,6 +1169,20 @@ function render() {
   } else if (routeId === "settings-rates") {
     content.innerHTML = viewSettingsRates();
     initSettingsRates();
+  } else if (routeId === "settings-aggregation-networks") {
+    content.innerHTML = viewAggregationNetworks();
+    initAggregationNetworks();
+  } else if (routeId === "settings-aggregation-network") {
+    const net = aggNetworkRef();
+    content.innerHTML = viewAggregationNetworkDetail(net);
+    initAggregationNetworkDetail(net);
+  } else if (routeId === "settings-aggregation-batches") {
+    content.innerHTML = viewAggregationBatches();
+    initAggregationBatches();
+  } else if (routeId === "settings-aggregation-batch") {
+    const id = aggBatchRef();
+    content.innerHTML = viewAggregationBatchDetail(id);
+    initAggregationBatchDetail(id);
   } else if (routeId === "clients-partners") {
     content.innerHTML = viewPartners();
     initPartners();

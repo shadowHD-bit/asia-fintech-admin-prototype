@@ -217,9 +217,14 @@ function hmDelta(values) {
   return `<span class="hm-delta ${pct >= 0 ? "is-up" : "is-down"}">${pct >= 0 ? "+" : ""}${pct}%</span>`;
 }
 
-// Минималистичная плитка: подпись, цифра, график справа, строка ссылок
-function hmTile({ label, big, sub, visual, list, stats, settings }) {
-  return `<article class="hm-tile">
+// Минималистичная плитка: подпись, цифра, график справа, строка ссылок. Перетаскивается целиком
+// (data-hm-card + draggable, см. hmAttachTilesDnd) и убирается крестиком в углу — без отдельной
+// модалки со списком: карточки правятся прямо на дашборде.
+function hmTile({ id, label, big, sub, visual, list, stats, settings }) {
+  return `<article class="hm-tile" draggable="true" data-hm-card="${id}">
+    <button type="button" class="hm-tile-remove" data-hm-remove="${id}" title="${pdEscape(t("home.cardSettings.remove"))}" aria-label="${pdEscape(t("home.cardSettings.remove"))}">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 8 8M14 6l-8 8"/></svg>
+    </button>
     <button type="button" class="hm-tile-main" data-dash-hash="${list}">
       <span class="hm-tile-label">${label}</span>
       <span class="hm-tile-row"><span class="hm-tile-big">${big}</span><span class="hm-tile-visual">${visual || ""}</span></span>
@@ -230,6 +235,21 @@ function hmTile({ label, big, sub, visual, list, stats, settings }) {
       ${settings ? `<button type="button" class="hm-link is-muted" data-dash-hash="${settings}">${t("home.linkSettings")}</button>` : ""}
     </footer>
   </article>`;
+}
+
+// Режим правки карточек — крестик «убрать», плейсхолдер «Добавить» и перетаскивание видны только
+// в этом режиме (кнопка «Изменить»/«Готово» в шапке «Разделы»), не пожизненно при наведении. Флаг —
+// в памяти модуля, не в localStorage: это временный режим экрана, а не сохраняемая настройка
+// (см. HM_CARDS_STORAGE_KEY для того, что действительно сохраняется — состав, метрики и порядок).
+let hmTilesEditing = false;
+
+// Плейсхолдер в конце сетки — пунктирная рамка, открывает модалку выбора раздела и метрики.
+// Не рисуется, если скрытых карточек не осталось (добавлять уже нечего).
+function hmAddTileHtml() {
+  return `<button type="button" class="hm-tile hm-tile-add" id="hm-tile-add-btn">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>
+    <span>${t("home.cardSettings.addTile")}</span>
+  </button>`;
 }
 
 // ---- Настройка карточек: какие показывать, что в них выводить, в каком порядке ---------------
@@ -244,14 +264,14 @@ const HM_METRIC_OPTIONS = {
   clients: ["total", "users", "companies", "byStatus", "byRisk"],
   companies: ["total", "today", "byStatus", "byRisk"],
   operations: ["today", "week", "byType"],
-  accounts: ["top", "count"],
-  eod: ["progress", "discrepancies"],
+  accounts: ["top", "count", "restricted"],
+  eod: ["progress", "discrepancies", "operations"],
   events: ["today", "critical", "bySeverity"],
   payments: ["today", "week", "byStatus"],
-  exchanges: ["today", "week"],
-  discrepancies: ["open", "byType"],
-  partners: ["total", "byStatus"],
-  currencies: ["active", "disabled"],
+  exchanges: ["today", "week", "byStatus"],
+  discrepancies: ["open", "byType", "byStatus"],
+  partners: ["total", "byStatus", "byMode"],
+  currencies: ["active", "disabled", "byNetwork"],
 };
 
 function hmCardMeta() {
@@ -412,6 +432,11 @@ function hmExchangesMetric(metric) {
     const week = d.reduce((n, v) => n + v, 0);
     return { big: week.toLocaleString("ru-RU"), sub: t("home.opsWeekTotalSub"), visual: hmSpark(d) };
   }
+  if (metric === "byStatus") {
+    const counts = {};
+    rows.forEach((r) => { counts[r.status] = (counts[r.status] || 0) + 1; });
+    return hmBreakdownMetric(counts, paymentStatusLabel);
+  }
   return { big: rows.filter((r) => MOCK_NOW - r.createdDate <= dayMs).length.toLocaleString("ru-RU"), sub: `${hmDelta(d)} ${t("home.opsWeek")}`, visual: hmSpark(d) };
 }
 
@@ -423,6 +448,11 @@ function hmDiscrepanciesMetric(metric) {
     rows.forEach((r) => { counts[r.reconciliationType] = (counts[r.reconciliationType] || 0) + 1; });
     return hmBreakdownMetric(counts, (k) => eodEnum("reconType", k));
   }
+  if (metric === "byStatus") {
+    const counts = {};
+    rows.forEach((r) => { counts[r.status] = (counts[r.status] || 0) + 1; });
+    return hmBreakdownMetric(counts, (k) => eodEnum("discStatus", k));
+  }
   const open = rows.filter(eodIsOpenDiscrepancy).length;
   return { big: open.toLocaleString("ru-RU"), sub: `${rows.length} ${t("home.discrepanciesTotalSub")}`, visual: hmSpark(d) };
 }
@@ -433,6 +463,11 @@ function hmPartnersMetric(metric) {
     PN_SERVICES.forEach((s) => { counts[s.status] = (counts[s.status] || 0) + 1; });
     return hmBreakdownMetric(counts, (k) => pn(`status.${k}`));
   }
+  if (metric === "byMode") {
+    const counts = {};
+    PN_SERVICES.forEach((s) => { counts[s.authMode] = (counts[s.authMode] || 0) + 1; });
+    return hmBreakdownMetric(counts, (k) => pn(`mode.${k}.short`));
+  }
   const approved = PN_SERVICES.filter((s) => s.status === "APPROVED").length;
   return { big: PN_SERVICES.length.toLocaleString("ru-RU"), sub: `${approved} ${pn("status.APPROVED")}`, visual: "" };
 }
@@ -442,6 +477,11 @@ function hmCurrenciesMetric(metric) {
   const disabled = VB_CURRENCIES.filter((c) => c.status === "DISABLED").length;
   if (metric === "disabled") {
     return { big: disabled.toLocaleString("ru-RU"), sub: t("home.currenciesDisabledSub"), visual: "" };
+  }
+  if (metric === "byNetwork") {
+    const counts = {};
+    VB_CURRENCIES.forEach((c) => { counts[c.networkName] = (counts[c.networkName] || 0) + 1; });
+    return hmBreakdownMetric(counts, (k) => k);
   }
   return { big: active.toLocaleString("ru-RU"), sub: `${VB_CURRENCIES.length} ${t("home.currenciesTotalSub")}`, visual: "" };
 }
@@ -468,6 +508,11 @@ function hmAccountsMetric(metric) {
     const totalAccounts = cur.reduce((n, x) => n + x.n, 0);
     return { big: totalAccounts.toLocaleString("ru-RU"), sub: t("home.accountsCountSub"), visual: top.length ? hmDonut(donut) : "" };
   }
+  if (metric === "restricted") {
+    const all = accAllAccounts();
+    const restricted = all.filter((a) => a.restrictionReason).length;
+    return { big: restricted.toLocaleString("ru-RU"), sub: `${all.length} ${t("home.accountsCountSub")}`, visual: "" };
+  }
   const subParts = top.slice(1).map((x) => `${compact(x.v)} ${x.c}`);
   if (restCur.length) subParts.push(t("home.otherCurrencies")(restCur.length));
   return {
@@ -486,6 +531,10 @@ function hmEodMetric(metric) {
   const ring = hmRing(done / stages.length, `${done}/${stages.length}`);
   if (metric === "discrepancies") {
     return { big: open.toLocaleString("ru-RU"), sub: `${eodDayDate(day)} · ${eodEnum("status", day.status)}`, visual: ring };
+  }
+  if (metric === "operations") {
+    const stats = eodDayStats(day);
+    return { big: stats.operations.toLocaleString("ru-RU"), sub: `${eodDayDate(day)} · ${eodEnum("status", day.status)}`, visual: ring };
   }
   return { big: eodDayDate(day), sub: `${eodEnum("status", day.status)} · ${open} ${t("home.discShort")}`, visual: ring };
 }
@@ -529,131 +578,163 @@ function hmTiles() {
     .map((c) => {
       const m = meta[c.id];
       const metric = HM_METRIC_BUILDERS[c.id](c.metric);
-      return hmTile({ label: m.label, big: metric.big, sub: metric.sub, visual: metric.visual, list: m.list, stats: m.stats, settings: m.settings });
+      return hmTile({ id: c.id, label: m.label, big: metric.big, sub: metric.sub, visual: metric.visual, list: m.list, stats: m.stats, settings: m.settings });
     })
     .join("");
-  const empty = visibleCards.length ? "" : `<div class="dash-empty">${t("home.cardSettings.emptyState")}</div>`;
+  const hasHidden = cfg.some((c) => !c.visible);
   return `<div class="hm-tiles-head">
     <h2 class="hm-tiles-title">${t("home.tilesTitle")}</h2>
-    <button type="button" class="hm-link" id="hm-cards-settings-btn">${ICONS.settings}<span>${t("home.cardSettings.open")}</span></button>
+    <button type="button" class="hm-link${hmTilesEditing ? " is-active" : ""}" id="hm-tiles-edit-btn">${ICONS.settings}<span>${t(hmTilesEditing ? "home.cardSettings.done" : "home.cardSettings.editToggle")}</span></button>
   </div>
-  <div class="hm-tiles">${tilesHtml}${empty}</div>`;
+  <div class="hm-tiles${hmTilesEditing ? " is-editing" : ""}" id="hm-tiles">${tilesHtml}${hasHidden ? hmAddTileHtml() : ""}</div>`;
 }
 
-// Выбор метрики — не нативный <select>, а тот же кастомный попап-дропдаун, что и
-// на экране создания платежа (.pc-dropdown/.pc-dropdown-trigger/-panel/-option,
-// см. pcBindDropdowns в operations-payments.js) — переиспользуем готовые классы,
-// открытие/закрытие вешаем один раз на модалку через hmBindCardDropdowns.
-function hmCardSettingsRowHtml(c, meta) {
-  const mt = t("home.cardSettings.metrics");
-  const optionsHtml = HM_METRIC_OPTIONS[c.id]
-    .map((mid) => `<button type="button" class="pc-dropdown-option${mid === c.metric ? " is-selected" : ""}" data-hm-metric-pick="${mid}"><span class="pc-dropdown-option-title">${pdEscape(mt[c.id][mid])}</span></button>`)
-    .join("");
-  return `<div class="hm-card-row" draggable="true" data-hm-card="${c.id}">
-    <span class="hm-card-drag" title="${pdEscape(t("home.cardSettings.dragHint"))}" aria-hidden="true">
-      <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="7" cy="5" r="1.4"/><circle cx="13" cy="5" r="1.4"/><circle cx="7" cy="10" r="1.4"/><circle cx="13" cy="10" r="1.4"/><circle cx="7" cy="15" r="1.4"/><circle cx="13" cy="15" r="1.4"/></svg>
-    </span>
-    <label class="hm-card-vis"><input type="checkbox" data-hm-vis${c.visible ? " checked" : ""} /></label>
-    <span class="hm-card-label">${pdEscape(meta[c.id].label)}</span>
-    <div class="pc-dropdown hm-card-dd" id="hm-dd-${c.id}" data-hm-metric="${c.metric}">
-      <button type="button" class="pc-dropdown-trigger" data-hm-dd-toggle="${c.id}">
-        <span data-hm-dd-label>${pdEscape(mt[c.id][c.metric])}</span><span class="pc-dropdown-chevron">${FILTER_GROUP_CHEVRON}</span>
-      </button>
-      <div class="pc-dropdown-panel">${optionsHtml}</div>
-    </div>
-  </div>`;
+// Убрать карточку с дашборда — сразу, без подтверждения (это личная настройка вида,
+// а не необратимое действие: карточка остаётся доступна в модалке «Добавить» со своей
+// последней выбранной метрикой).
+function hmRemoveCard(id) {
+  const cfg = hmLoadCardConfig();
+  const next = cfg.map((c) => (c.id === id ? { ...c, visible: false } : c));
+  hmSaveCardConfig(next);
+  render();
 }
 
-// Открытие/закрытие .hm-card-dd и выбор опции — один делегированный обработчик на
-// модалку, по образцу pcBindDropdowns (operations-payments.js).
-function hmBindCardDropdowns(modalEl) {
-  modalEl.addEventListener("click", (e) => {
-    const toggleBtn = e.target.closest("[data-hm-dd-toggle]");
-    if (toggleBtn) {
-      const wrap = modalEl.querySelector(`#hm-dd-${toggleBtn.dataset.hmDdToggle}`);
-      if (!wrap) return;
-      const wasOpen = wrap.classList.contains("is-open");
-      modalEl.querySelectorAll(".hm-card-dd.is-open").forEach((el) => el.classList.remove("is-open"));
-      if (!wasOpen) wrap.classList.add("is-open");
-      return;
-    }
-    const pickBtn = e.target.closest("[data-hm-metric-pick]");
-    if (pickBtn) {
-      const wrap = pickBtn.closest(".hm-card-dd");
-      const value = pickBtn.dataset.hmMetricPick;
-      wrap.dataset.hmMetric = value;
-      wrap.querySelector("[data-hm-dd-label]").textContent = pickBtn.querySelector(".pc-dropdown-option-title").textContent;
-      wrap.querySelectorAll("[data-hm-metric-pick]").forEach((b) => b.classList.toggle("is-selected", b === pickBtn));
-      wrap.classList.remove("is-open");
-      return;
-    }
-    if (!e.target.closest(".pc-dropdown-panel")) {
-      modalEl.querySelectorAll(".hm-card-dd.is-open").forEach((el) => el.classList.remove("is-open"));
-    }
-  });
+// Порядок после перетаскивания — по итоговому порядку карточек в DOM; скрытые карточки
+// (не нарисованы, тянуть нечего) остаются на своих местах в хранимом массиве.
+function hmReorderCards(newVisibleIds) {
+  const cfg = hmLoadCardConfig();
+  const byId = new Map(cfg.map((c) => [c.id, c]));
+  const visibleSet = new Set(newVisibleIds);
+  const next = [...newVisibleIds.map((id) => byId.get(id)), ...cfg.filter((c) => !visibleSet.has(c.id))];
+  hmSaveCardConfig(next);
 }
 
-// Перетаскивание строк — по аналогии с rgRulesDnd в settings-routing.js (та же схема
-// dragstart/dragover с классами -before/-after для индикатора места вставки).
-function hmAttachCardListDnd(list) {
-  if (!list) return;
+// Перетаскивание карточек прямо по сетке дашборда — та же схема dragstart/dragover
+// с классами -before/-after, что и в hmAttachCardListDnd раньше (и в rgRulesDnd,
+// settings-routing.js), только цель — сами плитки, не строки в модалке. Плейсхолдер
+// «Добавить» (.hm-tile-add) в перестановке не участвует — он не draggable.
+function hmAttachTilesDnd(grid) {
+  if (!grid) return;
   let dragId = null;
-  list.querySelectorAll(".hm-card-row").forEach((row) => {
-    row.addEventListener("dragstart", (e) => {
-      dragId = row.dataset.hmCard;
-      row.classList.add("is-dragging");
+  const saveOrder = () => {
+    const ids = [...grid.querySelectorAll(".hm-tile[data-hm-card]")].map((el) => el.dataset.hmCard);
+    hmReorderCards(ids);
+  };
+  grid.querySelectorAll(".hm-tile[data-hm-card]").forEach((tile) => {
+    tile.draggable = hmTilesEditing;
+    tile.addEventListener("dragstart", (e) => {
+      dragId = tile.dataset.hmCard;
+      tile.classList.add("is-dragging");
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", dragId);
     });
-    row.addEventListener("dragend", () => {
-      row.classList.remove("is-dragging");
-      list.querySelectorAll(".hm-card-drop-before, .hm-card-drop-after").forEach((x) => x.classList.remove("hm-card-drop-before", "hm-card-drop-after"));
+    tile.addEventListener("dragend", () => {
+      tile.classList.remove("is-dragging");
+      grid.querySelectorAll(".hm-tile-drop-before, .hm-tile-drop-after").forEach((x) => x.classList.remove("hm-tile-drop-before", "hm-tile-drop-after"));
+      if (dragId) saveOrder();
+      dragId = null;
     });
-    row.addEventListener("dragover", (e) => {
-      if (!dragId || row.dataset.hmCard === dragId) return;
+    tile.addEventListener("dragover", (e) => {
+      if (!dragId || tile.dataset.hmCard === dragId) return;
       e.preventDefault();
-      const r = row.getBoundingClientRect();
-      const before = e.clientY < r.top + r.height / 2;
-      list.querySelectorAll(".hm-card-drop-before, .hm-card-drop-after").forEach((x) => x.classList.remove("hm-card-drop-before", "hm-card-drop-after"));
-      row.classList.add(before ? "hm-card-drop-before" : "hm-card-drop-after");
+      const r = tile.getBoundingClientRect();
+      const before = e.clientX < r.left + r.width / 2;
+      grid.querySelectorAll(".hm-tile-drop-before, .hm-tile-drop-after").forEach((x) => x.classList.remove("hm-tile-drop-before", "hm-tile-drop-after"));
+      tile.classList.add(before ? "hm-tile-drop-before" : "hm-tile-drop-after");
     });
-    row.addEventListener("drop", (e) => {
+    tile.addEventListener("drop", (e) => {
       e.preventDefault();
-      const target = row.dataset.hmCard;
+      const target = tile.dataset.hmCard;
       if (!dragId || target === dragId) return;
-      const dragEl = list.querySelector(`[data-hm-card="${dragId}"]`);
-      const r = row.getBoundingClientRect();
-      const before = e.clientY < r.top + r.height / 2;
-      row.insertAdjacentElement(before ? "beforebegin" : "afterend", dragEl);
-      list.querySelectorAll(".hm-card-drop-before, .hm-card-drop-after").forEach((x) => x.classList.remove("hm-card-drop-before", "hm-card-drop-after"));
+      const dragEl = grid.querySelector(`.hm-tile[data-hm-card="${dragId}"]`);
+      const r = tile.getBoundingClientRect();
+      const before = e.clientX < r.left + r.width / 2;
+      tile.insertAdjacentElement(before ? "beforebegin" : "afterend", dragEl);
+      grid.querySelectorAll(".hm-tile-drop-before, .hm-tile-drop-after").forEach((x) => x.classList.remove("hm-tile-drop-before", "hm-tile-drop-after"));
     });
   });
 }
 
-function hmOpenCardSettings() {
+// Кнопка-поле того же вида, что .pc-dropdown-trigger (экран создания платежа), но без
+// своей инлайн-панели: сама панель — components/select-dropdown.js, попап, подвешенный
+// к <body> и спозиционированный под кнопкой (position: fixed). .pc-dropdown-panel внутри
+// openModal ломается — у .modal-body overflow-y: auto, и абсолютно спозиционированная
+// панель, вылезающая ниже его видимой области, обрезается и утягивает модалку в скролл,
+// а не всплывает поверх неё. Портал в body этой проблемы не знает в принципе.
+function hmTriggerFieldHtml(id, label, valueLabel) {
+  return `<label class="filters-field vb-field"><span class="filters-field-label">${label}</span>
+    <button type="button" class="pc-dropdown-trigger" id="${id}">
+      <span>${pdEscape(valueLabel)}</span><span class="pc-dropdown-chevron">${FILTER_GROUP_CHEVRON}</span>
+    </button>
+  </label>`;
+}
+
+// Модалка «Добавить карточку» — только выбор раздела (из скрытых) и его метрики,
+// без списка и без драга: это теперь делается прямо на дашборде. Смена раздела
+// подставляет метрику этого раздела (последнюю выбранную для него) и перестраивает
+// список второго попапа под его набор вариантов.
+function hmOpenAddCardModal() {
   const cfg = hmLoadCardConfig();
   const meta = hmCardMeta();
   const mt = t("home.cardSettings");
+  const hidden = cfg.filter((c) => !c.visible);
+  if (!hidden.length) return;
+  const mLabels = t("home.cardSettings.metrics");
+  const metricOptions = (id) => HM_METRIC_OPTIONS[id].map((mid) => ({ value: mid, label: mLabels[id][mid] }));
+  const state = { sectionId: hidden[0].id, metric: hidden[0].metric };
   openModal({
-    title: mt.title,
-    width: 560,
-    bodyHtml: `<p class="modal-confirm-text pd-modal-intro">${mt.intro}</p><div class="hm-card-list" id="hm-card-list">${cfg.map((c) => hmCardSettingsRowHtml(c, meta)).join("")}</div>`,
-    footerHtml: `<button type="button" class="btn-secondary" id="hm-cards-reset">${mt.reset}</button><span class="hm-card-foot-spacer"></span><button type="button" class="btn-secondary" id="hm-cards-cancel">${mt.cancel}</button><button type="button" class="btn-primary" id="hm-cards-save">${mt.save}</button>`,
+    title: mt.addModalTitle,
+    width: 420,
+    bodyHtml: `<div class="modal-form">
+      ${hmTriggerFieldHtml("hm-add-section-trigger", mt.sectionLabel, meta[state.sectionId].label)}
+      ${hmTriggerFieldHtml("hm-add-metric-trigger", mt.metricLabel, mLabels[state.sectionId][state.metric])}
+    </div>`,
+    footerHtml: `<button type="button" class="btn-secondary" id="hm-add-cancel">${mt.cancel}</button><button type="button" class="btn-primary" id="hm-add-submit">${mt.submit}</button>`,
     onMount: (el) => {
-      hmAttachCardListDnd(el.querySelector("#hm-card-list"));
-      hmBindCardDropdowns(el);
-      el.querySelector("#hm-cards-cancel").addEventListener("click", closeModal);
-      el.querySelector("#hm-cards-reset").addEventListener("click", () => {
-        hmSaveCardConfig(hmDefaultCardConfig());
-        closeModal();
-        render();
+      const sectionTrigger = el.querySelector("#hm-add-section-trigger");
+      const metricTrigger = el.querySelector("#hm-add-metric-trigger");
+      // openSelectDropdown — мультивыбор по природе (toggle в массиве selected); разницу
+      // массивов "было/стало" берём как выбранное значение, один клик — сразу закрываем.
+      const pickSingle = (vals, current) => {
+        const picked = vals.find((v) => v !== current);
+        return picked !== undefined ? picked : current;
+      };
+      sectionTrigger.addEventListener("click", () => {
+        openSelectDropdown({
+          anchorEl: sectionTrigger,
+          options: hidden.map((c) => ({ value: c.id, label: meta[c.id].label })),
+          selected: [state.sectionId],
+          onChange: (vals) => {
+            state.sectionId = pickSingle(vals, state.sectionId);
+            state.metric = hidden.find((x) => x.id === state.sectionId).metric;
+            sectionTrigger.querySelector("span").textContent = meta[state.sectionId].label;
+            metricTrigger.querySelector("span").textContent = mLabels[state.sectionId][state.metric];
+            closeSelectDropdown();
+          },
+        });
       });
-      el.querySelector("#hm-cards-save").addEventListener("click", () => {
-        const next = [...el.querySelectorAll(".hm-card-row")].map((row) => ({
-          id: row.dataset.hmCard,
-          visible: row.querySelector("[data-hm-vis]").checked,
-          metric: row.querySelector(".hm-card-dd").dataset.hmMetric,
-        }));
+      metricTrigger.addEventListener("click", () => {
+        openSelectDropdown({
+          anchorEl: metricTrigger,
+          options: metricOptions(state.sectionId),
+          selected: [state.metric],
+          onChange: (vals) => {
+            state.metric = pickSingle(vals, state.metric);
+            metricTrigger.querySelector("span").textContent = mLabels[state.sectionId][state.metric];
+            closeSelectDropdown();
+          },
+        });
+      });
+      el.querySelector("#hm-add-cancel").addEventListener("click", closeModal);
+      el.querySelector("#hm-add-submit").addEventListener("click", () => {
+        const id = state.sectionId;
+        const metric = state.metric;
+        const byId = new Map(cfg.map((c) => [c.id, c]));
+        const nextVisibleIds = [...cfg.filter((c) => c.visible).map((c) => c.id), id];
+        const next = [
+          ...nextVisibleIds.map((cid) => (cid === id ? { id, visible: true, metric } : byId.get(cid))),
+          ...cfg.filter((c) => !c.visible && c.id !== id),
+        ];
         hmSaveCardConfig(next);
         closeModal();
         render();
@@ -723,6 +804,22 @@ function initInteractiveMap(mapId) {
 function initHome() {
   initInteractiveMap("hm-map");
   document.querySelectorAll("[data-dash-hash]").forEach((b) => b.addEventListener("click", () => { window.location.hash = b.dataset.dashHash; }));
-  const settingsBtn = document.getElementById("hm-cards-settings-btn");
-  if (settingsBtn) settingsBtn.addEventListener("click", hmOpenCardSettings);
+  document.querySelectorAll("[data-hm-remove]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); hmRemoveCard(b.dataset.hmRemove); }));
+  const addBtn = document.getElementById("hm-tile-add-btn");
+  if (addBtn) addBtn.addEventListener("click", hmOpenAddCardModal);
+  hmAttachTilesDnd(document.getElementById("hm-tiles"));
+  const editBtn = document.getElementById("hm-tiles-edit-btn");
+  if (editBtn) editBtn.addEventListener("click", () => { hmTilesEditing = !hmTilesEditing; hmApplyTilesEditing(); });
+}
+
+// Переключение режима правки без полного render() — состав/метрики/порядок не менялись,
+// меняется только видимость крестиков, плейсхолдера «Добавить» и возможность тащить карточку.
+function hmApplyTilesEditing() {
+  const grid = document.getElementById("hm-tiles");
+  const btn = document.getElementById("hm-tiles-edit-btn");
+  if (!grid || !btn) return;
+  grid.classList.toggle("is-editing", hmTilesEditing);
+  grid.querySelectorAll(".hm-tile[data-hm-card]").forEach((tile) => { tile.draggable = hmTilesEditing; });
+  btn.classList.toggle("is-active", hmTilesEditing);
+  btn.querySelector("span").textContent = t(hmTilesEditing ? "home.cardSettings.done" : "home.cardSettings.editToggle");
 }

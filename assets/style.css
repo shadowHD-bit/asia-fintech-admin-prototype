@@ -5782,19 +5782,34 @@ textarea.vb-mono { line-height: 1.45; }
 .hm-tile-foot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-5); padding-top: var(--space-3); border-top: 1px dashed var(--color-border); }
 
 /* Настройка карточек главной: список строк с перетаскиванием (та же dnd-схема, что у .rg-table) */
-.hm-card-list { display: flex; flex-direction: column; gap: 2px; }
-.hm-card-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2); border-radius: 10px; background: var(--color-surface); }
-.hm-card-row:hover { background: var(--color-surface-hover, var(--color-bg-subtle)); }
-.hm-card-row.is-dragging { opacity: 0.45; }
-.hm-card-row.hm-card-drop-before { box-shadow: inset 0 2px 0 0 var(--color-brand, #2f5bea); }
-.hm-card-row.hm-card-drop-after { box-shadow: inset 0 -2px 0 0 var(--color-brand, #2f5bea); }
-.hm-card-drag { display: inline-flex; color: var(--color-text-tertiary); cursor: grab; flex: none; }
-.hm-card-drag svg { width: 18px; height: 18px; }
-.hm-card-vis { display: inline-flex; flex: none; }
-.hm-card-label { flex: 1 1 auto; min-width: 0; font-size: var(--font-size-sm); color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hm-card-dd { flex: none; width: 230px; }
-.hm-card-dd .pc-dropdown-trigger span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hm-card-foot-spacer { flex: 1 1 auto; }
+/* Плитки дашборда — крестик "убрать", плейсхолдер "Добавить" и возможность тащить карточку видны
+   только в режиме правки (.hm-tiles.is-editing, кнопка "Изменить"/"Готово" — hmApplyTilesEditing,
+   views/home-dashboard.js), не постоянно и не по наведению. */
+.hm-tile { position: relative; }
+.hm-tiles.is-editing .hm-tile[data-hm-card] { cursor: grab; }
+.hm-tile.is-dragging { opacity: 0.45; }
+.hm-tile.hm-tile-drop-before { box-shadow: inset 2px 0 0 0 var(--color-brand); }
+.hm-tile.hm-tile-drop-after { box-shadow: inset -2px 0 0 0 var(--color-brand); }
+.hm-tile-remove {
+  display: none; position: absolute; top: var(--space-3); right: var(--space-3); z-index: 1;
+  align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%; border: 1px solid transparent;
+  background: none; color: var(--color-text-tertiary); cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.hm-tiles.is-editing .hm-tile-remove { display: inline-flex; }
+.hm-tile-remove svg { width: 14px; height: 14px; }
+.hm-tile-remove:hover { background: var(--color-danger-soft); color: var(--color-danger); border-color: var(--color-danger-soft-text); }
+.hm-tile-add {
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 150px; background: none; border: 1.5px dashed var(--color-border-strong); border-radius: 20px;
+  color: var(--color-text-tertiary); cursor: pointer; font: inherit; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+.hm-tiles.is-editing .hm-tile-add { display: flex; }
+.hm-tile-add svg { width: 22px; height: 22px; }
+.hm-tile-add:hover { border-color: var(--color-brand); color: var(--color-brand); background: var(--color-brand-soft); }
+.hm-tiles-head #hm-tiles-edit-btn.is-active { color: var(--color-brand); }
 
 .hm-spark { width: 100%; height: 44px; overflow: visible; }
 .hm-spark-line { fill: none; stroke: var(--color-brand); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
@@ -6426,16 +6441,6 @@ textarea.vb-mono { line-height: 1.45; }
   .modal-body { padding: var(--space-4); }
   .modal-footer { flex-wrap: wrap; }
   .modal-footer > .btn-primary, .modal-footer > .btn-secondary, .modal-footer > .btn-danger { flex: 1 1 auto; }
-  /* Спейсер футера настройки карточек (раздвигает "Сбросить" и "Отмена/Сохранить") сам
-     становится flex:1 1 auto наравне с кнопками на узком футере — убираем, иначе кнопки
-     садятся вперемешку с пустым растущим блоком между ними. */
-  .hm-card-foot-spacer { display: none; }
-
-  /* Настройка карточек главной: строка с чекбоксом/лейблом и выбором метрики — на телефоне
-     выбор метрики уезжает на свою строку на всю ширину, иначе вместе с 230px-дропдауном
-     лейбл карточки сжимается до нечитаемого обрезка. */
-  .hm-card-row { flex-wrap: wrap; row-gap: var(--space-2); }
-  .hm-card-dd { flex: 1 1 100%; width: auto; order: 1; }
 }
 @media (max-width: 560px) {
   /* Степпер мастера: подписи только у текущего шага, остальные — кружки */
@@ -7185,6 +7190,47 @@ button.acg-agg:hover { border-color: var(--color-brand); }
 .rg-check-row.is-ok .rg-check-dot { background: #e6f6ec; color: #14663a; }
 @media (max-width: 1100px) { .rg-sim-grid { grid-template-columns: repeat(2, 1fr); } .rg-cond { grid-template-columns: 1fr 1fr; } .rg-cond.is-view { grid-template-columns: 1fr; } .rg-bar-row { grid-template-columns: 120px 1fr; } .rg-bar-val { grid-column: 1 / -1; } }
 @media (max-width: 640px) { .rg-params { grid-template-columns: 1fr; } .rg-route-fields { grid-template-columns: 1fr; } .rg-error-row { grid-template-columns: 1fr; } .rg-sim-grid { grid-template-columns: 1fr; } .rg-notify-channel, .rg-notify .rg-params { margin-left: 0; } }
+
+/* ---- Агрегация (assets/views/settings-aggregation.js) ----------------------------------------------------------
+   Карточка сети — шапка .hm-hero.ed-hero (как у дашборда операционного дня, eod.js), триггеры — строки
+   настроек .rg-notify/.pn-switch-row (как уведомления маршрутизации, settings-routing.js): переключатель
+   + название + описание, доп. инфо и "Настроить" — только когда включён. Переиспользуем 1-в-1. */
+.agg-step-bar { margin: 4px 0 2px; }
+.hm-hero.agg-hero-full { grid-template-columns: 1fr; padding: var(--space-8) var(--space-8) var(--space-8) var(--space-6); }
+.agg-hero-full .hm-hero-main { padding-left: 0; }
+.agg-hero-actions { margin-left: auto; display: flex; gap: var(--space-2); flex-wrap: wrap; }
+/* .hm-hero.agg-hero-full выше по специфичности, чем .hm-hero — на телефоне (ниже 900px)
+   у главной и EOD он сам сжимается через базовое правило .hm-hero, здесь то же нужно
+   повторить явно, иначе компаунд-селектор его перебивает и отступы остаются "десктопными". */
+@media (max-width: 900px) {
+  .hm-hero.agg-hero-full { margin: 0 calc(-1 * var(--space-4)); padding: var(--space-6) var(--space-4) var(--space-8); }
+}
+@media (max-width: 720px) { .agg-hero-actions { margin-left: 0; width: 100%; } .agg-hero-actions .btn-primary, .agg-hero-actions .btn-secondary { flex: 1; justify-content: center; } }
+.agg-trigger-row-info { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 0 50px; }
+.agg-trigger-row-foot { margin: 8px 0 0 50px; }
+@media (max-width: 640px) { .agg-trigger-row-info, .agg-trigger-row-foot { margin-left: 0; } }
+.agg-overview-net-col { gap: 2px; }
+.agg-overview-th { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.agg-info-dot {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--color-border-strong);
+  color: var(--color-text-tertiary); font-size: 10px; line-height: 1; cursor: help; background: var(--color-surface);
+  text-transform: none; font-weight: var(--font-weight-regular, 400); letter-spacing: 0;
+}
+.agg-info-dot:hover { color: var(--color-text); border-color: var(--color-text-tertiary); }
+.agg-static-switch input:disabled + .switch-track { opacity: 1; cursor: default; }
+.agg-batch-release { margin-top: var(--space-4); }
+.agg-hash-list { display: flex; flex-direction: column; gap: var(--space-2); }
+/* Хэш — одна строка без пробелов: без word-break он не переносится и толкает всю
+   строку (включая кнопку копирования) за пределы карточки на узких экранах. */
+.agg-hash-row .inline-copy { align-items: flex-start; flex-wrap: wrap; }
+.agg-hash-row .copy-icon-btn { margin-top: 2px; }
+.agg-hash-text { word-break: break-all; }
+.agg-row-flash { animation: agg-row-flash-anim 1.2s ease-out; }
+@keyframes agg-row-flash-anim {
+  0% { background: var(--color-accent-soft, rgba(59, 130, 246, 0.12)); }
+  100% { background: transparent; }
+}
 
 /* ---- Финансовые отчёты (assets/views/financial-reports.js) --------------------------------------------------- */
 .fr-report-tabs { margin-bottom: var(--space-5); }

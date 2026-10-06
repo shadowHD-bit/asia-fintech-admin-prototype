@@ -59,10 +59,14 @@ const mcRulesList = createAccessList({
   defaultSort: (a, b) => b.createdDate - a.createdDate,
   sorts: { created: (a, b) => a.createdDate - b.createdDate },
   columns: [
-    { label: () => mc("rules.fields.action"), html: (r) => `<div class="identity-cell">${mcActionTypeBadge(r.actionType)}<div class="table-cell-muted">${mcEntityLabel(r.entity)}</div></div>` },
+    { label: () => mc("rules.fields.action"), html: (r) => `<div class="identity-cell"><div>${mcEntityLabel(r.entity)}</div><div class="table-cell-muted">${mcActionTypeBadge(r.actionType)}</div></div>` },
     { label: () => mc("rules.fields.description"), html: (r) => (r.description ? pdEscape(r.description) : `<span class="table-cell-muted">—</span>`) },
-    { label: () => mc("rules.fields.checkerRoles"), html: (r) => r.checkerRoleIds.map((id) => `<span class="badge badge-neutral">${mcRoleName(id)}</span>`).join(" ") },
-    { label: () => mc("rules.fields.requiredApprovals"), html: (r) => (r.requiredApprovals > 1 ? `<span class="badge badge-warning">${mc("rules.sixEyes")} · ${r.requiredApprovals}</span>` : mc("rules.fourEyes")) },
+    { label: () => mc("rules.fields.checkerRoles"), html: (r) => {
+      const shown = r.checkerRoleIds.slice(0, 3).map((id) => `<span class="badge badge-neutral">${mcRoleName(id)}</span>`).join(" ");
+      const rest = r.checkerRoleIds.length - 3;
+      return rest > 0 ? `${shown} <span class="badge badge-neutral">+${rest}</span>` : shown;
+    } },
+    { label: () => mc("rules.fields.requiredApprovals"), html: (r) => (r.requiredApprovals > 1 ? `${mc("rules.sixEyes")} · ${r.requiredApprovals}` : mc("rules.fourEyes")) },
     { label: () => mc("rules.fields.enabled"), html: (r) => (r.isEnabled ? `<span class="coa-bool-icon">${CHECK_ICON_SVG}</span>` : `<span class="table-cell-muted">—</span>`) },
     { label: () => mc("rules.fields.created"), sort: "created", html: (r) => dateTimeCell(r.createdAt) },
     { label: () => "", html: (r) => `<div class="sl-actions"><button type="button" class="btn-secondary vb-row-btn" data-mc-rule-edit="${r.id}">${vt("common.edit")}</button></div>` },
@@ -72,49 +76,225 @@ const mcRulesList = createAccessList({
   },
 });
 
-function mcOpenRuleForm(rule) {
+// ---- Роли подтверждающих: кастомный дропдаун с мультивыбором (openSelectDropdown) ----------
+function mcCheckerRoleOptions() {
+  return ACCESS_ROLES.filter((r) => r.type === "ADMIN" && r.status === "ACTIVE").map((r) => ({ value: r.id, label: r.name }));
+}
+
+function mcCheckerRoleLabel(ids) {
+  if (!ids.length) return mc("rules.wizard.rolesPlaceholder");
+  const opts = mcCheckerRoleOptions();
+  const names = ids.map((id) => (opts.find((o) => o.value === id) || { label: id }).label);
+  const shown = names.slice(0, 3).join(", ");
+  return names.length > 3 ? `${shown} +${names.length - 3}` : shown;
+}
+
+// Кнопка-поле в стиле .pc-dropdown-trigger, попап — components/select-dropdown.js (портал в body,
+// иначе внутри .modal-body с overflow-y:auto он обрезается и уходит в скролл).
+function mcRolesFieldHtml(ids) {
+  const fl = mc("rules.fields");
+  return `<label class="filters-field vb-field"><span class="filters-field-label">${fl.checkerRoles}<span class="req-star">*</span></span>
+    <button type="button" class="pc-dropdown-trigger" id="mc-roles-trigger"><span>${pdEscape(mcCheckerRoleLabel(ids))}</span><span class="pc-dropdown-chevron">${FILTER_GROUP_CHEVRON}</span></button>
+  </label>`;
+}
+
+function mcBindRolesTrigger(el, ids, onChange) {
+  const trigger = el.querySelector("#mc-roles-trigger");
+  trigger.addEventListener("click", () => {
+    openSelectDropdown({
+      anchorEl: trigger,
+      options: mcCheckerRoleOptions(),
+      selected: ids,
+      doneLabel: mc("rules.wizard.done"),
+      searchPlaceholder: mc("rules.wizard.rolesSearch"),
+      emptyLabel: mc("rules.wizard.rolesEmpty"),
+      onChange: (vals) => {
+        onChange(vals);
+        trigger.querySelector("span").textContent = mcCheckerRoleLabel(vals);
+      },
+    });
+  });
+}
+
+// ---- Создание правила — степпер (3 шага): что проверяем → кто подтверждает → параметры ----------
+const MC_WIZ_STEPS = ["main", "approvers", "params"];
+let mcWiz = null;
+
+// Пара «сущность + тип действия» занята, если правило на неё уже есть (выключенное тоже занимает).
+function mcWizOccupied(actionType, entity) {
+  return APPROVAL_RULES.some((r) => r.actionType === actionType && r.entity === entity);
+}
+
+function mcWizFreeEntities(actionType) {
+  return MC_ENTITIES.filter((e) => !mcWizOccupied(actionType, e));
+}
+
+function mcWizFreeActions(entity) {
+  return MC_ACTION_TYPES.filter((a) => !mcWizOccupied(a, entity));
+}
+
+function mcWizEmptyState() {
+  const pair = MC_ENTITIES.flatMap((e) => MC_ACTION_TYPES.map((a) => [e, a])).find(([e, a]) => !mcWizOccupied(a, e));
+  const [entity, actionType] = pair || [MC_ENTITIES[0], MC_ACTION_TYPES[0]];
+  return { step: 1, actionType, entity, roleIds: [], requiredApprovals: 1, isEnabled: true, description: "" };
+}
+
+function mcWizStepperHtml() {
+  const c = mc("rules.wizard.steps");
+  return `<div class="kyc-stepper">${MC_WIZ_STEPS.map((k, i) => {
+    const n = i + 1;
+    const cls = n < mcWiz.step ? "is-done" : n === mcWiz.step ? "is-current" : "is-pending";
+    return `<div class="kyc-stepper-item">
+      <div class="kyc-stepper-circle ${cls}">${n < mcWiz.step ? CHECK_ICON_SVG : `<span>${n}</span>`}</div>
+      ${i < MC_WIZ_STEPS.length - 1 ? `<div class="kyc-stepper-line${n < mcWiz.step ? " is-done" : ""}"></div>` : ""}
+      <div class="kyc-stepper-label"><div class="kyc-stepper-title">${c[k]}</div></div>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+function mcWizStepBodyHtml() {
+  const fl = mc("rules.fields");
+  const w = mc("rules.wizard");
+  if (mcWiz.step === 1) {
+    return `${vbSelect("mc-wiz-entity", fl.entity, mcWizFreeEntities(mcWiz.actionType).map((v) => ({ value: v, label: mcEntityLabel(v) })), mcWiz.entity)}
+      ${vbSelect("mc-wiz-actionType", fl.actionType, mcWizFreeActions(mcWiz.entity).map((v) => ({ value: v, label: mc(`actionType.${v}`) })), mcWiz.actionType)}
+      <p class="table-cell-muted vb-note">${mc("rules.form.createIntro")}</p>`;
+  }
+  if (mcWiz.step === 2) {
+    return `${mcRolesFieldHtml(mcWiz.roleIds)}
+      ${vbSelect("mc-wiz-requiredApprovals", fl.requiredApprovals, [{ value: "1", label: mc("rules.fourEyes") }, { value: "2", label: `${mc("rules.sixEyes")} (2)` }], String(mcWiz.requiredApprovals))}
+      <p class="table-cell-muted vb-note">${w.approversNote}</p>`;
+  }
+  return `<label class="filters-field vb-field"><span class="filters-field-label"><input type="checkbox" id="mc-wiz-isEnabled"${mcWiz.isEnabled ? " checked" : ""} /> ${fl.enabled}</span></label>
+    ${vbTextarea("mc-wiz-description", fl.description, mcWiz.description, 3)}
+    <div class="form-error" id="mc-wiz-error" hidden></div>`;
+}
+
+function mcWizFooterHtml() {
+  const w = mc("rules.wizard");
+  const isLast = mcWiz.step === MC_WIZ_STEPS.length;
+  const backBtn = mcWiz.step > 1 ? `<button type="button" class="btn-secondary" id="mc-wiz-back">${w.back}</button>` : `<button type="button" class="btn-secondary" id="mc-wiz-cancel">${vt("common.cancel")}</button>`;
+  return `${backBtn}<button type="button" class="btn-primary" id="mc-wiz-next">${isLast ? mc("actions.create") : w.next}</button>`;
+}
+
+// Сохраняем значения текущего шага в mcWiz перед переходом, чтобы не терять ввод при «Назад».
+function mcWizCollect(root) {
+  if (mcWiz.step === 1) {
+    mcWiz.actionType = root.querySelector("#mc-wiz-actionType").value;
+    mcWiz.entity = root.querySelector("#mc-wiz-entity").value;
+  } else if (mcWiz.step === 2) {
+    mcWiz.requiredApprovals = Number(root.querySelector("#mc-wiz-requiredApprovals").value);
+  } else {
+    mcWiz.isEnabled = root.querySelector("#mc-wiz-isEnabled").checked;
+    mcWiz.description = root.querySelector("#mc-wiz-description").value;
+  }
+}
+
+function mcWizValidate() {
+  const f = mc("rules.form");
+  if (mcWiz.step === 1 && APPROVAL_RULES.some((r) => r.actionType === mcWiz.actionType && r.entity === mcWiz.entity)) return f.errExists;
+  if (mcWiz.step === 2 && !mcWiz.roleIds.length) return f.errCheckerRoles;
+  return null;
+}
+
+function mcWizRender(root) {
+  root.querySelector(".modal-body").innerHTML = `${mcWizStepperHtml()}${mcWizStepBodyHtml()}`;
+  root.querySelector(".modal-footer").innerHTML = mcWizFooterHtml();
+  if (mcWiz.step === 2) mcBindRolesTrigger(root, mcWiz.roleIds, (vals) => { mcWiz.roleIds = vals; });
+  if (mcWiz.step === 1) {
+    root.querySelector("#mc-wiz-entity").addEventListener("change", (e) => {
+      mcWiz.entity = e.target.value;
+      const free = mcWizFreeActions(mcWiz.entity);
+      if (!free.includes(mcWiz.actionType)) mcWiz.actionType = free[0] || mcWiz.actionType;
+      mcWizRender(root);
+    });
+    root.querySelector("#mc-wiz-actionType").addEventListener("change", (e) => {
+      mcWiz.actionType = e.target.value;
+      const free = mcWizFreeEntities(mcWiz.actionType);
+      if (!free.includes(mcWiz.entity)) mcWiz.entity = free[0] || mcWiz.entity;
+      mcWizRender(root);
+    });
+  }
+  const back = root.querySelector("#mc-wiz-back");
+  if (back) back.addEventListener("click", () => { mcWizCollect(root); mcWiz.step -= 1; mcWizRender(root); });
+  const cancel = root.querySelector("#mc-wiz-cancel");
+  if (cancel) cancel.addEventListener("click", closeModal);
+  root.querySelector("#mc-wiz-next").addEventListener("click", () => {
+    mcWizCollect(root);
+    const err = mcWizValidate();
+    const errEl = root.querySelector("#mc-wiz-error");
+    if (err) {
+      if (errEl) { errEl.textContent = err; errEl.hidden = false; }
+      return;
+    }
+    if (mcWiz.step < MC_WIZ_STEPS.length) { mcWiz.step += 1; mcWizRender(root); return; }
+    mcWizSubmit();
+  });
+}
+
+function mcWizSubmit() {
+  const now = pdNow();
+  APPROVAL_RULES.push(mcStamp({
+    id: seedToPaymentUuid(Date.now() % 100000 + 47000), actionType: mcWiz.actionType, entity: mcWiz.entity,
+    checkerRoleIds: mcWiz.roleIds, requiredApprovals: mcWiz.requiredApprovals, isEnabled: mcWiz.isEnabled,
+    status: "ACTIVE", description: mcWiz.description.trim() || null,
+  }, now));
+  closeModal();
+  render();
+  showToast(mc("actions.createdToast"));
+}
+
+function mcOpenRuleCreateWizard() {
+  mcWiz = mcWizEmptyState();
+  openModal({
+    title: mc("rules.form.createTitle"),
+    width: 560,
+    bodyHtml: "<div></div>",
+    footerHtml: "<div></div>",
+    onMount: (el) => mcWizRender(el),
+  });
+}
+
+// ---- Редактирование: тип и сущность не меняются, остальное — как в мастере --------------------
+function mcOpenRuleEditForm(rule) {
   const f = mc("rules.form");
   const fl = mc("rules.fields");
-  const isEdit = !!rule;
-  const existing = (actionType, entity) => APPROVAL_RULES.some((r) => r !== rule && r.actionType === actionType && r.entity === entity);
-  const html = `
-    ${vbSelect("mc-actionType", fl.actionType, MC_ACTION_TYPES.map((v) => ({ value: v, label: mc(`actionType.${v}`) })), isEdit ? rule.actionType : "CREATE", isEdit ? "disabled" : "")}
-    ${vbSelect("mc-entity", fl.entity, MC_ENTITIES.map((v) => ({ value: v, label: mcEntityLabel(v) })), isEdit ? rule.entity : MC_ENTITIES[0], isEdit ? "disabled" : "")}
-    <div class="filters-field vb-field" style="margin-top:6px"><span class="filters-field-label">${fl.checkerRoles}<span class="req-star">*</span></span><div class="rt-clients">${ACCESS_ROLES.filter((r) => r.type === "ADMIN" && r.status === "ACTIVE").map(
-      (r) => `<label class="rt-client"><input type="checkbox" data-mc-checker-role value="${r.id}"${isEdit && rule.checkerRoleIds.includes(r.id) ? " checked" : ""} /><span>${r.name}</span></label>`
-    ).join("")}</div></div>
-    ${vbSelect("mc-requiredApprovals", fl.requiredApprovals, [{ value: "1", label: mc("rules.fourEyes") }, { value: "2", label: `${mc("rules.sixEyes")} (2)` }], isEdit ? String(rule.requiredApprovals) : "1")}
-    <label class="filters-field vb-field" style="margin-top:6px"><span class="filters-field-label"><input type="checkbox" id="mc-isEnabled"${!isEdit || rule.isEnabled ? " checked" : ""} /> ${fl.enabled}</span></label>
-    ${vbTextarea("mc-description", fl.description, isEdit ? rule.description || "" : "", 2)}
-  `;
-  vbOpenForm({
-    title: isEdit ? f.editTitle : f.createTitle,
+  const state = { roleIds: [...rule.checkerRoleIds] };
+  openModal({
+    title: f.editTitle,
     width: 560,
-    intro: isEdit ? f.editIntro : f.createIntro,
-    fieldsHtml: html,
-    submitLabel: isEdit ? mc("actions.save") : mc("actions.create"),
-    onSubmit: (el) => {
-      const actionType = el.querySelector("#mc-actionType").value;
-      const entity = el.querySelector("#mc-entity").value;
-      const checkerRoleIds = [...el.querySelectorAll("[data-mc-checker-role]:checked")].map((i) => i.value);
-      const requiredApprovals = Number(el.querySelector("#mc-requiredApprovals").value);
-      const isEnabled = el.querySelector("#mc-isEnabled").checked;
-      const description = el.querySelector("#mc-description").value.trim() || null;
-      if (!checkerRoleIds.length) return f.errCheckerRoles;
-      if (!isEdit && existing(actionType, entity)) return f.errExists;
-      closeModal();
-      if (!isEdit) {
-        const now = pdNow();
-        APPROVAL_RULES.push(mcStamp({ id: seedToPaymentUuid(Date.now() % 100000 + 47000), actionType, entity, checkerRoleIds, requiredApprovals, isEnabled, status: "ACTIVE", description }, now));
-      } else {
-        Object.assign(rule, { checkerRoleIds, requiredApprovals, isEnabled, description });
+    bodyHtml: `<p class="modal-confirm-text pd-modal-intro">${f.editIntro}</p><div class="modal-form">
+      ${mcRolesFieldHtml(state.roleIds)}
+      ${vbSelect("mc-requiredApprovals", fl.requiredApprovals, [{ value: "1", label: mc("rules.fourEyes") }, { value: "2", label: `${mc("rules.sixEyes")} (2)` }], String(rule.requiredApprovals))}
+      <label class="filters-field vb-field"><span class="filters-field-label"><input type="checkbox" id="mc-isEnabled"${rule.isEnabled ? " checked" : ""} /> ${fl.enabled}</span></label>
+      ${vbTextarea("mc-description", fl.description, rule.description || "", 2)}
+      <div class="form-error" id="mc-edit-error" hidden></div>
+    </div>`,
+    footerHtml: `<button type="button" class="btn-secondary" id="mc-edit-cancel">${vt("common.cancel")}</button><button type="button" class="btn-primary" id="mc-edit-submit">${mc("actions.save")}</button>`,
+    onMount: (el) => {
+      mcBindRolesTrigger(el, state.roleIds, (vals) => { state.roleIds = vals; });
+      el.querySelector("#mc-edit-cancel").addEventListener("click", closeModal);
+      el.querySelector("#mc-edit-submit").addEventListener("click", () => {
+        const errEl = el.querySelector("#mc-edit-error");
+        if (!state.roleIds.length) { errEl.textContent = f.errCheckerRoles; errEl.hidden = false; return; }
+        Object.assign(rule, {
+          checkerRoleIds: state.roleIds,
+          requiredApprovals: Number(el.querySelector("#mc-requiredApprovals").value),
+          isEnabled: el.querySelector("#mc-isEnabled").checked,
+          description: el.querySelector("#mc-description").value.trim() || null,
+        });
         mcStamp(rule, rule.createdDate, pdNow());
-      }
-      render();
-      showToast(isEdit ? mc("actions.savedToast") : mc("actions.createdToast"));
-      return null;
+        closeModal();
+        render();
+        showToast(mc("actions.savedToast"));
+      });
     },
   });
+}
+
+function mcOpenRuleForm(rule) {
+  if (rule) mcOpenRuleEditForm(rule);
+  else mcOpenRuleCreateWizard();
 }
 
 function viewMakerCheckerRules() {
