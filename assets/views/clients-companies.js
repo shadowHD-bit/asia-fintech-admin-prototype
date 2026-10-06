@@ -1203,12 +1203,13 @@ function openCompanyCreateWizard() {
 // id клиента, не завязаны конкретно на пользователя). Поля основной вкладки и
 // вкладки KYB сверены с реальным запросом `company` (получен от пользователя
 // 23.09.2026) — детали по каждому новому полю см. в комментариях мок-файла.
-const COMPANY_DETAIL_SUB_TABS = ["main", "kyb", "accounts", "operations", "tariff", "employees", "security", "auditLog"];
+const COMPANY_DETAIL_SUB_TABS = ["main", "kyb", "accounts", "cryptoAddresses", "operations", "tariff", "employees", "security", "auditLog"];
 
 const CO_TAB_ICONS = {
   main: CD_TAB_ICONS.main,
   kyb: CD_TAB_ICONS.kycLevels,
   accounts: CD_TAB_ICONS.accounts,
+  cryptoAddresses: CD_TAB_ICONS.cryptoAddresses,
   operations: CD_TAB_ICONS.operations,
   tariff: CD_TAB_ICONS.tariff,
   employees: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="7" r="2.75"/><path d="M2.5 17c.4-3 2.4-4.8 5-4.8s4.6 1.8 5 4.8"/><circle cx="14.5" cy="6.5" r="2"/><path d="M13 12.3c2.2.2 3.7 1.9 4 4.7"/></svg>`,
@@ -2482,6 +2483,7 @@ function renderCompanyDetailBody(company) {
   // (clients-users.js): они завязаны только на id клиента, не на конкретный тип
   // (физлицо/компания), поэтому переиспользуются один в один.
   if (companyDetailState.subTab === "accounts") return renderClientDetailAccountsTab(company, "company");
+  if (companyDetailState.subTab === "cryptoAddresses") return renderClientCryptoAddressesTab(company);
   if (companyDetailState.subTab === "operations") return renderClientDetailOperationsTab(company, "company");
   if (companyDetailState.subTab === "tariff") return renderClientDetailTariffTab(company);
   if (companyDetailState.subTab === "employees") return renderCompanyDetailEmployeesTab(company);

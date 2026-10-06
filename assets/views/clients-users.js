@@ -35,7 +35,7 @@ let cuExpandedFilterGroups = null;
 // тарифа — TF_CLIENTS/settings-tariffs-clients.js; KYT — KYT_TRANSACTIONS/
 // security-kyt.mock.js, у каждой записи client.id — тот же id, что у findUser),
 // поэтому вкладки добавлены как отдельные, на одном уровне с "Основное"/"KYC".
-const CLIENT_DETAIL_SUB_TABS = ["main", "kycLevels", "risk", "companies", "accounts", "operations", "tariff", "kyt", "security", "auditLog"];
+const CLIENT_DETAIL_SUB_TABS = ["main", "kycLevels", "risk", "companies", "accounts", "cryptoAddresses", "operations", "tariff", "kyt", "security", "auditLog"];
 
 const CD_TAB_ICONS = {
   security: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="8" rx="1.8"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/><path d="M10 12.5v1.6"/></svg>`,
@@ -43,6 +43,7 @@ const CD_TAB_ICONS = {
   main: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7" r="3"/><path d="M4 17c.6-3.6 2.9-5.5 6-5.5s5.4 1.9 6 5.5"/></svg>`,
   kycLevels: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17V3"/><path d="M3 17h14"/><rect x="6" y="10.5" width="2.2" height="6.5" rx="0.4"/><rect x="10" y="7" width="2.2" height="10" rx="0.4"/><rect x="14" y="12.5" width="2.2" height="4.5" rx="0.4"/></svg>`,
   accounts: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="15" height="11" rx="1.5"/><path d="M2.5 8.5h15"/><path d="M5.5 12h3"/></svg>`,
+  cryptoAddresses: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5h11.5a2 2 0 0 1 2 2V13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6.5Z"/><path d="M3 6.5 13.5 4"/><circle cx="13.5" cy="10" r="1"/></svg>`,
   operations: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h14M3 10h10M3 14h6"/></svg>`,
   tariff: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3.5h8l6 6-9.5 9.5-6-6v-8Z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg>`,
   kyt: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 17 6v5.5c0 4-3 6.5-7 8-4-1.5-7-4-7-8V6l7-3.5Z"/><path d="m7 10 2 2 4-4.5"/></svg>`,
@@ -3885,11 +3886,67 @@ function renderClientDetailTabsBar() {
   `;
 }
 
+// Вкладка "Крипто-адреса": адреса клиента по сетям — как вкладка "Счета", но без поиска и выгрузки:
+// адресов у клиента немного. Текущее поколение — то, что видит клиент; прошлые — в той же таблице.
+function caStateBadge(state) {
+  const cls = { ISSUED: "badge-success", ISSUING: "badge-info", REFUSED: "badge-danger" }[state] || "badge-neutral";
+  return `<span class="badge ${cls}">${t(`clientDetail.cryptoAddr.state.${state}`)}</span>`;
+}
+
+function caAddressCell(addr) {
+  if (!addr.address) {
+    return `<span class="table-cell-muted">${addr.state === "REFUSED" ? pdEscape(addr.unavailableReason) : t("clientDetail.cryptoAddr.pending")}</span>`;
+  }
+  const tag = addr.tag ? `<div class="table-cell-muted">${t("clientDetail.cryptoAddr.tag")}: <span class="vb-mono">${pdEscape(addr.tag)}</span></div>` : "";
+  return `<div class="identity-cell">
+    <div class="identity-cell-primary"><span class="inline-copy vb-mono">${pdEscape(addr.address)}${copyIconButton(addr.address)}</span></div>
+    ${tag}
+  </div>`;
+}
+
+// Баланс клиента по основным валютам сети: свободно и в холде (из виртуальных счетов клиента).
+function caNetworkBalanceCell(client, network) {
+  const c = t("clientDetail.cryptoAddr");
+  const accs = getClientVirtualAccounts(client);
+  const lines = (CA_NETWORK_TICKERS[network] || []).map((tk) => {
+    let avail = 0;
+    let hold = 0;
+    let found = false;
+    accs.forEach((acc) => acc.balances.forEach((b) => {
+      if (b.currency === tk) { found = true; avail += b.available; hold += b.hold; }
+    }));
+    return found ? `<div>${formatPaymentAmount(avail)} ${tk} <span class="table-cell-muted">${c.available}</span></div><div class="table-cell-muted">${formatPaymentAmount(hold)} ${tk} · ${c.hold}</div>` : null;
+  }).filter(Boolean);
+  return lines.length ? lines.join("") : `<span class="table-cell-muted">—</span>`;
+}
+
+function renderClientCryptoAddressesTab(entity) {
+  const c = t("clientDetail.cryptoAddr");
+  const list = getClientCryptoAddresses(entity);
+  const rows = list.map((a) => [
+    a.network,
+    caAddressCell(a),
+    caNetworkBalanceCell(entity, a.network),
+    caStateBadge(a.state),
+    dateTimeCell(formatDateTime(a.createdAt)),
+    dateTimeCell(formatDateTime(a.updatedAt)),
+  ]);
+  return `
+    <div class="acc-list-block">
+      <div class="acc-tab-head">
+        <div class="profile-flat-section-desc">${c.description}</div>
+      </div>
+      ${vbMiniTable([c.network, c.address, c.balance, c.status, c.created, c.updated], rows, c.empty)}
+    </div>
+  `;
+}
+
 function renderClientDetailBody(user) {
   if (clientDetailState.subTab === "kycLevels") return renderClientDetailKycTab(user);
   if (clientDetailState.subTab === "risk") return renderClientDetailRiskTab(user);
   if (clientDetailState.subTab === "companies") return renderClientDetailCompaniesTab(user);
   if (clientDetailState.subTab === "accounts") return renderClientDetailAccountsTab(user, "user");
+  if (clientDetailState.subTab === "cryptoAddresses") return renderClientCryptoAddressesTab(user);
   if (clientDetailState.subTab === "operations") return renderClientDetailOperationsTab(user, "user");
   if (clientDetailState.subTab === "tariff") return renderClientDetailTariffTab(user);
   if (clientDetailState.subTab === "kyt") return renderClientDetailKytTab(user);
